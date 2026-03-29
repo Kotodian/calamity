@@ -19,6 +19,7 @@ import {
 import { useNodesStore } from "@/stores/nodes";
 import type { ProtocolConfig, ProxyNode } from "@/services/types";
 import { cn } from "@/lib/utils";
+import { countryFlag } from "@/lib/flags";
 
 function latencyColor(ms: number | null): string {
   if (ms === null) return "text-muted-foreground";
@@ -27,12 +28,7 @@ function latencyColor(ms: number | null): string {
   return "text-red-400";
 }
 
-const flagEmoji: Record<string, string> = {
-  JP: "\u{1F1EF}\u{1F1F5}", US: "\u{1F1FA}\u{1F1F8}", SG: "\u{1F1F8}\u{1F1EC}",
-  HK: "\u{1F1ED}\u{1F1F0}", KR: "\u{1F1F0}\u{1F1F7}",
-};
-
-const countryFilters = ["All", "HK", "JP", "US", "SG", "KR"];
+const countryFilters = ["All", "HK", "JP", "US", "SG", "KR", "DE", "GB"];
 
 function QuickInfoPanel({ node, onClose, onConnect, onDelete }: { node: ProxyNode; onClose: () => void; onConnect: () => void; onDelete: (id: string) => void }) {
   return (
@@ -349,13 +345,14 @@ const countries = [
 ];
 
 export function NodesPage() {
-  const { groups, selectedGroup, testing, fetchGroups, testAllLatency, setActiveNode, addNode, removeNode } =
+  const { groups, selectedGroup, testing, fetchGroups, selectGroup, testAllLatency, setActiveNode, addNode, removeNode, addGroup, removeGroup, renameGroup } =
     useNodesStore();
   const [search, setSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState("All");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [form, setForm] = useState(defaultNodeForm);
+  const [newGroupName, setNewGroupName] = useState("");
 
   useEffect(() => {
     fetchGroups();
@@ -395,6 +392,58 @@ export function NodesPage() {
             className="h-8 w-8 rounded-lg border border-white/[0.06] bg-muted/30 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 hover:shadow-[0_0_15px_rgba(254,151,185,0.1)] transition-all"
           >
             <Plus className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Group Tabs */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1 rounded-lg bg-muted/30 p-0.5 flex-1">
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => selectGroup(g.id)}
+              onDoubleClick={() => {
+                const name = prompt("Rename group:", g.name);
+                if (name) renameGroup(g.id, name);
+              }}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 relative group",
+                selectedGroup === g.id
+                  ? "bg-primary text-primary-foreground shadow-[0_0_10px_rgba(254,151,185,0.15)]"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {g.name}
+              {!["proxy", "auto"].includes(g.id) && selectedGroup === g.id && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeGroup(g.id); }}
+                  className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[8px] opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-2 w-2" />
+                </button>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <Input
+            placeholder="New group"
+            className="w-28 h-7 text-[10px] bg-muted/30 border-white/[0.06]"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newGroupName.trim()) {
+                addGroup(newGroupName.trim());
+                setNewGroupName("");
+              }
+            }}
+          />
+          <button
+            onClick={() => { if (newGroupName.trim()) { addGroup(newGroupName.trim()); setNewGroupName(""); } }}
+            className="h-7 w-7 rounded-md border border-white/[0.06] bg-muted/30 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+          >
+            <Plus className="h-3 w-3" />
           </button>
         </div>
       </div>
@@ -452,7 +501,7 @@ export function NodesPage() {
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">{flagEmoji[node.countryCode] ?? "\u{1F310}"}</span>
+                  <span className="text-xl">{countryFlag(node.countryCode)}</span>
                   <div>
                     <p className="text-sm font-medium leading-tight">{node.name}</p>
                     {node.active && (
@@ -568,7 +617,7 @@ export function NodesPage() {
                   <Select value={form.countryCode} onValueChange={(v) => { const c = countries.find((c) => c.code === v); setForm({ ...form, countryCode: v, country: c?.name ?? "" }); }}>
                     <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Country" /></SelectTrigger>
                     <SelectContent>
-                      {countries.map((c) => <SelectItem key={c.code} value={c.code}>{flagEmoji[c.code] ?? ""} {c.name}</SelectItem>)}
+                      {countries.map((c) => <SelectItem key={c.code} value={c.code}>{countryFlag(c.code)} {c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

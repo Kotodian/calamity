@@ -13,6 +13,9 @@ interface NodesStore {
   setActiveNode: (nodeId: string) => Promise<void>;
   addNode: (groupId: string, input: NewNodeInput) => Promise<void>;
   removeNode: (nodeId: string) => Promise<void>;
+  addGroup: (name: string) => Promise<void>;
+  removeGroup: (groupId: string) => Promise<void>;
+  renameGroup: (groupId: string, name: string) => Promise<void>;
 }
 
 export const useNodesStore = create<NodesStore>((set, get) => ({
@@ -47,6 +50,18 @@ export const useNodesStore = create<NodesStore>((set, get) => ({
   },
   async removeNode(nodeId) {
     await nodesService.removeNode(nodeId);
+    await get().fetchGroups();
+  },
+  async addGroup(name) {
+    await nodesService.addGroup(name);
+    await get().fetchGroups();
+  },
+  async removeGroup(groupId) {
+    await nodesService.removeGroup(groupId);
+    await get().fetchGroups();
+  },
+  async renameGroup(groupId, name) {
+    await nodesService.renameGroup(groupId, name);
     await get().fetchGroups();
   },
 }));

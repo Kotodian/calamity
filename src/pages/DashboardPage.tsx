@@ -23,10 +23,7 @@ function formatSpeed(bytesPerSec: number): string {
   return `${formatBytes(bytesPerSec)}/s`;
 }
 
-const flagEmoji: Record<string, string> = {
-  JP: "\u{1F1EF}\u{1F1F5}", US: "\u{1F1FA}\u{1F1F8}", SG: "\u{1F1F8}\u{1F1EC}",
-  HK: "\u{1F1ED}\u{1F1F0}", KR: "\u{1F1F0}\u{1F1F7}",
-};
+import { countryFlag } from "@/lib/flags";
 
 export function DashboardPage() {
   const {
@@ -140,7 +137,7 @@ export function DashboardPage() {
         {/* Active Node */}
         {isConnected && activeNodeObj && (
           <div className="flex items-center gap-2 mt-1 animate-slide-up" style={{ animationDelay: "100ms" }}>
-            <span className="text-lg">{flagEmoji[activeNodeObj.countryCode] ?? "\u{1F310}"}</span>
+            <span className="text-lg">{countryFlag(activeNodeObj.countryCode)}</span>
             <span className="text-sm font-medium">{activeNode}</span>
             <span className="text-xs text-muted-foreground">• {latency}ms</span>
           </div>

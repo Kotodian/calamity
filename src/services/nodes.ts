@@ -17,6 +17,9 @@ export interface NodesService {
   setActiveNode(nodeId: string): Promise<void>;
   addNode(groupId: string, input: NewNodeInput): Promise<ProxyNode>;
   removeNode(nodeId: string): Promise<void>;
+  addGroup(name: string): Promise<NodeGroup>;
+  removeGroup(groupId: string): Promise<void>;
+  renameGroup(groupId: string, name: string): Promise<void>;
 }
 
 const mockNodes: NodeGroup[] = [
@@ -97,5 +100,18 @@ export const nodesService: NodesService = {
         return;
       }
     }
+  },
+  async addGroup(name: string) {
+    const group: NodeGroup = { id: `group-${Date.now()}`, name, nodes: [] };
+    mockNodes.push(group);
+    return { ...group };
+  },
+  async removeGroup(groupId: string) {
+    const idx = mockNodes.findIndex((g) => g.id === groupId);
+    if (idx !== -1) mockNodes.splice(idx, 1);
+  },
+  async renameGroup(groupId: string, name: string) {
+    const group = mockNodes.find((g) => g.id === groupId);
+    if (group) group.name = name;
   },
 };
