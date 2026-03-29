@@ -67,6 +67,62 @@ export function SettingsPage() {
           <Separator className="bg-white/[0.04]" />
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-sm font-medium">Enhanced Mode</p>
+              <p className="text-xs text-muted-foreground">TUN mode — capture all system traffic (requires root)</p>
+            </div>
+            <Switch checked={settings.enhancedMode} onCheckedChange={(v) => updateSettings({ enhancedMode: v })} />
+          </div>
+          {settings.enhancedMode && (
+            <>
+              <div className="rounded-lg border border-white/[0.04] bg-muted/10 p-3 space-y-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">TUN Configuration</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Stack</p>
+                    <Select
+                      value={settings.tunConfig.stack}
+                      onValueChange={(v) => updateSettings({ tunConfig: { ...settings.tunConfig, stack: v as "system" | "gvisor" | "mixed" } })}
+                    >
+                      <SelectTrigger className="bg-muted/30 border-white/[0.06] h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">System</SelectItem>
+                        <SelectItem value="gvisor">gVisor</SelectItem>
+                        <SelectItem value="mixed">Mixed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">MTU</p>
+                    <Input
+                      type="number"
+                      className="bg-muted/30 border-white/[0.06] h-8 text-xs"
+                      value={settings.tunConfig.mtu}
+                      onChange={(e) => updateSettings({ tunConfig: { ...settings.tunConfig, mtu: parseInt(e.target.value) || 9000 } })}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs">Auto Route</p>
+                  <Switch checked={settings.tunConfig.autoRoute} onCheckedChange={(v) => updateSettings({ tunConfig: { ...settings.tunConfig, autoRoute: v } })} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs">Strict Route</p>
+                  <Switch checked={settings.tunConfig.strictRoute} onCheckedChange={(v) => updateSettings({ tunConfig: { ...settings.tunConfig, strictRoute: v } })} />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">DNS Hijack</p>
+                  <Input
+                    className="bg-muted/30 border-white/[0.06] h-8 text-xs font-mono"
+                    value={settings.tunConfig.dnsHijack.join(", ")}
+                    onChange={(e) => updateSettings({ tunConfig: { ...settings.tunConfig, dnsHijack: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          <Separator className="bg-white/[0.04]" />
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm font-medium">Allow LAN</p>
               <p className="text-xs text-muted-foreground">Allow connections from other devices on LAN</p>
             </div>

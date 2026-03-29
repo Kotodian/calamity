@@ -11,6 +11,14 @@ let mockSettings: AppSettings = {
   singboxPath: "/usr/local/bin/sing-box",
   autoStart: false,
   systemProxy: true,
+  enhancedMode: false,
+  tunConfig: {
+    stack: "system",
+    mtu: 9000,
+    autoRoute: true,
+    strictRoute: false,
+    dnsHijack: ["198.18.0.2:53"],
+  },
   allowLan: false,
   httpPort: 7890,
   socksPort: 7891,
@@ -20,7 +28,7 @@ let mockSettings: AppSettings = {
 
 export const settingsService: SettingsService = {
   async getSettings() {
-    return { ...mockSettings };
+    return { ...mockSettings, tunConfig: { ...mockSettings.tunConfig, dnsHijack: [...mockSettings.tunConfig.dnsHijack] } };
   },
   async updateSettings(settings) {
     mockSettings = { ...mockSettings, ...settings };

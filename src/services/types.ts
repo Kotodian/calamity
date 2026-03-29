@@ -221,11 +221,21 @@ export interface DnsCacheEntry {
 // Settings
 export type Theme = "light" | "dark" | "system";
 
+export interface TunConfig {
+  stack: "system" | "gvisor" | "mixed";
+  mtu: number;
+  autoRoute: boolean;
+  strictRoute: boolean;
+  dnsHijack: string[];
+}
+
 export interface AppSettings {
   theme: Theme;
   singboxPath: string;
   autoStart: boolean;
   systemProxy: boolean;
+  enhancedMode: boolean;
+  tunConfig: TunConfig;
   allowLan: boolean;
   httpPort: number;
   socksPort: number;
