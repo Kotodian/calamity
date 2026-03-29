@@ -49,31 +49,60 @@ export type ProtocolConfig =
   | TUICConfig
   | AnyTLSConfig;
 
+// Shared TLS config
+export interface TlsConfig {
+  enabled: boolean;
+  sni: string;
+  alpn: string[];
+  insecure: boolean;
+  // Reality
+  reality: boolean;
+  realityPublicKey: string;
+  realityShortId: string;
+}
+
+// Shared transport config
+export interface TransportConfig {
+  type: TransportType;
+  // WebSocket
+  wsPath?: string;
+  wsHeaders?: Record<string, string>;
+  // gRPC
+  grpcServiceName?: string;
+  // HTTP/2
+  h2Host?: string[];
+}
+
 export interface VMessConfig {
   type: "vmess";
   uuid: string;
   alterId: number;
   security: "auto" | "aes-128-gcm" | "chacha20-poly1305" | "none";
-  transport: TransportType;
+  transport: TransportConfig;
+  tls: TlsConfig;
 }
 
 export interface VLESSConfig {
   type: "vless";
   uuid: string;
   flow: "" | "xtls-rprx-vision";
-  transport: TransportType;
+  transport: TransportConfig;
+  tls: TlsConfig;
 }
 
 export interface TrojanConfig {
   type: "trojan";
   password: string;
-  transport: TransportType;
+  transport: TransportConfig;
+  tls: TlsConfig;
 }
 
 export interface ShadowsocksConfig {
   type: "shadowsocks";
   password: string;
   method: SSMethod;
+  plugin?: "obfs-local" | "v2ray-plugin" | "";
+  pluginOpts?: string;
 }
 
 export interface Hysteria2Config {
@@ -81,7 +110,9 @@ export interface Hysteria2Config {
   password: string;
   upMbps: number;
   downMbps: number;
+  obfsType?: "salamander" | "";
   obfsPassword?: string;
+  tls: TlsConfig;
 }
 
 export interface TUICConfig {
@@ -89,6 +120,8 @@ export interface TUICConfig {
   uuid: string;
   password: string;
   congestionControl: "bbr" | "cubic" | "new_reno";
+  udpRelayMode: "native" | "quic";
+  tls: TlsConfig;
 }
 
 export interface AnyTLSConfig {
@@ -96,6 +129,8 @@ export interface AnyTLSConfig {
   password: string;
   sni: string;
   idleTimeout: number;
+  minPaddingLen: number;
+  maxPaddingLen: number;
 }
 
 export type TransportType = "tcp" | "ws" | "grpc" | "h2" | "quic";

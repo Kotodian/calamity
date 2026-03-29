@@ -81,7 +81,84 @@ function QuickInfoPanel({ node, onClose, onConnect, onDelete }: { node: ProxyNod
   );
 }
 
-const inputCls = "bg-muted/30 border-white/[0.06]";
+const inputCls = "bg-muted/30 border-white/[0.06] h-8 text-xs";
+const labelCls = "text-[10px] text-muted-foreground uppercase tracking-wider mb-1 block";
+
+function TlsFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeForm) => void }) {
+  const F = (props: { placeholder: string; field: keyof NodeForm; type?: string }) => (
+    <Input className={inputCls} placeholder={props.placeholder} type={props.type} value={form[props.field]} onChange={(e) => setForm({ ...form, [props.field]: e.target.value })} />
+  );
+  return (
+    <div className="space-y-2">
+      <label className={labelCls}>TLS</label>
+      <div className="grid grid-cols-2 gap-2">
+        <Select value={form.tlsEnabled} onValueChange={(v) => setForm({ ...form, tlsEnabled: v })}>
+          <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="true">TLS Enabled</SelectItem>
+            <SelectItem value="false">TLS Disabled</SelectItem>
+          </SelectContent>
+        </Select>
+        <F placeholder="SNI" field="sni" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <F placeholder="ALPN (comma separated)" field="alpn" />
+        <Select value={form.insecure} onValueChange={(v) => setForm({ ...form, insecure: v })}>
+          <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="false">Verify Certificate</SelectItem>
+            <SelectItem value="true">Skip Verify</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {form.protocol === "VLESS" && (
+        <>
+          <label className={labelCls}>Reality</label>
+          <div className="grid grid-cols-3 gap-2">
+            <Select value={form.reality} onValueChange={(v) => setForm({ ...form, reality: v })}>
+              <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">Disabled</SelectItem>
+                <SelectItem value="true">Enabled</SelectItem>
+              </SelectContent>
+            </Select>
+            <F placeholder="Public Key" field="realityPublicKey" />
+            <F placeholder="Short ID" field="realityShortId" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TransportFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeForm) => void }) {
+  const F = (props: { placeholder: string; field: keyof NodeForm }) => (
+    <Input className={inputCls} placeholder={props.placeholder} value={form[props.field]} onChange={(e) => setForm({ ...form, [props.field]: e.target.value })} />
+  );
+  return (
+    <div className="space-y-2">
+      <label className={labelCls}>Transport</label>
+      <Select value={form.transport} onValueChange={(v) => setForm({ ...form, transport: v })}>
+        <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {["tcp", "ws", "grpc", "h2", "quic"].map((t) => <SelectItem key={t} value={t}>{t.toUpperCase()}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      {form.transport === "ws" && (
+        <div className="grid grid-cols-2 gap-2">
+          <F placeholder="WS Path (e.g. /ws)" field="wsPath" />
+          <F placeholder="WS Host Header" field="wsHost" />
+        </div>
+      )}
+      {form.transport === "grpc" && (
+        <F placeholder="gRPC Service Name" field="grpcServiceName" />
+      )}
+      {form.transport === "h2" && (
+        <F placeholder="H2 Host (comma separated)" field="h2Host" />
+      )}
+    </div>
+  );
+}
 
 function ProtocolFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeForm) => void }) {
   const F = (props: { placeholder: string; field: keyof NodeForm; type?: string }) => (
@@ -98,29 +175,34 @@ function ProtocolFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeFo
     case "VMess":
       return (<>
         <F placeholder="UUID" field="uuid" />
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <F placeholder="Alter ID" field="alterId" type="number" />
           <S field="security" options={["auto", "aes-128-gcm", "chacha20-poly1305", "none"]} />
-          <S field="transport" options={["tcp", "ws", "grpc", "h2", "quic"]} />
         </div>
+        <TransportFields form={form} setForm={setForm} />
+        <TlsFields form={form} setForm={setForm} />
       </>);
     case "VLESS":
       return (<>
         <F placeholder="UUID" field="uuid" />
-        <div className="grid grid-cols-2 gap-2">
-          <S field="flow" options={["none", "xtls-rprx-vision"]} placeholder="Flow (optional)" />
-          <S field="transport" options={["tcp", "ws", "grpc", "h2", "quic"]} />
-        </div>
+        <S field="flow" options={["none", "xtls-rprx-vision"]} placeholder="Flow" />
+        <TransportFields form={form} setForm={setForm} />
+        <TlsFields form={form} setForm={setForm} />
       </>);
     case "Trojan":
       return (<>
         <F placeholder="Password" field="password" />
-        <S field="transport" options={["tcp", "ws", "grpc", "h2", "quic"]} />
+        <TransportFields form={form} setForm={setForm} />
+        <TlsFields form={form} setForm={setForm} />
       </>);
     case "Shadowsocks":
       return (<>
         <F placeholder="Password" field="password" />
         <S field="method" options={["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305", "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm"]} />
+        <div className="grid grid-cols-2 gap-2">
+          <S field="plugin" options={["none", "obfs-local", "v2ray-plugin"]} placeholder="Plugin" />
+          <F placeholder="Plugin Opts" field="pluginOpts" />
+        </div>
       </>);
     case "Hysteria2":
       return (<>
@@ -129,41 +211,78 @@ function ProtocolFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeFo
           <F placeholder="Up (Mbps)" field="upMbps" type="number" />
           <F placeholder="Down (Mbps)" field="downMbps" type="number" />
         </div>
-        <F placeholder="Obfs Password (optional)" field="obfsPassword" />
+        <div className="grid grid-cols-2 gap-2">
+          <S field="obfsType" options={["none", "salamander"]} placeholder="Obfs Type" />
+          <F placeholder="Obfs Password" field="obfsPassword" />
+        </div>
+        <TlsFields form={form} setForm={setForm} />
       </>);
     case "TUIC":
       return (<>
         <F placeholder="UUID" field="uuid" />
         <F placeholder="Password" field="password" />
-        <S field="congestionControl" options={["bbr", "cubic", "new_reno"]} />
+        <div className="grid grid-cols-2 gap-2">
+          <S field="congestionControl" options={["bbr", "cubic", "new_reno"]} />
+          <S field="udpRelayMode" options={["native", "quic"]} placeholder="UDP Relay" />
+        </div>
+        <TlsFields form={form} setForm={setForm} />
       </>);
     case "AnyTLS":
       return (<>
         <F placeholder="Password" field="password" />
         <F placeholder="SNI" field="sni" />
-        <F placeholder="Idle Timeout (seconds)" field="idleTimeout" type="number" />
+        <div className="grid grid-cols-3 gap-2">
+          <F placeholder="Idle Timeout (s)" field="idleTimeout" type="number" />
+          <F placeholder="Min Padding" field="minPaddingLen" type="number" />
+          <F placeholder="Max Padding" field="maxPaddingLen" type="number" />
+        </div>
       </>);
     default:
       return <p className="text-xs text-muted-foreground">Select a protocol</p>;
   }
 }
 
+function buildTls(form: NodeForm) {
+  return {
+    enabled: form.tlsEnabled === "true",
+    sni: form.sni,
+    alpn: form.alpn ? form.alpn.split(",").map((s) => s.trim()) : [],
+    insecure: form.insecure === "true",
+    reality: form.reality === "true",
+    realityPublicKey: form.realityPublicKey,
+    realityShortId: form.realityShortId,
+  };
+}
+
+function buildTransport(form: NodeForm) {
+  const t: { type: string; wsPath?: string; wsHeaders?: Record<string, string>; grpcServiceName?: string; h2Host?: string[] } = {
+    type: form.transport,
+  };
+  if (form.transport === "ws") {
+    t.wsPath = form.wsPath || "/";
+    if (form.wsHost) t.wsHeaders = { Host: form.wsHost };
+  }
+  if (form.transport === "grpc") t.grpcServiceName = form.grpcServiceName;
+  if (form.transport === "h2" && form.h2Host) t.h2Host = form.h2Host.split(",").map((s) => s.trim());
+  return t as ProtocolConfig extends { transport: infer T } ? T : never;
+}
+
 function buildProtocolConfig(form: NodeForm): ProtocolConfig | undefined {
   switch (form.protocol) {
     case "VMess":
-      return { type: "vmess", uuid: form.uuid, alterId: parseInt(form.alterId) || 0, security: form.security as "auto", transport: form.transport as "tcp" };
+      return { type: "vmess", uuid: form.uuid, alterId: parseInt(form.alterId) || 0, security: form.security as "auto", transport: buildTransport(form) as never, tls: buildTls(form) };
     case "VLESS":
-      return { type: "vless", uuid: form.uuid, flow: (form.flow === "none" ? "" : form.flow) as "", transport: form.transport as "tcp" };
+      return { type: "vless", uuid: form.uuid, flow: (form.flow === "none" ? "" : form.flow) as "", transport: buildTransport(form) as never, tls: buildTls(form) };
     case "Trojan":
-      return { type: "trojan", password: form.password, transport: form.transport as "tcp" };
+      return { type: "trojan", password: form.password, transport: buildTransport(form) as never, tls: buildTls(form) };
     case "Shadowsocks":
-      return { type: "shadowsocks", password: form.password, method: form.method as "aes-256-gcm" };
+      return { type: "shadowsocks", password: form.password, method: form.method as "aes-256-gcm", plugin: (form.plugin === "none" ? "" : form.plugin) as "", pluginOpts: form.pluginOpts };
     case "Hysteria2":
-      return { type: "hysteria2", password: form.password, upMbps: parseInt(form.upMbps) || 100, downMbps: parseInt(form.downMbps) || 200, obfsPassword: form.obfsPassword || undefined };
+      return { type: "hysteria2", password: form.password, upMbps: parseInt(form.upMbps) || 100, downMbps: parseInt(form.downMbps) || 200, obfsType: (form.obfsType === "none" ? "" : form.obfsType) as "", obfsPassword: form.obfsPassword || undefined, tls: buildTls(form) };
     case "TUIC":
-      return { type: "tuic", uuid: form.uuid, password: form.password, congestionControl: form.congestionControl as "bbr" };
+      return { type: "tuic", uuid: form.uuid, password: form.password, congestionControl: form.congestionControl as "bbr", udpRelayMode: form.udpRelayMode as "native", tls: buildTls(form) };
     case "AnyTLS":
-      return { type: "anytls", password: form.password, sni: form.sni, idleTimeout: parseInt(form.idleTimeout) || 900 };
+      return { type: "anytls", password: form.password, sni: form.sni, idleTimeout: parseInt(form.idleTimeout) || 900, minPaddingLen: parseInt(form.minPaddingLen) || 0, maxPaddingLen: parseInt(form.maxPaddingLen) || 0 };
     default:
       return undefined;
   }
@@ -176,20 +295,44 @@ const defaultNodeForm = {
   protocol: "VMess",
   country: "",
   countryCode: "",
-  // Protocol-specific
+  // Auth
   uuid: "",
   password: "",
+  // VMess
   alterId: "0",
   security: "auto",
-  transport: "tcp",
+  // VLESS
   flow: "none",
+  // Shadowsocks
   method: "aes-256-gcm",
+  plugin: "none",
+  pluginOpts: "",
+  // Hysteria2
   upMbps: "100",
   downMbps: "200",
+  obfsType: "none",
   obfsPassword: "",
+  // TUIC
   congestionControl: "bbr",
-  sni: "",
+  udpRelayMode: "native",
+  // AnyTLS
   idleTimeout: "900",
+  minPaddingLen: "0",
+  maxPaddingLen: "0",
+  // Transport
+  transport: "tcp",
+  wsPath: "",
+  wsHost: "",
+  grpcServiceName: "",
+  h2Host: "",
+  // TLS
+  tlsEnabled: "true",
+  sni: "",
+  alpn: "",
+  insecure: "false",
+  reality: "false",
+  realityPublicKey: "",
+  realityShortId: "",
 };
 
 type NodeForm = typeof defaultNodeForm;
