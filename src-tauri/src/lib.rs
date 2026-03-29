@@ -29,12 +29,10 @@ pub fn run() {
                             if visible {
                                 let _ = window.hide();
                             } else {
-                                // Use logical size for proper scaling on Retina
                                 let logical_w = 288.0_f64;
                                 let logical_h = 420.0_f64;
 
                                 let scale = window.scale_factor().unwrap_or(2.0);
-                                // tray position is in physical pixels, convert to logical
                                 let logical_x = position.x / scale - logical_w / 2.0;
                                 let logical_y = position.y / scale;
 
@@ -48,6 +46,17 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // Main window: intercept close to hide instead of destroy
+            if let Some(main_window) = app.get_webview_window("main") {
+                let main_clone = main_window.clone();
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = main_clone.hide();
+                    }
+                });
+            }
 
             // Hide tray window when it loses focus
             if let Some(tray_window) = app.get_webview_window("tray") {
