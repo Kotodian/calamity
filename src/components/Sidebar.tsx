@@ -8,6 +8,7 @@ import {
   Shell,
   Settings,
   Cable,
+  Rss,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection";
@@ -18,6 +19,7 @@ const navItems = [
   { to: "/rules", icon: Route, label: "Rules" },
   { to: "/connections", icon: Cable, label: "Connections" },
   { to: "/logs", icon: ScrollText, label: "Logs" },
+  { to: "/subscriptions", icon: Rss, label: "Subscriptions" },
   { to: "/tailnet", icon: Network, label: "Tailnet" },
   { to: "/dns", icon: Shell, label: "DNS" },
   { to: "/settings", icon: Settings, label: "Settings" },

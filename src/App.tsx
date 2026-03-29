@@ -8,6 +8,7 @@ import { TailnetPage } from "./pages/TailnetPage";
 import { DnsPage } from "./pages/DnsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectionsPage } from "./pages/ConnectionsPage";
+import { SubscriptionsPage } from "./pages/SubscriptionsPage";
 import { useEffect } from "react";
 import { useSettingsStore } from "./stores/settings";
 import { useConnectionStore } from "./stores/connection";
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="connections" element={<ConnectionsPage />} />
           <Route path="logs" element={<LogsPage />} />
           <Route path="tailnet" element={<TailnetPage />} />
+          <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="dns" element={<DnsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
