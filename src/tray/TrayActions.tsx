@@ -28,15 +28,18 @@ export function TrayActions() {
         Copy Proxy Address
       </button>
       <button
-        onClick={() => {
-          // Focus main window via Tauri API or fallback
-          import("@tauri-apps/api/webviewWindow").then(({ WebviewWindow }) => {
-            const main = new WebviewWindow("main");
-            main.show();
-            main.setFocus();
-          }).catch(() => {
-            window.open("/", "_blank");
-          });
+        onClick={async () => {
+          try {
+            const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+            const main = await WebviewWindow.getByLabel("main");
+            if (main) {
+              await main.show();
+              await main.unminimize();
+              await main.setFocus();
+            }
+          } catch {
+            // fallback for dev
+          }
         }}
         className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
       >
