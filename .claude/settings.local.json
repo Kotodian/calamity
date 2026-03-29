@@ -35,7 +35,8 @@
       "Bash(xargs kill:*)",
       "mcp__claude_ai_Context7__resolve-library-id",
       "mcp__claude_ai_Context7__query-docs",
-      "WebFetch(domain:lh3.googleusercontent.com)"
+      "WebFetch(domain:lh3.googleusercontent.com)",
+      "Bash(curl -sL \"https://lh3.googleusercontent.com/aida/ADBb0ujA-UOqc6JkOvDMey3VCjBv-5kVfKOArd1l6OYqV2TMEv6_43qC7PzWnTF9Onc85348EHNTRsYqvgP2BFHEnxCYO6S03As16dtrOXwsZTuZbTTd2wtRv8IgnxCuytSya3h-J-ieTl8J7UyXAA1nGKeS0n_A8X2uty-9yz-Rfb7dIqiuFyHCc7z8RonyCA6JCI7V5ZFJD_giGSmem9DYaq6UgRGhDEa18z1ilipusD2t9fWSnQRqDqU-wA\" -o /tmp/dashboard-4f3cc9cf.png)"
     ]
   }
 }

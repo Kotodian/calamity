@@ -122,3 +122,74 @@
     font-family: "Inter", system-ui, -apple-system, sans-serif;
   }
 }
+
+/* Power button ring animation */
+@keyframes power-ring {
+  0% { box-shadow: 0 0 0 0 rgba(254, 151, 185, 0.4); }
+  70% { box-shadow: 0 0 0 12px rgba(254, 151, 185, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(254, 151, 185, 0); }
+}
+
+@keyframes power-ring-connect {
+  0% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.5); transform: scale(1); }
+  50% { box-shadow: 0 0 20px 8px rgba(250, 204, 21, 0.15); transform: scale(1.05); }
+  100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); transform: scale(1); }
+}
+
+@keyframes glow-expand {
+  0% { opacity: 0; transform: scale(0.8); }
+  50% { opacity: 1; }
+  100% { opacity: 0; transform: scale(2); }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); opacity: 0; }
+  20% { opacity: 0.6; }
+  80% { opacity: 0.6; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes slide-up-fade {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes count-up {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-power-ring {
+  animation: power-ring 2s ease-out infinite;
+}
+
+.animate-power-connecting {
+  animation: power-ring-connect 1.2s ease-in-out infinite;
+}
+
+.animate-glow-expand {
+  animation: glow-expand 1.5s ease-out forwards;
+}
+
+.animate-scan-line {
+  animation: scan-line 1.5s ease-in-out infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up-fade 0.4s ease-out;
+}
+
+.animate-count-up {
+  animation: count-up 0.3s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(254,151,185,0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}

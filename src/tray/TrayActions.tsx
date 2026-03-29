@@ -27,7 +27,19 @@ export function TrayActions() {
         <Copy className="h-3.5 w-3.5" />
         Copy Proxy Address
       </button>
-      <button className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+      <button
+        onClick={() => {
+          // Focus main window via Tauri API or fallback
+          import("@tauri-apps/api/webviewWindow").then(({ WebviewWindow }) => {
+            const main = new WebviewWindow("main");
+            main.show();
+            main.setFocus();
+          }).catch(() => {
+            window.open("/", "_blank");
+          });
+        }}
+        className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+      >
         <ExternalLink className="h-3.5 w-3.5" />
         Open Dashboard
       </button>
