@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNodesStore } from "@/stores/nodes";
-import type { ProxyNode } from "@/services/types";
+import type { ProtocolConfig, ProxyNode } from "@/services/types";
 import { cn } from "@/lib/utils";
 
 function latencyColor(ms: number | null): string {
@@ -81,6 +81,94 @@ function QuickInfoPanel({ node, onClose, onConnect, onDelete }: { node: ProxyNod
   );
 }
 
+const inputCls = "bg-muted/30 border-white/[0.06]";
+
+function ProtocolFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeForm) => void }) {
+  const F = (props: { placeholder: string; field: keyof NodeForm; type?: string }) => (
+    <Input className={inputCls} placeholder={props.placeholder} type={props.type} value={form[props.field]} onChange={(e) => setForm({ ...form, [props.field]: e.target.value })} />
+  );
+  const S = (props: { field: keyof NodeForm; options: string[]; placeholder?: string }) => (
+    <Select value={form[props.field]} onValueChange={(v) => setForm({ ...form, [props.field]: v })}>
+      <SelectTrigger className={inputCls}><SelectValue placeholder={props.placeholder} /></SelectTrigger>
+      <SelectContent>{props.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+    </Select>
+  );
+
+  switch (form.protocol) {
+    case "VMess":
+      return (<>
+        <F placeholder="UUID" field="uuid" />
+        <div className="grid grid-cols-3 gap-2">
+          <F placeholder="Alter ID" field="alterId" type="number" />
+          <S field="security" options={["auto", "aes-128-gcm", "chacha20-poly1305", "none"]} />
+          <S field="transport" options={["tcp", "ws", "grpc", "h2", "quic"]} />
+        </div>
+      </>);
+    case "VLESS":
+      return (<>
+        <F placeholder="UUID" field="uuid" />
+        <div className="grid grid-cols-2 gap-2">
+          <S field="flow" options={["", "xtls-rprx-vision"]} placeholder="Flow (optional)" />
+          <S field="transport" options={["tcp", "ws", "grpc", "h2", "quic"]} />
+        </div>
+      </>);
+    case "Trojan":
+      return (<>
+        <F placeholder="Password" field="password" />
+        <S field="transport" options={["tcp", "ws", "grpc", "h2", "quic"]} />
+      </>);
+    case "Shadowsocks":
+      return (<>
+        <F placeholder="Password" field="password" />
+        <S field="method" options={["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305", "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm"]} />
+      </>);
+    case "Hysteria2":
+      return (<>
+        <F placeholder="Password" field="password" />
+        <div className="grid grid-cols-2 gap-2">
+          <F placeholder="Up (Mbps)" field="upMbps" type="number" />
+          <F placeholder="Down (Mbps)" field="downMbps" type="number" />
+        </div>
+        <F placeholder="Obfs Password (optional)" field="obfsPassword" />
+      </>);
+    case "TUIC":
+      return (<>
+        <F placeholder="UUID" field="uuid" />
+        <F placeholder="Password" field="password" />
+        <S field="congestionControl" options={["bbr", "cubic", "new_reno"]} />
+      </>);
+    case "AnyTLS":
+      return (<>
+        <F placeholder="Password" field="password" />
+        <F placeholder="SNI" field="sni" />
+        <F placeholder="Idle Timeout (seconds)" field="idleTimeout" type="number" />
+      </>);
+    default:
+      return <p className="text-xs text-muted-foreground">Select a protocol</p>;
+  }
+}
+
+function buildProtocolConfig(form: NodeForm): ProtocolConfig | undefined {
+  switch (form.protocol) {
+    case "VMess":
+      return { type: "vmess", uuid: form.uuid, alterId: parseInt(form.alterId) || 0, security: form.security as "auto", transport: form.transport as "tcp" };
+    case "VLESS":
+      return { type: "vless", uuid: form.uuid, flow: form.flow as "", transport: form.transport as "tcp" };
+    case "Trojan":
+      return { type: "trojan", password: form.password, transport: form.transport as "tcp" };
+    case "Shadowsocks":
+      return { type: "shadowsocks", password: form.password, method: form.method as "aes-256-gcm" };
+    case "Hysteria2":
+      return { type: "hysteria2", password: form.password, upMbps: parseInt(form.upMbps) || 100, downMbps: parseInt(form.downMbps) || 200, obfsPassword: form.obfsPassword || undefined };
+    case "TUIC":
+      return { type: "tuic", uuid: form.uuid, password: form.password, congestionControl: form.congestionControl as "bbr" };
+    case "AnyTLS":
+      return { type: "anytls", password: form.password, sni: form.sni, idleTimeout: parseInt(form.idleTimeout) || 900 };
+    default:
+      return undefined;
+  }
+}
+
 const defaultNodeForm = {
   name: "",
   server: "",
@@ -88,9 +176,25 @@ const defaultNodeForm = {
   protocol: "VMess",
   country: "",
   countryCode: "",
+  // Protocol-specific
+  uuid: "",
+  password: "",
+  alterId: "0",
+  security: "auto",
+  transport: "tcp",
+  flow: "",
+  method: "aes-256-gcm",
+  upMbps: "100",
+  downMbps: "200",
+  obfsPassword: "",
+  congestionControl: "bbr",
+  sni: "",
+  idleTimeout: "900",
 };
 
-const protocols = ["VMess", "VLESS", "Trojan", "Shadowsocks", "Hysteria2", "TUIC"];
+type NodeForm = typeof defaultNodeForm;
+
+const protocols = ["VMess", "VLESS", "Trojan", "Shadowsocks", "Hysteria2", "TUIC", "AnyTLS"];
 const countries = [
   { code: "JP", name: "Japan" },
   { code: "US", name: "United States" },
@@ -297,65 +401,47 @@ export function NodesPage() {
 
       {/* Add Node Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="bg-card/90 backdrop-blur-2xl border-white/[0.06]">
+        <DialogContent className="bg-card/90 backdrop-blur-2xl border-white/[0.06] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Node</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input
-              placeholder="Node name (e.g. Tokyo 03)"
-              className="bg-muted/30 border-white/[0.06]"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-            <Input
-              placeholder="Server address"
-              className="bg-muted/30 border-white/[0.06]"
-              value={form.server}
-              onChange={(e) => setForm({ ...form, server: e.target.value })}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                placeholder="Port"
-                type="number"
-                className="bg-muted/30 border-white/[0.06]"
-                value={form.port}
-                onChange={(e) => setForm({ ...form, port: e.target.value })}
-              />
-              <Select value={form.protocol} onValueChange={(v) => setForm({ ...form, protocol: v })}>
-                <SelectTrigger className="bg-muted/30 border-white/[0.06]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {protocols.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Common fields */}
+            <div>
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5 block">Basic</label>
+              <div className="space-y-3">
+                <Input placeholder="Node name" className="bg-muted/30 border-white/[0.06]" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <div className="grid grid-cols-3 gap-2">
+                  <Input placeholder="Server address" className="bg-muted/30 border-white/[0.06] col-span-2" value={form.server} onChange={(e) => setForm({ ...form, server: e.target.value })} />
+                  <Input placeholder="Port" type="number" className="bg-muted/30 border-white/[0.06]" value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select value={form.protocol} onValueChange={(v) => setForm({ ...form, protocol: v })}>
+                    <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {protocols.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={form.countryCode} onValueChange={(v) => { const c = countries.find((c) => c.code === v); setForm({ ...form, countryCode: v, country: c?.name ?? "" }); }}>
+                    <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Country" /></SelectTrigger>
+                    <SelectContent>
+                      {countries.map((c) => <SelectItem key={c.code} value={c.code}>{flagEmoji[c.code] ?? ""} {c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <Select
-              value={form.countryCode}
-              onValueChange={(v) => {
-                const c = countries.find((c) => c.code === v);
-                setForm({ ...form, countryCode: v, country: c?.name ?? "" });
-              }}
-            >
-              <SelectTrigger className="bg-muted/30 border-white/[0.06]">
-                <SelectValue placeholder="Select country" />
-              </SelectTrigger>
-              <SelectContent>
-                {countries.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {flagEmoji[c.code] ?? ""} {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {/* Protocol-specific fields */}
+            <div>
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5 block">{form.protocol} Config</label>
+              <div className="space-y-3 rounded-lg border border-white/[0.04] bg-muted/10 p-3">
+                <ProtocolFields form={form} setForm={setForm} />
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-white/10" onClick={() => setAddDialogOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" className="border-white/10" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
             <Button
               className="shadow-[0_0_15px_rgba(254,151,185,0.15)]"
               disabled={!form.name || !form.server || !form.countryCode}
@@ -367,6 +453,7 @@ export function NodesPage() {
                   protocol: form.protocol,
                   country: form.country,
                   countryCode: form.countryCode,
+                  protocolConfig: buildProtocolConfig(form),
                 });
                 setAddDialogOpen(false);
               }}

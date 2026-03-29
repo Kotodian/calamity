@@ -36,7 +36,76 @@ export interface ProxyNode {
   country: string;
   countryCode: string;
   active: boolean;
+  protocolConfig?: ProtocolConfig;
 }
+
+// Protocol-specific configs
+export type ProtocolConfig =
+  | VMessConfig
+  | VLESSConfig
+  | TrojanConfig
+  | ShadowsocksConfig
+  | Hysteria2Config
+  | TUICConfig
+  | AnyTLSConfig;
+
+export interface VMessConfig {
+  type: "vmess";
+  uuid: string;
+  alterId: number;
+  security: "auto" | "aes-128-gcm" | "chacha20-poly1305" | "none";
+  transport: TransportType;
+}
+
+export interface VLESSConfig {
+  type: "vless";
+  uuid: string;
+  flow: "" | "xtls-rprx-vision";
+  transport: TransportType;
+}
+
+export interface TrojanConfig {
+  type: "trojan";
+  password: string;
+  transport: TransportType;
+}
+
+export interface ShadowsocksConfig {
+  type: "shadowsocks";
+  password: string;
+  method: SSMethod;
+}
+
+export interface Hysteria2Config {
+  type: "hysteria2";
+  password: string;
+  upMbps: number;
+  downMbps: number;
+  obfsPassword?: string;
+}
+
+export interface TUICConfig {
+  type: "tuic";
+  uuid: string;
+  password: string;
+  congestionControl: "bbr" | "cubic" | "new_reno";
+}
+
+export interface AnyTLSConfig {
+  type: "anytls";
+  password: string;
+  sni: string;
+  idleTimeout: number;
+}
+
+export type TransportType = "tcp" | "ws" | "grpc" | "h2" | "quic";
+
+export type SSMethod =
+  | "aes-128-gcm"
+  | "aes-256-gcm"
+  | "chacha20-ietf-poly1305"
+  | "2022-blake3-aes-128-gcm"
+  | "2022-blake3-aes-256-gcm";
 
 // Rules
 export type OutboundType = "proxy" | "direct" | "reject" | "tailnet";

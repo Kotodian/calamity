@@ -1,4 +1,4 @@
-import type { NodeGroup, ProxyNode } from "./types";
+import type { NodeGroup, ProtocolConfig, ProxyNode } from "./types";
 
 export type NewNodeInput = {
   name: string;
@@ -7,6 +7,7 @@ export type NewNodeInput = {
   protocol: string;
   country: string;
   countryCode: string;
+  protocolConfig?: ProtocolConfig;
 };
 
 export interface NodesService {
