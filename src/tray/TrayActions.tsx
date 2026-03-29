@@ -6,7 +6,9 @@ import { useConnectionStore } from "@/stores/connection";
 export function TrayActions() {
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const status = useConnectionStore((s) => s.status);
   const toggleConnection = useConnectionStore((s) => s.toggleConnection);
+  const isConnected = status === "connected";
 
   return (
     <div className="space-y-1.5">
@@ -31,10 +33,14 @@ export function TrayActions() {
       </button>
       <button
         onClick={toggleConnection}
-        className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+        className={`flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs transition-colors ${
+          isConnected
+            ? "text-destructive hover:bg-destructive/10"
+            : "text-green-600 hover:bg-green-500/10"
+        }`}
       >
         <Power className="h-3.5 w-3.5" />
-        Disconnect
+        {isConnected ? "Disconnect" : "Connect"}
       </button>
     </div>
   );
