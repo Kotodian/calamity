@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Wifi, Search, RefreshCw, X, Zap, Plus, Trash2 } from "lucide-react";
+import { Check, Wifi, Search, RefreshCw, X, Zap, Plus, Trash2, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +20,7 @@ import { useNodesStore } from "@/stores/nodes";
 import type { ProtocolConfig, ProxyNode } from "@/services/types";
 import { cn } from "@/lib/utils";
 import { countryFlag } from "@/lib/flags";
+import { parseMultipleUris } from "@/lib/proxy-uri";
 
 function latencyColor(ms: number | null): string {
   if (ms === null) return "text-muted-foreground";
@@ -353,6 +354,7 @@ export function NodesPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [form, setForm] = useState(defaultNodeForm);
   const [newGroupName, setNewGroupName] = useState("");
+  const [importCount, setImportCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetchGroups();
@@ -387,6 +389,35 @@ export function NodesPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <button
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                const nodes = parseMultipleUris(text);
+                if (nodes.length === 0) {
+                  setImportCount(0);
+                  setTimeout(() => setImportCount(null), 2000);
+                  return;
+                }
+                for (const node of nodes) {
+                  await addNode(selectedGroup, node);
+                }
+                setImportCount(nodes.length);
+                setTimeout(() => setImportCount(null), 3000);
+              } catch {
+                setImportCount(0);
+                setTimeout(() => setImportCount(null), 2000);
+              }
+            }}
+            className="h-8 px-2 rounded-lg border border-white/[0.06] bg-muted/30 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-all"
+          >
+            <ClipboardPaste className="h-3.5 w-3.5" />
+            {importCount !== null ? (
+              importCount > 0 ? <span className="text-green-400">+{importCount}</span> : <span className="text-red-400">No nodes</span>
+            ) : (
+              <span>Paste</span>
+            )}
+          </button>
           <button
             onClick={() => { setForm(defaultNodeForm); setAddDialogOpen(true); }}
             className="h-8 w-8 rounded-lg border border-white/[0.06] bg-muted/30 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 hover:shadow-[0_0_15px_rgba(254,151,185,0.1)] transition-all"
