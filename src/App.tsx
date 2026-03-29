@@ -1,7 +1,38 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AppLayout } from "./components/AppLayout";
+import { DashboardPage } from "./pages/DashboardPage";
+import { NodesPage } from "./pages/NodesPage";
+import { RulesPage } from "./pages/RulesPage";
+import { LogsPage } from "./pages/LogsPage";
+import { TailnetPage } from "./pages/TailnetPage";
+import { DnsPage } from "./pages/DnsPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { useEffect } from "react";
+import { useSettingsStore } from "./stores/settings";
+import { useConnectionStore } from "./stores/connection";
+
 export default function App() {
+  const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const fetchConnectionState = useConnectionStore((s) => s.fetchState);
+
+  useEffect(() => {
+    fetchSettings();
+    fetchConnectionState();
+  }, [fetchSettings, fetchConnectionState]);
+
   return (
-    <div className="flex h-screen items-center justify-center">
-      <h1 className="text-2xl font-semibold text-primary">Calamity</h1>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="nodes" element={<NodesPage />} />
+          <Route path="rules" element={<RulesPage />} />
+          <Route path="logs" element={<LogsPage />} />
+          <Route path="tailnet" element={<TailnetPage />} />
+          <Route path="dns" element={<DnsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
