@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__stitch__create_project",
+      "mcp__stitch__create_design_system",
+      "mcp__stitch__update_design_system",
+      "mcp__stitch__generate_screen_from_text",
+      "mcp__stitch__list_screens",
+      "mcp__stitch__get_screen",
+      "mcp__stitch__generate_variants",
+      "mcp__stitch__edit_screens",
+      "WebFetch(domain:contribution.usercontent.google.com)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npm -v)",
+      "Bash(cargo --version)",
+      "Bash(npm create:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx:*)"
+    ]
+  }
+}
