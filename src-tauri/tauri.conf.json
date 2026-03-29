@@ -36,12 +36,7 @@
         "alwaysOnTop": true,
         "skipTaskbar": true
       }
-    ],
-    "trayIcon": {
-      "id": "main-tray",
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
-    }
+    ]
   },
   "bundle": {
     "active": true,

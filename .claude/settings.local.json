@@ -27,7 +27,14 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''app'''',{}\\).get\\(''''trayIcon'''',{}\\), indent=2\\)\\)\")",
       "Bash(pkill -f \"tauri dev\")",
       "Bash(pkill -f \"cargo\")",
-      "Bash(pkill -f \"vite\")"
+      "Bash(pkill -f \"vite\")",
+      "Bash(pkill -f calamity)",
+      "Bash(pkill -f tauri)",
+      "Bash(pkill -f vite)",
+      "Bash(lsof -ti:1420)",
+      "Bash(xargs kill:*)",
+      "mcp__claude_ai_Context7__resolve-library-id",
+      "mcp__claude_ai_Context7__query-docs"
     ]
   }
 }

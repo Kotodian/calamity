@@ -1,22 +1,30 @@
-use tauri::Manager;
+use tauri::{
+    image::Image,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            // Attach click handler to the declarative tray icon from tauri.conf.json
-            if let Some(tray) = app.tray_by_id("main-tray") {
-                let app_handle = app.handle().clone();
-                tray.on_tray_icon_event(move |_tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
+            let icon = Image::from_bytes(include_bytes!("../icons/icon.png"))
+                .expect("failed to load tray icon");
+
+            let _tray = TrayIconBuilder::new()
+                .icon(icon)
+                .icon_as_template(true)
+                .tooltip("Calamity")
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
                         position,
                         ..
-                    } = event
-                    {
-                        if let Some(window) = app_handle.get_webview_window("tray") {
+                    } => {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("tray") {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
                             } else {
@@ -32,8 +40,9 @@ pub fn run() {
                             }
                         }
                     }
-                });
-            }
+                    _ => {}
+                })
+                .build(app)?;
 
             // Hide tray window when it loses focus
             if let Some(tray_window) = app.get_webview_window("tray") {
