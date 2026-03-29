@@ -1,7 +1,10 @@
-import { useEffect } from "react";
-import { Monitor, Smartphone, Server, LogOut, LogIn, Network, User, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Monitor, Smartphone, Server, LogOut, LogIn, Network, User, Loader2, Plus, Trash2, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTailnetStore } from "@/stores/tailnet";
 import { cn } from "@/lib/utils";
 import type { TailnetDevice } from "@/services/types";
@@ -94,15 +97,20 @@ function LoginPanel({ onLogin, loggingIn }: { onLogin: () => void; loggingIn: bo
 }
 
 export function TailnetPage() {
-  const { account, devices, loggingIn, fetchAccount, login, logout, fetchDevices, setExitNode } = useTailnetStore();
+  const { account, devices, funnels, loggingIn, fetchAccount, login, logout, fetchDevices, setExitNode, fetchFunnels, addFunnel, toggleFunnel, removeFunnel } = useTailnetStore();
+  const [funnelPort, setFunnelPort] = useState("3000");
+  const [funnelProtocol, setFunnelProtocol] = useState<"https" | "tcp" | "tls-terminated-tcp">("https");
 
   useEffect(() => {
     fetchAccount();
   }, [fetchAccount]);
 
   useEffect(() => {
-    if (account?.loggedIn) fetchDevices();
-  }, [account?.loggedIn, fetchDevices]);
+    if (account?.loggedIn) {
+      fetchDevices();
+      fetchFunnels();
+    }
+  }, [account?.loggedIn, fetchDevices, fetchFunnels]);
 
   const onlineCount = devices.filter((d) => d.status === "online").length;
   const currentExit = devices.find((d) => d.isCurrentExitNode);
@@ -174,6 +182,83 @@ export function TailnetPage() {
         {devices.map((device, i) => (
           <DeviceCard key={device.id} device={device} index={i} onSetExitNode={setExitNode} />
         ))}
+      </div>
+
+      {/* Funnel */}
+      <div className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5 animate-slide-up space-y-4" style={{ animationDelay: "320ms" }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-medium">Funnel</h3>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Expose local services to the internet</p>
+        </div>
+
+        {/* Add funnel */}
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Port"
+            type="number"
+            className="w-24 bg-muted/30 border-white/[0.06] h-8 text-xs"
+            value={funnelPort}
+            onChange={(e) => setFunnelPort(e.target.value)}
+          />
+          <Select value={funnelProtocol} onValueChange={(v) => setFunnelProtocol(v as typeof funnelProtocol)}>
+            <SelectTrigger className="w-44 bg-muted/30 border-white/[0.06] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="https">HTTPS</SelectItem>
+              <SelectItem value="tcp">TCP</SelectItem>
+              <SelectItem value="tls-terminated-tcp">TLS-terminated TCP</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="h-8 text-xs shadow-[0_0_15px_rgba(254,151,185,0.15)]"
+            onClick={() => {
+              addFunnel({ localPort: parseInt(funnelPort) || 3000, protocol: funnelProtocol, allowPublic: true });
+            }}
+          >
+            <Plus className="mr-1 h-3 w-3" /> Add
+          </Button>
+        </div>
+
+        {/* Funnel list */}
+        {funnels.length > 0 && (
+          <div className="space-y-2">
+            {funnels.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-muted/10 p-3">
+                <Switch
+                  checked={f.enabled}
+                  onCheckedChange={(v) => toggleFunnel(f.id, v)}
+                  className="scale-75"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-mono truncate">{f.publicUrl}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    localhost:{f.localPort} • {f.protocol}
+                  </p>
+                </div>
+                <Badge variant={f.enabled ? "default" : "secondary"} className="text-[9px]">
+                  {f.enabled ? "Live" : "Off"}
+                </Badge>
+                <button
+                  onClick={() => removeFunnel(f.id)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {funnels.length === 0 && (
+          <p className="text-xs text-muted-foreground/50 text-center py-2">
+            No funnels active. Add a port to expose it via your Tailnet.
+          </p>
+        )}
       </div>
     </div>
   );

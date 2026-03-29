@@ -7,12 +7,31 @@ export interface TailnetAccount {
   loggedIn: boolean;
 }
 
+export interface FunnelEntry {
+  id: string;
+  localPort: number;
+  protocol: "https" | "tcp" | "tls-terminated-tcp";
+  publicUrl: string;
+  enabled: boolean;
+  allowPublic: boolean;
+}
+
+export type NewFunnelInput = {
+  localPort: number;
+  protocol: "https" | "tcp" | "tls-terminated-tcp";
+  allowPublic: boolean;
+};
+
 export interface TailnetService {
   getAccount(): Promise<TailnetAccount>;
   login(): Promise<TailnetAccount>;
   logout(): Promise<void>;
   getDevices(): Promise<TailnetDevice[]>;
   setExitNode(deviceId: string | null): Promise<void>;
+  getFunnels(): Promise<FunnelEntry[]>;
+  addFunnel(input: NewFunnelInput): Promise<FunnelEntry>;
+  toggleFunnel(id: string, enabled: boolean): Promise<void>;
+  removeFunnel(id: string): Promise<void>;
 }
 
 let mockAccount: TailnetAccount = {
@@ -28,6 +47,8 @@ const mockDevices: TailnetDevice[] = [
   { id: "d4", name: "Raspberry Pi", hostname: "rpi-gateway", ip: "100.64.0.4", os: "Linux", status: "offline", lastSeen: new Date(Date.now() - 86400000).toISOString(), isExitNode: true, isCurrentExitNode: false, isSelf: false },
   { id: "d5", name: "iPhone", hostname: "iphone", ip: "100.64.0.5", os: "iOS", status: "online", lastSeen: new Date().toISOString(), isExitNode: false, isCurrentExitNode: false, isSelf: false },
 ];
+
+let mockFunnels: FunnelEntry[] = [];
 
 export const tailnetService: TailnetService = {
   async getAccount() {
@@ -53,5 +74,28 @@ export const tailnetService: TailnetService = {
     for (const d of mockDevices) {
       d.isCurrentExitNode = d.id === deviceId;
     }
+  },
+  async getFunnels() {
+    return mockFunnels.map((f) => ({ ...f }));
+  },
+  async addFunnel(input) {
+    const entry: FunnelEntry = {
+      id: `funnel-${Date.now()}`,
+      localPort: input.localPort,
+      protocol: input.protocol,
+      publicUrl: `https://${mockAccount.tailnetName?.replace(".ts.net", "") || "device"}.ts.net:${input.localPort}`,
+      enabled: true,
+      allowPublic: input.allowPublic,
+    };
+    mockFunnels.push(entry);
+    return { ...entry };
+  },
+  async toggleFunnel(id, enabled) {
+    const f = mockFunnels.find((f) => f.id === id);
+    if (f) f.enabled = enabled;
+  },
+  async removeFunnel(id) {
+    const idx = mockFunnels.findIndex((f) => f.id === id);
+    if (idx !== -1) mockFunnels.splice(idx, 1);
   },
 };

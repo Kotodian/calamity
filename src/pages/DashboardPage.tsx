@@ -141,22 +141,22 @@ export function DashboardPage() {
         </div>
 
         {/* Active Node */}
-        {isConnected && activeNodeObj && (
+        {isConnected && (
           <div className="flex items-center gap-2 mt-1 animate-slide-up" style={{ animationDelay: "100ms" }}>
-            <span className="text-lg">{countryFlag(activeNodeObj.countryCode)}</span>
-            <span className="text-sm font-medium">{activeNode}</span>
-            <span className="text-xs text-muted-foreground">• {latency}ms</span>
-          </div>
-        )}
-
-        {/* Exit Node indicator */}
-        {exitNode && (
-          <div className="flex items-center gap-2 mt-2 animate-slide-up" style={{ animationDelay: "150ms" }}>
-            <Badge variant="outline" className="text-[10px] border-purple-500/30 bg-purple-500/10 text-purple-400">
-              <LogOut className="mr-1 h-2.5 w-2.5" />
-              Exit Node: {exitNode.name}
-            </Badge>
-            <span className="text-[10px] text-muted-foreground">{exitNode.ip}</span>
+            {exitNode ? (
+              <>
+                <LogOut className="h-4 w-4 text-purple-400" />
+                <span className="text-sm font-medium">{exitNode.name}</span>
+                <Badge variant="outline" className="text-[9px] border-purple-500/30 bg-purple-500/10 text-purple-400">Exit Node</Badge>
+                <span className="text-xs text-muted-foreground">• {exitNode.ip}</span>
+              </>
+            ) : activeNodeObj ? (
+              <>
+                <span className="text-lg">{countryFlag(activeNodeObj.countryCode)}</span>
+                <span className="text-sm font-medium">{activeNode}</span>
+                <span className="text-xs text-muted-foreground">• {latency}ms</span>
+              </>
+            ) : null}
           </div>
         )}
       </div>
