@@ -25,20 +25,25 @@ export function Sidebar() {
   const status = useConnectionStore((s) => s.status);
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-border/50 bg-sidebar/80 backdrop-blur-xl">
+    <aside className="flex h-screen w-56 flex-col border-r border-white/[0.06] bg-sidebar/60 backdrop-blur-2xl">
       <div className="h-12 flex items-center px-5 pt-2" data-tauri-drag-region>
-        <span className="text-lg font-semibold text-primary">Calamity</span>
+        <span className="text-lg font-semibold text-primary" style={{ textShadow: "0 0 20px rgba(254,151,185,0.3)" }}>Calamity</span>
       </div>
 
-      <div className="mx-4 mb-3 flex items-center gap-2 rounded-lg bg-accent/50 px-3 py-2">
-        <span
-          className={cn(
-            "h-2 w-2 rounded-full",
-            status === "connected" && "bg-green-500",
-            status === "connecting" && "bg-yellow-500 animate-pulse",
-            status === "disconnected" && "bg-muted-foreground/40"
+      <div className="mx-4 mb-3 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-muted/30 backdrop-blur-xl px-3 py-2">
+        <span className="relative">
+          <span
+            className={cn(
+              "block h-2 w-2 rounded-full",
+              status === "connected" && "bg-green-500",
+              status === "connecting" && "bg-yellow-500 animate-pulse",
+              status === "disconnected" && "bg-muted-foreground/40"
+            )}
+          />
+          {status === "connected" && (
+            <span className="absolute inset-0 h-2 w-2 rounded-full bg-green-500 animate-ping opacity-75" />
           )}
-        />
+        </span>
         <span className="text-xs font-medium text-muted-foreground capitalize">
           {status}
         </span>
@@ -52,10 +57,10 @@ export function Sidebar() {
             end={to === "/"}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                 isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
+                  ? "bg-primary text-primary-foreground shadow-[0_0_15px_rgba(254,151,185,0.15)]"
+                  : "text-sidebar-foreground hover:bg-white/[0.04]"
               )
             }
           >
@@ -65,7 +70,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-border/50 p-4">
+      <div className="border-t border-white/[0.06] p-4">
         <p className="text-[10px] text-muted-foreground/60 text-center">
           SingBox Core v1.8.4
         </p>

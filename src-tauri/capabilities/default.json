@@ -5,6 +5,12 @@
   "windows": ["main", "tray"],
   "permissions": [
     "core:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:window:allow-is-visible",
+    "core:window:allow-start-dragging",
     "shell:allow-open"
   ]
 }

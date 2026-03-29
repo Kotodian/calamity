@@ -55,32 +55,38 @@ const outboundLabels: Record<OutboundType, string> = {
 
 function SortableRule({
   rule,
+  index,
   onToggle,
   onEdit,
   onDelete,
 }: {
   rule: RouteRule;
+  index: number;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: rule.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
+  const style = { transform: CSS.Transform.toString(transform), transition, animationDelay: `${index * 80}ms` };
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className={cn("border-l-4", outboundColors[rule.outbound], !rule.enabled && "opacity-50")}
+      className={cn(
+        "animate-slide-up border-l-4 rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl shadow-[0_0_20px_rgba(254,151,185,0.08)] transition-all duration-200 hover:border-white/10 hover:bg-card/80",
+        outboundColors[rule.outbound],
+        !rule.enabled && "opacity-50"
+      )}
     >
       <CardContent className="flex items-center gap-3 p-3">
-        <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
+        <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground transition-colors duration-200">
           <GripVertical className="h-4 w-4" />
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">{rule.name}</span>
-            <Badge variant="outline" className="text-[10px]">{rule.matchType}</Badge>
+            <Badge variant="outline" className="text-[10px] border-white/[0.06] bg-muted/30">{rule.matchType}</Badge>
           </div>
           <p className="text-xs text-muted-foreground truncate">
             {rule.matchValue} → {outboundLabels[rule.outbound]}
@@ -89,10 +95,10 @@ function SortableRule({
           </p>
         </div>
         <Switch checked={rule.enabled} onCheckedChange={onToggle} />
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/[0.04] transition-all duration-200" onClick={onEdit}>
           <Pencil className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={onDelete}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-red-500/10 transition-all duration-200" onClick={onDelete}>
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </CardContent>
@@ -173,12 +179,17 @@ export function RulesPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-slide-up">
         <div>
           <h1 className="text-2xl font-semibold">Rules</h1>
-          <p className="text-sm text-muted-foreground">{rules.length} rules • {activeCount} active</p>
+          <p className="text-sm text-muted-foreground">
+            {rules.length} rules{" "}
+            <span className="inline-flex items-center justify-center rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+              {activeCount} active
+            </span>
+          </p>
         </div>
-        <Button onClick={openAdd}>
+        <Button onClick={openAdd} className="shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200 hover:shadow-[0_0_25px_rgba(254,151,185,0.25)]">
           <Plus className="mr-2 h-4 w-4" /> Add Rule
         </Button>
       </div>
@@ -186,10 +197,11 @@ export function RulesPage() {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={rules.map((r) => r.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
-            {rules.map((rule) => (
+            {rules.map((rule, i) => (
               <SortableRule
                 key={rule.id}
                 rule={rule}
+                index={i}
                 onToggle={() => updateRule(rule.id, { enabled: !rule.enabled })}
                 onEdit={() => openEdit(rule)}
                 onDelete={() => deleteRule(rule.id)}
@@ -200,15 +212,15 @@ export function RulesPage() {
       </DndContext>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-xl border border-white/[0.06] bg-card/80 backdrop-blur-2xl shadow-[0_0_40px_rgba(0,0,0,0.3)]">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Rule" : "Add Rule"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input placeholder="Rule name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Input placeholder="Rule name" className="bg-muted/30 border-white/[0.06]" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Select value={form.matchType} onValueChange={(v) => setForm({ ...form, matchType: v as RouteRule["matchType"] })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
+              <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
+              <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                 <SelectItem value="domain-suffix">domain-suffix</SelectItem>
                 <SelectItem value="domain-keyword">domain-keyword</SelectItem>
                 <SelectItem value="domain-full">domain-full</SelectItem>
@@ -217,10 +229,10 @@ export function RulesPage() {
                 <SelectItem value="ip-cidr">ip-cidr</SelectItem>
               </SelectContent>
             </Select>
-            <Input placeholder="Match value" value={form.matchValue} onChange={(e) => setForm({ ...form, matchValue: e.target.value })} />
+            <Input placeholder="Match value" className="bg-muted/30 border-white/[0.06]" value={form.matchValue} onChange={(e) => setForm({ ...form, matchValue: e.target.value })} />
             <Select value={form.outbound} onValueChange={(v) => setForm({ ...form, outbound: v as OutboundType })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
+              <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
+              <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                 <SelectItem value="proxy">Proxy</SelectItem>
                 <SelectItem value="direct">DIRECT</SelectItem>
                 <SelectItem value="reject">REJECT</SelectItem>
@@ -228,15 +240,15 @@ export function RulesPage() {
               </SelectContent>
             </Select>
             {form.outbound === "proxy" && (
-              <Input placeholder="Node name (e.g. Tokyo 01)" value={form.outboundNode ?? ""} onChange={(e) => setForm({ ...form, outboundNode: e.target.value })} />
+              <Input placeholder="Node name (e.g. Tokyo 01)" className="bg-muted/30 border-white/[0.06]" value={form.outboundNode ?? ""} onChange={(e) => setForm({ ...form, outboundNode: e.target.value })} />
             )}
             {form.outbound === "tailnet" && (
-              <Input placeholder="Tailnet device name" value={form.outboundDevice ?? ""} onChange={(e) => setForm({ ...form, outboundDevice: e.target.value })} />
+              <Input placeholder="Tailnet device name" className="bg-muted/30 border-white/[0.06]" value={form.outboundDevice ?? ""} onChange={(e) => setForm({ ...form, outboundDevice: e.target.value })} />
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave}>Save</Button>
+            <Button variant="outline" className="border-white/[0.06] hover:bg-white/[0.04]" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} className="shadow-[0_0_15px_rgba(254,151,185,0.15)]">Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

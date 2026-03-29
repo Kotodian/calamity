@@ -37,8 +37,8 @@ export function TrayActions() {
               await main.unminimize();
               await main.setFocus();
             }
-          } catch {
-            // fallback for dev
+          } catch (e) {
+            console.error("Failed to open dashboard:", e);
           }
         }}
         className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
