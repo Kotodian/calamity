@@ -17,14 +17,16 @@ export function TrayApp() {
   }, [fetchState, fetchSettings]);
 
   return (
-    <div className="w-72 rounded-xl border border-border bg-background/95 p-3 backdrop-blur-xl shadow-lg space-y-2">
-      <TrayStatus />
-      <Separator />
-      <TrayModeSwitch />
-      <Separator />
-      <TraySiteRule />
-      <Separator />
-      <TrayActions />
+    <div className="p-2">
+      <div className="w-68 rounded-2xl border border-white/20 bg-background/70 p-3 backdrop-blur-2xl shadow-2xl space-y-2">
+        <TrayStatus />
+        <Separator className="bg-border/50" />
+        <TrayModeSwitch />
+        <Separator className="bg-border/50" />
+        <TraySiteRule />
+        <Separator className="bg-border/50" />
+        <TrayActions />
+      </div>
     </div>
   );
 }
