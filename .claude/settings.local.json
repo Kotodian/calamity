@@ -19,7 +19,10 @@
       "Bash(npm init:*)",
       "Bash(npm install:*)",
       "Bash(npx:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(rustup show:*)",
+      "Bash(cargo check:*)",
+      "Bash(rustup update:*)"
     ]
   }
 }
