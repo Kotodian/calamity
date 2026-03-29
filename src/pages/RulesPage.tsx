@@ -92,6 +92,7 @@ function SortableRule({
             {rule.matchValue} → {outboundLabels[rule.outbound]}
             {rule.outboundNode && `: ${rule.outboundNode}`}
             {rule.outboundDevice && `: ${rule.outboundDevice}`}
+            {rule.downloadDetour && <span className="text-muted-foreground/50"> (via {rule.downloadDetour})</span>}
           </p>
         </div>
         <Switch checked={rule.enabled} onCheckedChange={onToggle} />
@@ -116,6 +117,8 @@ const defaultForm: RuleFormData = {
   outbound: "proxy",
   outboundNode: "",
   outboundDevice: "",
+  ruleSetUrl: "",
+  downloadDetour: "direct",
 };
 
 export function RulesPage() {
@@ -162,6 +165,8 @@ export function RulesPage() {
       outbound: rule.outbound,
       outboundNode: rule.outboundNode,
       outboundDevice: rule.outboundDevice,
+      ruleSetUrl: rule.ruleSetUrl,
+      downloadDetour: rule.downloadDetour ?? "direct",
     });
     setDialogOpen(true);
   }
@@ -265,6 +270,27 @@ export function RulesPage() {
             )}
             {form.outbound === "tailnet" && (
               <Input placeholder="Tailnet device name" className="bg-muted/30 border-white/[0.06]" value={form.outboundDevice ?? ""} onChange={(e) => setForm({ ...form, outboundDevice: e.target.value })} />
+            )}
+            {(form.matchType === "geosite" || form.matchType === "geoip") && (
+              <div className="space-y-2 rounded-lg border border-white/[0.04] bg-muted/10 p-3">
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Rule Set Download</label>
+                <Input
+                  placeholder="Rule set URL (auto-generated if empty)"
+                  className="bg-muted/30 border-white/[0.06] text-xs font-mono"
+                  value={form.ruleSetUrl ?? ""}
+                  onChange={(e) => setForm({ ...form, ruleSetUrl: e.target.value })}
+                />
+                <Select value={form.downloadDetour ?? "direct"} onValueChange={(v) => setForm({ ...form, downloadDetour: v })}>
+                  <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Download via..." /></SelectTrigger>
+                  <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
+                    <SelectItem value="direct">DIRECT (直连下载)</SelectItem>
+                    <SelectItem value="proxy">Default Proxy</SelectItem>
+                    <SelectItem value="Tokyo 01">Tokyo 01</SelectItem>
+                    <SelectItem value="US West">US West</SelectItem>
+                    <SelectItem value="SG 01">Singapore 01</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
           <DialogFooter>

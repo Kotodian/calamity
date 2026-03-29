@@ -150,6 +150,9 @@ export interface RouteRule {
   name: string;
   enabled: boolean;
   matchType: "domain-suffix" | "domain-keyword" | "domain-full" | "domain-regex" | "geosite" | "geoip" | "ip-cidr" | "process-name" | "process-path" | "process-path-regex" | "port" | "port-range" | "network";
+  // For geosite/geoip rule sets
+  ruleSetUrl?: string;
+  downloadDetour?: string;
   matchValue: string;
   outbound: OutboundType;
   outboundNode?: string;
