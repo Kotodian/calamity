@@ -108,7 +108,7 @@ function ProtocolFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeFo
       return (<>
         <F placeholder="UUID" field="uuid" />
         <div className="grid grid-cols-2 gap-2">
-          <S field="flow" options={["", "xtls-rprx-vision"]} placeholder="Flow (optional)" />
+          <S field="flow" options={["none", "xtls-rprx-vision"]} placeholder="Flow (optional)" />
           <S field="transport" options={["tcp", "ws", "grpc", "h2", "quic"]} />
         </div>
       </>);
@@ -153,7 +153,7 @@ function buildProtocolConfig(form: NodeForm): ProtocolConfig | undefined {
     case "VMess":
       return { type: "vmess", uuid: form.uuid, alterId: parseInt(form.alterId) || 0, security: form.security as "auto", transport: form.transport as "tcp" };
     case "VLESS":
-      return { type: "vless", uuid: form.uuid, flow: form.flow as "", transport: form.transport as "tcp" };
+      return { type: "vless", uuid: form.uuid, flow: (form.flow === "none" ? "" : form.flow) as "", transport: form.transport as "tcp" };
     case "Trojan":
       return { type: "trojan", password: form.password, transport: form.transport as "tcp" };
     case "Shadowsocks":
@@ -182,7 +182,7 @@ const defaultNodeForm = {
   alterId: "0",
   security: "auto",
   transport: "tcp",
-  flow: "",
+  flow: "none",
   method: "aes-256-gcm",
   upMbps: "100",
   downMbps: "200",
