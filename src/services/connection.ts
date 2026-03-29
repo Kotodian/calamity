@@ -38,6 +38,7 @@ export const connectionService: ConnectionService = {
     return { ...mockState };
   },
   async connect() {
+    await new Promise((r) => setTimeout(r, 1500));
     mockState.status = "connected";
   },
   async disconnect() {

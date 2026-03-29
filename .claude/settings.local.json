@@ -34,7 +34,8 @@
       "Bash(lsof -ti:1420)",
       "Bash(xargs kill:*)",
       "mcp__claude_ai_Context7__resolve-library-id",
-      "mcp__claude_ai_Context7__query-docs"
+      "mcp__claude_ai_Context7__query-docs",
+      "WebFetch(domain:lh3.googleusercontent.com)"
     ]
   }
 }
