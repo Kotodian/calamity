@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { countryFlag } from "@/lib/flags";
+import { useTranslation } from "react-i18next";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -37,6 +38,7 @@ function formatUptime(startedAt: number | null): string {
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const {
     status, activeNode, uploadSpeed, downloadSpeed,
     totalUpload, totalDownload, latency, speedHistory,
@@ -105,11 +107,11 @@ export function DashboardPage() {
     <div className="p-6 min-h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-lg font-semibold">Network Overview</h1>
+        <h1 className="text-lg font-semibold">{t("dashboard.title")}</h1>
         {isConnected && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/15 px-2.5 py-0.5 text-[10px] font-semibold text-green-400 uppercase tracking-wider">
             <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-            Online
+            {t("common.status.online")}
           </span>
         )}
       </div>
@@ -155,20 +157,20 @@ export function DashboardPage() {
         <div className="text-center mb-2">
           {isConnected && (
             <div className="animate-slide-up">
-              <p className="text-sm font-semibold tracking-widest uppercase text-primary mb-0.5">Connected</p>
+              <p className="text-sm font-semibold tracking-widest uppercase text-primary mb-0.5">{t("common.status.connected")}</p>
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
                 <Shield className="h-3 w-3 text-primary" />
-                <span className="uppercase tracking-wider">Protected</span>
+                <span className="uppercase tracking-wider">{t("common.status.protected")}</span>
               </div>
             </div>
           )}
           {isConnecting && (
             <p className="text-sm font-medium text-yellow-400 animate-pulse tracking-wider uppercase">
-              Connecting...
+              {t("common.status.connecting")}
             </p>
           )}
           {!isConnected && !isConnecting && (
-            <p className="text-sm text-muted-foreground">Tap to connect</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.tapToConnect")}</p>
           )}
         </div>
 
@@ -179,7 +181,7 @@ export function DashboardPage() {
               <>
                 <LogOut className="h-4 w-4 text-purple-400" />
                 <span className="text-sm font-medium">{exitNode.name}</span>
-                <Badge variant="outline" className="text-[9px] border-purple-500/30 bg-purple-500/10 text-purple-400">Exit Node</Badge>
+                <Badge variant="outline" className="text-[9px] border-purple-500/30 bg-purple-500/10 text-purple-400">{t("dashboard.exitNode")}</Badge>
                 <span className="text-xs text-muted-foreground">- {exitNode.ip}</span>
               </>
             ) : activeNodeObj ? (
@@ -196,12 +198,12 @@ export function DashboardPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: "Upload", value: formatSpeed(uploadSpeed), icon: ArrowUp, iconColor: "text-primary", gradient: "from-primary/10 to-transparent" },
-          { label: "Download", value: formatSpeed(downloadSpeed), icon: ArrowDown, iconColor: "text-green-400", gradient: "from-green-500/10 to-transparent" },
-          { label: "Traffic", value: formatBytes(totalDownload + totalUpload), icon: Database, iconColor: "text-purple-400", gradient: "from-purple-500/10 to-transparent" },
-          { label: "Connections", value: `${activeConnections}`, icon: Wifi, iconColor: "text-blue-400", gradient: "from-blue-500/10 to-transparent" },
-          { label: "Memory", value: formatBytes(memoryInuse), icon: Cpu, iconColor: "text-orange-400", gradient: "from-orange-500/10 to-transparent" },
-          { label: "Uptime", value: uptimeStr, icon: Clock, iconColor: "text-cyan-400", gradient: "from-cyan-500/10 to-transparent" },
+          { label: t("dashboard.upload"), value: formatSpeed(uploadSpeed), icon: ArrowUp, iconColor: "text-primary", gradient: "from-primary/10 to-transparent" },
+          { label: t("dashboard.download"), value: formatSpeed(downloadSpeed), icon: ArrowDown, iconColor: "text-green-400", gradient: "from-green-500/10 to-transparent" },
+          { label: t("dashboard.traffic"), value: formatBytes(totalDownload + totalUpload), icon: Database, iconColor: "text-purple-400", gradient: "from-purple-500/10 to-transparent" },
+          { label: t("dashboard.connections"), value: `${activeConnections}`, icon: Wifi, iconColor: "text-blue-400", gradient: "from-blue-500/10 to-transparent" },
+          { label: t("dashboard.memory"), value: formatBytes(memoryInuse), icon: Cpu, iconColor: "text-orange-400", gradient: "from-orange-500/10 to-transparent" },
+          { label: t("dashboard.uptime"), value: uptimeStr, icon: Clock, iconColor: "text-cyan-400", gradient: "from-cyan-500/10 to-transparent" },
         ].map((card, i) => (
           <div
             key={card.label}
@@ -223,8 +225,8 @@ export function DashboardPage() {
       {/* Bandwidth Chart */}
       <div className="rounded-2xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium">Bandwidth History</h3>
-          <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Last 5 min</span>
+          <h3 className="text-sm font-medium">{t("dashboard.bandwidthHistory")}</h3>
+          <span className="text-[9px] text-muted-foreground uppercase tracking-wider">{t("dashboard.lastFiveMinutes")}</span>
         </div>
         <div className="h-36">
           <ResponsiveContainer width="100%" height="100%">
@@ -245,8 +247,8 @@ export function DashboardPage() {
                 formatter={(v) => formatSpeed(Number(v))}
                 contentStyle={{ backgroundColor: "rgba(35,35,63,0.95)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "0.5rem", fontSize: "11px", color: "#e5e3ff" }}
               />
-              <Area type="natural" dataKey="download" stroke="#fe97b9" strokeWidth={2} fill="url(#dlGrad)" name="Download" animationDuration={300} />
-              <Area type="natural" dataKey="upload" stroke="#a4a1ff" strokeWidth={1.5} fill="url(#ulGrad)" name="Upload" animationDuration={300} />
+              <Area type="natural" dataKey="download" stroke="#fe97b9" strokeWidth={2} fill="url(#dlGrad)" name={t("dashboard.download")} animationDuration={300} />
+              <Area type="natural" dataKey="upload" stroke="#a4a1ff" strokeWidth={1.5} fill="url(#ulGrad)" name={t("dashboard.upload")} animationDuration={300} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

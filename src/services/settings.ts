@@ -10,6 +10,7 @@ export interface SettingsService {
 
 let mockSettings: AppSettings = {
   theme: "dark",
+  language: "system",
   singboxPath: "sing-box",
   autoStart: false,
   systemProxy: true,

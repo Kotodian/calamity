@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { syncAppLanguage } from "@/i18n";
 import { settingsService } from "../services/settings";
 import type { AppSettings, Theme } from "../services/types";
 
@@ -28,12 +29,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     const settings = await settingsService.getSettings();
     set({ settings });
     applyTheme(settings.theme);
+    await syncAppLanguage(settings.language);
   },
   async updateSettings(updates) {
     // Optimistic update: apply locally first for responsive UI
     const current = get().settings;
     if (current) {
       set({ settings: { ...current, ...updates } });
+    }
+    if (updates.language) {
+      await syncAppLanguage(updates.language);
     }
     await settingsService.updateSettings(updates);
     await get().fetchSettings();

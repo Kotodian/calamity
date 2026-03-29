@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSubscriptionsStore } from "@/stores/subscriptions";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0";
@@ -15,21 +16,21 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024 * 1024)).toFixed(2)} TB`;
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: (key: string, options?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 60000) return "just now";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-  return `${Math.floor(diff / 86400000)}d ago`;
+  if (diff < 60000) return t("subscriptions.justNow");
+  if (diff < 3600000) return t("subscriptions.minutesAgo", { count: Math.floor(diff / 60000) });
+  if (diff < 86400000) return t("subscriptions.hoursAgo", { count: Math.floor(diff / 3600000) });
+  return t("subscriptions.daysAgo", { count: Math.floor(diff / 86400000) });
 }
 
-function formatExpire(iso: string | null): string | null {
+function formatExpire(iso: string | null, t: (key: string, options?: Record<string, unknown>) => string): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   const diff = date.getTime() - Date.now();
-  if (diff < 0) return "Expired";
-  if (diff < 86400000) return "< 1 day";
-  return `${Math.floor(diff / 86400000)} days`;
+  if (diff < 0) return t("subscriptions.expired");
+  if (diff < 86400000) return t("subscriptions.lessThanOneDay");
+  return t("subscriptions.days", { count: Math.floor(diff / 86400000) });
 }
 
 const INTERVAL_PRESETS: { label: string; value: number }[] = [
@@ -46,6 +47,7 @@ function intervalToSelectValue(seconds: number): string {
 }
 
 export function SubscriptionsPage() {
+  const { t } = useTranslation();
   const {
     subscriptions, fetchSubscriptions, addSubscription,
     removeSubscription, updateSubscription, updateAllSubscriptions,
@@ -70,7 +72,7 @@ export function SubscriptionsPage() {
     if (!url || adding) return;
     setAdding(true);
     try {
-      await addSubscription(name || "Untitled", url);
+      await addSubscription(name || t("subscriptions.untitled"), url);
       setName("");
       setUrl("");
     } finally {
@@ -105,8 +107,8 @@ export function SubscriptionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between animate-slide-up">
         <div>
-          <h1 className="text-xl font-semibold">Subscriptions</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Manage proxy subscription links</p>
+          <h1 className="text-xl font-semibold">{t("subscriptions.title")}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("subscriptions.subtitle")}</p>
         </div>
         <Button
           variant="outline"
@@ -116,7 +118,7 @@ export function SubscriptionsPage() {
           disabled={updatingAll}
         >
           {updatingAll ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1.5 h-3 w-3" />}
-          Update All
+          {t("subscriptions.updateAll")}
         </Button>
       </div>
 
@@ -126,14 +128,14 @@ export function SubscriptionsPage() {
           <div className="relative flex-1">
             <Link className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Subscription URL"
+              placeholder={t("subscriptions.urlPlaceholder")}
               className="pl-9 bg-muted/30 border-white/[0.06] h-9 text-xs font-mono"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
             />
           </div>
           <Input
-            placeholder="Name"
+            placeholder={t("subscriptions.namePlaceholder")}
             className="w-40 bg-muted/30 border-white/[0.06] h-9 text-xs"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -144,7 +146,7 @@ export function SubscriptionsPage() {
             onClick={handleAdd}
           >
             {adding ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Plus className="mr-1.5 h-3 w-3" />}
-            {adding ? "Adding..." : "Add"}
+            {adding ? t("subscriptions.adding") : t("subscriptions.add")}
           </Button>
         </div>
       </div>
@@ -153,7 +155,7 @@ export function SubscriptionsPage() {
       <div className="space-y-3">
         {subscriptions.map((sub, i) => {
           const isUpdating = updatingIds.has(sub.id);
-          const expireText = formatExpire(sub.expire);
+          const expireText = formatExpire(sub.expire, t);
           return (
             <div
               key={sub.id}
@@ -200,21 +202,21 @@ export function SubscriptionsPage() {
               {/* Row 3: Stats */}
               <div className="flex items-center gap-4 text-xs flex-wrap">
                 <span className="text-muted-foreground">
-                  <span className="font-semibold text-foreground">{sub.nodeCount}</span> nodes
+                  <span className="font-semibold text-foreground">{t("subscriptions.nodes", { count: sub.nodeCount })}</span>
                 </span>
                 <div className="h-3 w-px bg-white/10" />
-                <span className="text-muted-foreground">Updated {timeAgo(sub.lastUpdated)}</span>
+                <span className="text-muted-foreground">{t("subscriptions.updated", { value: timeAgo(sub.lastUpdated, t) })}</span>
                 {expireText && (
                   <>
                     <div className="h-3 w-px bg-white/10" />
-                    <span className={cn("text-muted-foreground", expireText === "Expired" && "text-red-400")}>
-                      Expires: {expireText}
+                    <span className={cn("text-muted-foreground", expireText === t("subscriptions.expired") && "text-red-400")}>
+                      {t("subscriptions.expires", { value: expireText })}
                     </span>
                   </>
                 )}
                 <div className="h-3 w-px bg-white/10" />
                 <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">Auto:</span>
+                  <span className="text-muted-foreground">{t("subscriptions.auto")}</span>
                   <Select
                     value={intervalToSelectValue(sub.autoUpdateInterval)}
                     onValueChange={(v) => {
@@ -231,7 +233,7 @@ export function SubscriptionsPage() {
                           {p.label}
                         </SelectItem>
                       ))}
-                      <SelectItem value="custom">Custom</SelectItem>
+                      <SelectItem value="custom">{t("subscriptions.custom")}</SelectItem>
                     </SelectContent>
                   </Select>
                   {intervalToSelectValue(sub.autoUpdateInterval) === "custom" && (
@@ -243,7 +245,7 @@ export function SubscriptionsPage() {
                         const mins = parseInt(e.target.value) || 0;
                         editSubscription(sub.id, { autoUpdateInterval: mins * 60 });
                       }}
-                      placeholder="min"
+                      placeholder={t("subscriptions.min")}
                     />
                   )}
                 </div>
@@ -274,7 +276,7 @@ export function SubscriptionsPage() {
                   disabled={isUpdating}
                 >
                   <RefreshCw className={cn("mr-1 h-3 w-3", isUpdating && "animate-spin")} />
-                  Update Now
+                  {t("subscriptions.updateNow")}
                 </Button>
                 <button
                   onClick={() => removeSubscription(sub.id)}
@@ -290,9 +292,9 @@ export function SubscriptionsPage() {
 
       {/* Bottom Stats */}
       <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground animate-slide-up" style={{ animationDelay: "400ms" }}>
-        <span><span className="font-semibold text-foreground">{activeCount}</span> active subscriptions</span>
+        <span>{t("subscriptions.activeSubscriptions", { count: activeCount })}</span>
         <div className="h-3 w-px bg-white/10" />
-        <span><span className="font-semibold text-foreground">{totalNodes}</span> total nodes</span>
+        <span>{t("subscriptions.totalNodes", { count: totalNodes })}</span>
         {totalTrafficTotal > 0 && (
           <>
             <div className="h-3 w-px bg-white/10" />

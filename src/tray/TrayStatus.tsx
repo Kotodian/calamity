@@ -1,4 +1,5 @@
 import { ArrowUp, ArrowDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { useConnectionStore } from "@/stores/connection";
 
@@ -8,6 +9,7 @@ function formatSpeed(bytes: number): string {
 }
 
 export function TrayStatus() {
+  const { t } = useTranslation();
   const { status, activeNode, uploadSpeed, downloadSpeed, latency } = useConnectionStore();
   const isConnected = status === "connected";
 
@@ -16,7 +18,7 @@ export function TrayStatus() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full ${isConnected ? "bg-green-500" : "bg-muted-foreground/40"}`} />
-          <span className="text-sm font-medium">{isConnected ? "Connected" : "Disconnected"}</span>
+          <span className="text-sm font-medium">{isConnected ? t("common.status.connected") : t("common.status.disconnected")}</span>
         </div>
         {isConnected && (
           <Badge variant="outline" className="text-[10px]">{latency}ms</Badge>

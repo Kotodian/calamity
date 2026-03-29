@@ -1,20 +1,21 @@
 import { useConnectionStore } from "@/stores/connection";
 import type { ProxyMode } from "@/services/types";
 import { cn } from "@/lib/utils";
-
-const modes: { value: ProxyMode; label: string }[] = [
-  { value: "rule", label: "Rule" },
-  { value: "global", label: "Global" },
-  { value: "direct", label: "Direct" },
-];
+import { useTranslation } from "react-i18next";
 
 export function TrayModeSwitch() {
+  const { t } = useTranslation();
   const { mode, setMode } = useConnectionStore();
+  const modes: { value: ProxyMode; label: string }[] = [
+    { value: "rule", label: t("common.modes.rule") },
+    { value: "global", label: t("common.modes.global") },
+    { value: "direct", label: t("common.modes.direct") },
+  ];
 
   return (
     <div className="space-y-1.5">
       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        Proxy Mode
+        {t("tray.proxyMode")}
       </p>
       <div className="flex gap-1 rounded-lg bg-muted p-0.5">
         {modes.map((m) => (

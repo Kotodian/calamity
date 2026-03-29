@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { GripVertical, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -46,12 +47,6 @@ const outboundColors: Record<string, string> = {
   reject: "border-l-red-500",
 };
 
-const outboundLabels: Record<string, string> = {
-  proxy: "Proxy",
-  direct: "DIRECT",
-  reject: "REJECT",
-};
-
 function SortableRule({
   rule,
   index,
@@ -65,9 +60,15 @@ function SortableRule({
   onEdit: () => void;
   onDelete: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState<"toggle" | "delete" | null>(null);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: rule.id });
   const style = { transform: CSS.Transform.toString(transform), transition, animationDelay: `${index * 80}ms` };
+  const outboundLabels: Record<string, string> = {
+    proxy: t("common.outbound.proxy"),
+    direct: t("common.outbound.direct"),
+    reject: t("common.outbound.reject"),
+  };
 
   return (
     <Card
@@ -125,6 +126,7 @@ const defaultForm: RuleFormData = {
 };
 
 export function RulesPage() {
+  const { t } = useTranslation();
   const { rules, fetchRules, addRule, updateRule, deleteRule, reorderRules } = useRulesStore();
   const { groups, fetchGroups } = useNodesStore();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -205,16 +207,16 @@ export function RulesPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between animate-slide-up">
         <div>
-          <h1 className="text-2xl font-semibold">Rules</h1>
+          <h1 className="text-2xl font-semibold">{t("rules.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            {rules.length} rules{" "}
+            {t("rules.rulesCount", { count: rules.length })}{" "}
             <span className="inline-flex items-center justify-center rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
-              {activeCount} active
+              {t("rules.activeCount", { count: activeCount })}
             </span>
           </p>
         </div>
         <Button onClick={openAdd} className="shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200 hover:shadow-[0_0_25px_rgba(254,151,185,0.25)]">
-          <Plus className="mr-2 h-4 w-4" /> Add Rule
+          <Plus className="mr-2 h-4 w-4" /> {t("rules.addRule")}
         </Button>
       </div>
 
@@ -238,10 +240,10 @@ export function RulesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="rounded-xl border border-white/[0.06] bg-card/80 backdrop-blur-2xl shadow-[0_0_40px_rgba(0,0,0,0.3)]">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Rule" : "Add Rule"}</DialogTitle>
+            <DialogTitle>{editingId ? t("rules.editRule") : t("rules.addRule")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input placeholder="Rule name" className="bg-muted/30 border-white/[0.06]" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Input placeholder={t("rules.ruleName")} className="bg-muted/30 border-white/[0.06]" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Select value={form.matchType} onValueChange={(v) => setForm({ ...form, matchType: v as RouteRule["matchType"] })}>
               <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
               <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
@@ -287,7 +289,7 @@ export function RulesPage() {
             </Select>
             {form.outbound === "proxy" && (
               <Select value={form.outboundNode || undefined} onValueChange={(v) => setForm({ ...form, outboundNode: v })}>
-                <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Select node..." /></SelectTrigger>
+                <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder={t("rules.selectNode")} /></SelectTrigger>
                 <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                   {allNodes.map((node) => (
                     <SelectItem key={node.id} value={node.name}>{node.name}</SelectItem>
@@ -297,21 +299,21 @@ export function RulesPage() {
             )}
             {(form.matchType === "geosite" || form.matchType === "geoip") && (
               <div className="space-y-2 rounded-lg border border-white/[0.04] bg-muted/10 p-3">
-                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Rule Set Download</label>
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t("rules.ruleSetDownload")}</label>
                 <Input
-                  placeholder="Local .srs file path (optional, overrides URL)"
+                  placeholder={t("rules.localRuleSetPath")}
                   className="bg-muted/30 border-white/[0.06] text-xs font-mono"
                   value={form.ruleSetLocalPath ?? ""}
                   onChange={(e) => setForm({ ...form, ruleSetLocalPath: e.target.value })}
                 />
                 <Input
-                  placeholder="Remote URL (auto-generated if empty)"
+                  placeholder={t("rules.remoteRuleSetUrl")}
                   className="bg-muted/30 border-white/[0.06] text-xs font-mono"
                   value={form.ruleSetUrl ?? ""}
                   onChange={(e) => setForm({ ...form, ruleSetUrl: e.target.value })}
                 />
                 <Select value={form.downloadDetour ?? "direct"} onValueChange={(v) => setForm({ ...form, downloadDetour: v })}>
-                  <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Download via..." /></SelectTrigger>
+                  <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder={t("rules.downloadVia")} /></SelectTrigger>
                   <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                     <SelectItem value="direct">DIRECT</SelectItem>
                     <SelectItem value="proxy">Proxy</SelectItem>
@@ -321,8 +323,8 @@ export function RulesPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-white/[0.06] hover:bg-white/[0.04]" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving} className="shadow-[0_0_15px_rgba(254,151,185,0.15)]">{saving ? "Saving..." : "Save"}</Button>
+            <Button variant="outline" className="border-white/[0.06] hover:bg-white/[0.04]" onClick={() => setDialogOpen(false)} disabled={saving}>{t("common.actions.cancel")}</Button>
+            <Button onClick={handleSave} disabled={saving} className="shadow-[0_0_15px_rgba(254,151,185,0.15)]">{saving ? t("rules.saving") : t("common.actions.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -12,21 +12,22 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection";
-
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/nodes", icon: Globe, label: "Nodes" },
-  { to: "/rules", icon: Route, label: "Rules" },
-  { to: "/connections", icon: Cable, label: "Connections" },
-  { to: "/logs", icon: ScrollText, label: "Logs" },
-  { to: "/subscriptions", icon: Rss, label: "Subscriptions" },
-  { to: "/tailnet", icon: Network, label: "Tailnet" },
-  { to: "/dns", icon: Shell, label: "DNS" },
-  { to: "/settings", icon: Settings, label: "Settings" },
-];
+import { useTranslation } from "react-i18next";
 
 export function Sidebar() {
+  const { t } = useTranslation();
   const status = useConnectionStore((s) => s.status);
+  const navItems = [
+    { to: "/", icon: LayoutDashboard, label: t("sidebar.dashboard") },
+    { to: "/nodes", icon: Globe, label: t("sidebar.nodes") },
+    { to: "/rules", icon: Route, label: t("sidebar.rules") },
+    { to: "/connections", icon: Cable, label: t("sidebar.connections") },
+    { to: "/logs", icon: ScrollText, label: t("sidebar.logs") },
+    { to: "/subscriptions", icon: Rss, label: t("sidebar.subscriptions") },
+    { to: "/tailnet", icon: Network, label: t("sidebar.tailnet") },
+    { to: "/dns", icon: Shell, label: t("sidebar.dns") },
+    { to: "/settings", icon: Settings, label: t("sidebar.settings") },
+  ];
 
   return (
     <aside className="flex h-screen w-56 flex-col border-r border-white/[0.06] bg-sidebar/60 backdrop-blur-2xl">

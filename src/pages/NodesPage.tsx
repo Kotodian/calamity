@@ -20,6 +20,7 @@ import { useNodesStore } from "@/stores/nodes";
 import type { ProtocolConfig, ProxyNode } from "@/services/types";
 import { cn } from "@/lib/utils";
 import { countryFlag } from "@/lib/flags";
+import { useTranslation } from "react-i18next";
 import { inferCountry } from "@/lib/proxy-uri";
 import { parseMultipleUris } from "@/lib/proxy-uri";
 
@@ -191,6 +192,7 @@ function TransportFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeF
 }
 
 function ChainFields({ form, setForm, allNodes }: { form: NodeForm; setForm: (f: NodeForm) => void; allNodes: ProxyNode[] }) {
+  const { t } = useTranslation();
   const availableNodes = allNodes.filter((n) => n.protocol !== "Chain");
   const chainNodes = form.chainNodeIds.map((id) => availableNodes.find((n) => n.id === id)).filter(Boolean) as ProxyNode[];
 
@@ -230,7 +232,7 @@ function ChainFields({ form, setForm, allNodes }: { form: NodeForm; setForm: (f:
         }}
       >
         <SelectTrigger className={inputCls}>
-          <SelectValue placeholder="Add node to chain..." />
+          <SelectValue placeholder={t("nodes.addNodeToChain")} />
         </SelectTrigger>
         <SelectContent>
           {availableNodes
@@ -244,7 +246,7 @@ function ChainFields({ form, setForm, allNodes }: { form: NodeForm; setForm: (f:
       </Select>
 
       {form.chainNodeIds.length < 2 && (
-        <p className="text-[10px] text-yellow-400">Add at least 2 nodes to form a chain</p>
+        <p className="text-[10px] text-yellow-400">{t("nodes.minChainNodes")}</p>
       )}
     </div>
   );
@@ -508,6 +510,7 @@ function tlsToForm(t: { enabled: boolean; sni: string; alpn: string[]; insecure:
 }
 
 export function NodesPage() {
+  const { t } = useTranslation();
   const { groups, selectedGroup, testing, testingNodes, fetchGroups, selectGroup, testLatency, testAllLatency, setActiveNode, disconnectNode, addNode, updateNode, removeNode, addGroup, removeGroup, renameGroup } =
     useNodesStore();
   const [search, setSearch] = useState("");
@@ -537,16 +540,16 @@ export function NodesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold">Nodes</h1>
+          <h1 className="text-lg font-semibold">{t("nodes.title")}</h1>
           <span className="text-xs text-muted-foreground">
-            Connected: <span className="text-primary font-medium">{allNodes.find((n) => n.active)?.name ?? "None"}</span>
+            {t("nodes.connected")} <span className="text-primary font-medium">{allNodes.find((n) => n.active)?.name ?? t("nodes.none")}</span>
           </span>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search nodes"
+              placeholder={t("nodes.searchPlaceholder")}
               className="pl-8 w-44 h-8 text-xs bg-muted/30 border-white/[0.06]"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -576,9 +579,9 @@ export function NodesPage() {
           >
             <ClipboardPaste className="h-3.5 w-3.5" />
             {importCount !== null ? (
-              importCount > 0 ? <span className="text-green-400">+{importCount}</span> : <span className="text-red-400">No nodes</span>
+              importCount > 0 ? <span className="text-green-400">+{importCount}</span> : <span className="text-red-400">{t("nodes.noNodes")}</span>
             ) : (
-              <span>Paste</span>
+              <span>{t("nodes.paste")}</span>
             )}
           </button>
           <button
@@ -598,7 +601,7 @@ export function NodesPage() {
               key={g.id}
               onClick={() => selectGroup(g.id)}
               onDoubleClick={() => {
-                const name = prompt("Rename group:", g.name);
+                const name = prompt(t("nodes.renameGroup"), g.name);
                 if (name) renameGroup(g.id, name);
               }}
               className={cn(
@@ -622,7 +625,7 @@ export function NodesPage() {
         </div>
         <div className="flex items-center gap-1">
           <Input
-            placeholder="New group"
+            placeholder={t("nodes.newGroup")}
             className="w-28 h-7 text-[10px] bg-muted/30 border-white/[0.06]"
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
@@ -669,7 +672,7 @@ export function NodesPage() {
           disabled={testing}
         >
           <RefreshCw className={cn("mr-1.5 h-3 w-3", testing && "animate-spin")} />
-          {testing ? "Testing..." : "Test All"}
+          {testing ? t("nodes.testing") : t("nodes.testAll")}
         </Button>
       </div>
 
@@ -708,9 +711,9 @@ export function NodesPage() {
                       <span className="text-[9px] text-muted-foreground">{(node.protocolConfig as { chain: string[] }).chain.length} hops</span>
                     )}
                     {node.active && (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase tracking-wider mt-0.5">
-                        <Check className="h-2.5 w-2.5" />
-                        Active
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase tracking-wider mt-0.5">
+                          <Check className="h-2.5 w-2.5" />
+                        {t("nodes.active")}
                       </span>
                     )}
                   </div>
@@ -777,18 +780,18 @@ export function NodesPage() {
         <div className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5 animate-slide-up">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-medium">Connection Stability</h3>
+              <h3 className="text-sm font-medium">{t("nodes.connectionStability")}</h3>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Real-time latency analysis for {allNodes.find((n) => n.active)?.name}
+                {t("nodes.realTimeLatency", { name: allNodes.find((n) => n.active)?.name })}
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <div>
-                <span className="text-muted-foreground">Avg Latency </span>
+                <span className="text-muted-foreground">{t("nodes.avgLatency")} </span>
                 <span className="font-semibold text-primary tabular-nums">{allNodes.find((n) => n.active)?.latency ?? 0} ms</span>
               </div>
               <div>
-                <span className="text-muted-foreground">Jitter </span>
+                <span className="text-muted-foreground">{t("nodes.jitter")} </span>
                 <span className="font-semibold text-primary tabular-nums">1.2 ms</span>
               </div>
             </div>
@@ -821,14 +824,14 @@ export function NodesPage() {
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="bg-card/90 backdrop-blur-2xl border-white/[0.06] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingNodeId ? "Edit Node" : "Add Node"}</DialogTitle>
+            <DialogTitle>{editingNodeId ? t("nodes.editNode") : t("nodes.addNode")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* Common fields */}
             <div>
-              <label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5 block">Basic</label>
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5 block">{t("nodes.basic")}</label>
               <div className="space-y-3">
-                <Input placeholder="Node name" className="bg-muted/30 border-white/[0.06]" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <Input placeholder={t("nodes.addNode")} className="bg-muted/30 border-white/[0.06]" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 <div className={cn("grid gap-2", form.protocol === "Chain" ? "grid-cols-1" : "grid-cols-2")}>
                   <Select value={form.protocol} onValueChange={(v) => setForm({ ...form, protocol: v })}>
                     <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
@@ -838,7 +841,7 @@ export function NodesPage() {
                   </Select>
                   {form.protocol !== "Chain" && (
                     <Select value={form.countryCode} onValueChange={(v) => { const c = countries.find((c) => c.code === v); setForm({ ...form, countryCode: v, country: c?.name ?? "" }); }}>
-                      <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Country" /></SelectTrigger>
+                      <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder={t("nodes.country")} /></SelectTrigger>
                       <SelectContent>
                         {countries.map((c) => <SelectItem key={c.code} value={c.code}>{countryFlag(c.code)} {c.name}</SelectItem>)}
                       </SelectContent>
@@ -847,8 +850,8 @@ export function NodesPage() {
                 </div>
                 {form.protocol !== "Chain" && (
                   <div className="grid grid-cols-3 gap-2">
-                    <Input placeholder="Server address" className="bg-muted/30 border-white/[0.06] col-span-2" value={form.server} onChange={(e) => setForm({ ...form, server: e.target.value })} />
-                    <Input placeholder="Port" type="number" className="bg-muted/30 border-white/[0.06]" value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} />
+                    <Input placeholder={t("nodes.serverAddress")} className="bg-muted/30 border-white/[0.06] col-span-2" value={form.server} onChange={(e) => setForm({ ...form, server: e.target.value })} />
+                    <Input placeholder={t("nodes.port")} type="number" className="bg-muted/30 border-white/[0.06]" value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} />
                   </div>
                 )}
               </div>
@@ -863,7 +866,7 @@ export function NodesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-white/10" onClick={() => { setAddDialogOpen(false); setEditingNodeId(null); }}>Cancel</Button>
+            <Button variant="outline" className="border-white/10" onClick={() => { setAddDialogOpen(false); setEditingNodeId(null); }}>{t("common.actions.cancel")}</Button>
             <Button
               className="shadow-[0_0_15px_rgba(254,151,185,0.15)]"
               disabled={!form.name || (form.protocol !== "Chain" && !form.server) || (form.protocol === "Chain" && form.chainNodeIds.length < 2)}
@@ -887,7 +890,7 @@ export function NodesPage() {
                 setEditingNodeId(null);
               }}
             >
-              {editingNodeId ? "Save" : "Add Node"}
+              {editingNodeId ? t("common.actions.save") : t("nodes.addNode")}
             </Button>
           </DialogFooter>
         </DialogContent>

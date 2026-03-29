@@ -50,10 +50,16 @@ impl Default for TunConfig {
     }
 }
 
+fn default_language() -> String {
+    "system".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub theme: String,
+    #[serde(default = "default_language")]
+    pub language: String,
     pub singbox_path: String,
     pub auto_start: bool,
     pub system_proxy: bool,
@@ -70,6 +76,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: "dark".to_string(),
+            language: default_language(),
             singbox_path: "sing-box".to_string(),
             auto_start: false,
             system_proxy: true,
@@ -92,4 +99,50 @@ pub fn load_settings() -> AppSettings {
 
 pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     write_json(SETTINGS_FILE, settings)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppSettings;
+
+    #[test]
+    fn old_settings_json_defaults_language_without_resetting_other_fields() {
+        let json = r#"{
+            "theme": "light",
+            "singboxPath": "/usr/local/bin/sing-box",
+            "autoStart": true,
+            "systemProxy": false,
+            "enhancedMode": true,
+            "tunConfig": {
+                "stack": "mixed",
+                "mtu": 1500,
+                "autoRoute": false,
+                "strictRoute": true,
+                "dnsHijack": ["198.18.0.2:53"]
+            },
+            "allowLan": true,
+            "httpPort": 8080,
+            "socksPort": 1080,
+            "mixedPort": 7890,
+            "logLevel": "debug"
+        }"#;
+
+        let settings: AppSettings = serde_json::from_str(json).expect("old settings should still deserialize");
+
+        assert_eq!(settings.language, "system");
+        assert_eq!(settings.theme, "light");
+        assert_eq!(settings.singbox_path, "/usr/local/bin/sing-box");
+        assert!(settings.auto_start);
+        assert!(!settings.system_proxy);
+        assert!(settings.enhanced_mode);
+        assert_eq!(settings.tun_config.stack, "mixed");
+        assert_eq!(settings.tun_config.mtu, 1500);
+        assert!(!settings.tun_config.auto_route);
+        assert!(settings.tun_config.strict_route);
+        assert!(settings.allow_lan);
+        assert_eq!(settings.http_port, 8080);
+        assert_eq!(settings.socks_port, 1080);
+        assert_eq!(settings.mixed_port, 7890);
+        assert_eq!(settings.log_level, "debug");
+    }
 }

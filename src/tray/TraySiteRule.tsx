@@ -1,17 +1,12 @@
 import { useState, useEffect } from "react";
 import { Globe, Plus, Check, Loader2, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { OutboundType } from "@/services/types";
 import { useRulesStore } from "@/stores/rules";
 import { cn } from "@/lib/utils";
-
-const outboundOptions: { value: OutboundType; label: string }[] = [
-  { value: "proxy", label: "Proxy" },
-  { value: "direct", label: "Direct" },
-  { value: "reject", label: "Reject" },
-];
 
 function extractDomain(url: string): string {
   try {
@@ -23,6 +18,7 @@ function extractDomain(url: string): string {
 }
 
 export function TraySiteRule() {
+  const { t } = useTranslation();
   const [domain, setDomain] = useState("");
   const [detecting, setDetecting] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
@@ -31,6 +27,11 @@ export function TraySiteRule() {
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   const addRule = useRulesStore((s) => s.addRule);
+  const outboundOptions: { value: OutboundType; label: string }[] = [
+    { value: "proxy", label: t("common.outbound.proxy") },
+    { value: "direct", label: t("common.outbound.direct") },
+    { value: "reject", label: t("common.outbound.reject") },
+  ];
 
   useEffect(() => {
     (async () => {
@@ -79,7 +80,7 @@ export function TraySiteRule() {
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        Current Site
+        {t("tray.currentSite")}
       </p>
       <div
         onClick={domain ? openDialog : undefined}
@@ -94,7 +95,7 @@ export function TraySiteRule() {
         ) : domain ? (
           <span className="text-xs font-mono truncate flex-1">{domain}</span>
         ) : (
-          <span className="text-xs text-muted-foreground/50">No site detected</span>
+          <span className="text-xs text-muted-foreground/50">{t("tray.noSiteDetected")}</span>
         )}
         {domain && !showDialog && (
           <Plus className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -107,7 +108,7 @@ export function TraySiteRule() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-              Add Rule
+              {t("tray.addRule")}
             </p>
             <button
               onClick={() => setShowDialog(false)}
@@ -119,7 +120,7 @@ export function TraySiteRule() {
 
           {/* Match Type */}
           <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground">Type</p>
+            <p className="text-[10px] text-muted-foreground">{t("tray.type")}</p>
             <Badge variant="outline" className="text-[10px] border-white/[0.06]">
               domain-suffix
             </Badge>
@@ -127,7 +128,7 @@ export function TraySiteRule() {
 
           {/* Domain Value */}
           <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground">Value</p>
+            <p className="text-[10px] text-muted-foreground">{t("tray.value")}</p>
             <Input
               value={dialogDomain}
               onChange={(e) => setDialogDomain(e.target.value)}
@@ -138,7 +139,7 @@ export function TraySiteRule() {
 
           {/* Outbound */}
           <div className="space-y-1">
-            <p className="text-[10px] text-muted-foreground">Outbound</p>
+            <p className="text-[10px] text-muted-foreground">{t("tray.outbound")}</p>
             <div className="flex gap-1">
               {outboundOptions.map((opt) => (
                 <Badge
@@ -164,11 +165,11 @@ export function TraySiteRule() {
             disabled={!dialogDomain || adding}
           >
             {added ? (
-              <><Check className="mr-1 h-3 w-3" /> Added</>
+              <><Check className="mr-1 h-3 w-3" /> {t("tray.added")}</>
             ) : adding ? (
-              <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Adding...</>
+              <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> {t("tray.adding")}</>
             ) : (
-              <><Plus className="mr-1 h-3 w-3" /> Confirm</>
+              <><Plus className="mr-1 h-3 w-3" /> {t("common.actions.confirm")}</>
             )}
           </Button>
         </div>

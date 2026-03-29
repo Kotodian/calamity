@@ -1,9 +1,19 @@
 import { Shield, Copy, ExternalLink, Power } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSettingsStore } from "@/stores/settings";
 import { useConnectionStore } from "@/stores/connection";
+import type { Language } from "@/services/types";
 
 export function TrayActions() {
+  const { t } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const status = useConnectionStore((s) => s.status);
@@ -15,7 +25,7 @@ export function TrayActions() {
       <div className="flex items-center justify-between py-1">
         <div className="flex items-center gap-2 text-xs">
           <Shield className="h-3.5 w-3.5" />
-          <span>System Proxy</span>
+          <span>{t("tray.systemProxy")}</span>
         </div>
         <Switch
           className="scale-75"
@@ -31,8 +41,21 @@ export function TrayActions() {
         className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
       >
         <Copy className="h-3.5 w-3.5" />
-        Copy Proxy Address
+        {t("common.actions.copyProxyAddress")}
       </button>
+      <Select
+        value={settings?.language ?? "system"}
+        onValueChange={(value) => updateSettings({ language: value as Language })}
+      >
+        <SelectTrigger className="h-8 w-full bg-transparent px-1 text-xs text-muted-foreground hover:text-foreground">
+          <SelectValue placeholder={t("common.language")} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="system">{t("common.languages.system")}</SelectItem>
+          <SelectItem value="en">{t("common.languages.english")}</SelectItem>
+          <SelectItem value="zh-CN">{t("common.languages.chinese")}</SelectItem>
+        </SelectContent>
+      </Select>
       <button
         onClick={async () => {
           try {
@@ -50,7 +73,7 @@ export function TrayActions() {
         className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
       >
         <ExternalLink className="h-3.5 w-3.5" />
-        Open Dashboard
+        {t("common.actions.openDashboard")}
       </button>
       <button
         onClick={toggleConnection}
@@ -61,7 +84,7 @@ export function TrayActions() {
         }`}
       >
         <Power className="h-3.5 w-3.5" />
-        {isConnected ? "Disconnect" : "Connect"}
+        {isConnected ? t("common.actions.disconnect") : t("common.actions.connect")}
       </button>
     </div>
   );

@@ -224,6 +224,7 @@ export interface DnsRule {
 
 // Settings
 export type Theme = "light" | "dark" | "system";
+export type Language = "system" | "en" | "zh-CN";
 
 export interface TunConfig {
   stack: "system" | "gvisor" | "mixed";
@@ -235,6 +236,7 @@ export interface TunConfig {
 
 export interface AppSettings {
   theme: Theme;
+  language: Language;
   singboxPath: string;
   autoStart: boolean;
   systemProxy: boolean;

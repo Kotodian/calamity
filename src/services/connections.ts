@@ -173,7 +173,7 @@ function createTauriConnectionsService(): ConnectionsService {
   return {
     async getConnections() {
       const { invoke } = await import("@tauri-apps/api/core");
-      const raw = await invoke<RawConnectionsSnapshot>("get_dashboard_info");
+      await invoke<RawConnectionsSnapshot>("get_dashboard_info");
       // get_dashboard_info doesn't return full connections, use subscribe instead
       return [];
     },
@@ -191,11 +191,11 @@ function createTauriConnectionsService(): ConnectionsService {
         const { listen } = await import("@tauri-apps/api/event");
         const { invoke } = await import("@tauri-apps/api/core");
 
-        unlisten = (await listen<RawConnectionsSnapshot>("connections-update", (event) => {
+        unlisten = await listen<RawConnectionsSnapshot>("connections-update", (event) => {
           const raw = event.payload;
           const connections = (raw.connections ?? []).map(mapConnection);
           callback(connections);
-        })).unlisten ?? (() => {});
+        });
 
         // Start the subscription
         await invoke("subscribe_connections").catch(() => {});

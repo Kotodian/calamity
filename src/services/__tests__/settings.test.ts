@@ -5,14 +5,16 @@ describe("settingsService", () => {
   it("getSettings returns default settings", async () => {
     const settings = await settingsService.getSettings();
     expect(settings.theme).toBeTruthy();
+    expect(settings.language).toBe("system");
     expect(settings.singboxPath).toBeTruthy();
     expect(typeof settings.httpPort).toBe("number");
   });
 
   it("updateSettings merges partial updates", async () => {
-    await settingsService.updateSettings({ autoStart: true });
+    await settingsService.updateSettings({ autoStart: true, language: "zh-CN" });
     const settings = await settingsService.getSettings();
     expect(settings.autoStart).toBe(true);
+    expect(settings.language).toBe("zh-CN");
     // Other fields preserved
     expect(settings.singboxPath).toBeTruthy();
   });

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useConnectionsStore } from "@/stores/connections";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const outboundColor: Record<string, string> = {
   proxy: "text-primary",
@@ -18,14 +19,8 @@ const outboundIcon: Record<string, typeof Globe> = {
   reject: Ban,
 };
 
-const filters = [
-  { value: "all", label: "All" },
-  { value: "proxy", label: "Proxy" },
-  { value: "direct", label: "Direct" },
-  { value: "reject", label: "Reject" },
-];
-
 export function ConnectionsPage() {
+  const { t, i18n } = useTranslation();
   const {
     stats, search, outboundFilter,
     fetchRecords, fetchStats, setSearch, setOutboundFilter,
@@ -40,17 +35,23 @@ export function ConnectionsPage() {
   }, [fetchRecords, fetchStats, subscribe]);
 
   const records = filteredRecords();
+  const filters = [
+    { value: "all", label: t("logs.all") },
+    { value: "proxy", label: t("common.outbound.proxy") },
+    { value: "direct", label: t("common.outbound.direct") },
+    { value: "reject", label: t("common.outbound.reject") },
+  ];
 
   return (
     <div className="flex flex-col h-full p-6 gap-4">
       {/* Header */}
       <div className="flex items-center justify-between animate-slide-up">
         <div>
-          <h1 className="text-xl font-semibold">Connections</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Real-time connection tracking</p>
+          <h1 className="text-xl font-semibold">{t("connections.title")}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("connections.subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" className="border-white/[0.06] text-xs" onClick={clearAll}>
-          <Trash2 className="mr-1.5 h-3 w-3" /> Clear All
+          <Trash2 className="mr-1.5 h-3 w-3" /> {t("common.actions.clearAll")}
         </Button>
       </div>
 
@@ -58,25 +59,25 @@ export function ConnectionsPage() {
       <div className="flex items-center gap-4 animate-slide-up" style={{ animationDelay: "80ms" }}>
         <div className="flex items-center gap-1.5 text-xs">
           <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-muted-foreground">Total</span>
+          <span className="text-muted-foreground">{t("connections.total")}</span>
           <span className="font-semibold tabular-nums">{stats.total}</span>
         </div>
         <div className="h-3 w-px bg-white/10" />
         <div className="flex items-center gap-1.5 text-xs">
           <Globe className="h-3.5 w-3.5 text-primary" />
-          <span className="text-muted-foreground">Proxy</span>
+          <span className="text-muted-foreground">{t("common.outbound.proxy")}</span>
           <span className="font-semibold tabular-nums text-primary">{stats.proxy}</span>
         </div>
         <div className="h-3 w-px bg-white/10" />
         <div className="flex items-center gap-1.5 text-xs">
           <Shield className="h-3.5 w-3.5 text-green-400" />
-          <span className="text-muted-foreground">Direct</span>
+          <span className="text-muted-foreground">{t("common.outbound.direct")}</span>
           <span className="font-semibold tabular-nums text-green-400">{stats.direct}</span>
         </div>
         <div className="h-3 w-px bg-white/10" />
         <div className="flex items-center gap-1.5 text-xs">
           <Ban className="h-3.5 w-3.5 text-red-400" />
-          <span className="text-muted-foreground">Reject</span>
+          <span className="text-muted-foreground">{t("common.outbound.reject")}</span>
           <span className="font-semibold tabular-nums text-red-400">{stats.reject}</span>
         </div>
       </div>
@@ -102,7 +103,7 @@ export function ConnectionsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search host or process..."
+            placeholder={t("connections.searchPlaceholder")}
             className="pl-9 bg-muted/30 border-white/[0.06] h-8 text-xs"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -145,7 +146,7 @@ export function ConnectionsPage() {
               {/* Row 2: Details */}
               <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
                 <span className="font-mono tabular-nums">
-                  {new Date(r.timestamp).toLocaleTimeString()}
+                  {new Date(r.timestamp).toLocaleTimeString(i18n.language)}
                 </span>
                 <span className={cn("shrink-0", outboundColor[r.outbound])}>
                   {r.outboundNode}

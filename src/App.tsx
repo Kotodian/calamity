@@ -14,8 +14,10 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { useSettingsStore } from "./stores/settings";
 import { useConnectionStore } from "./stores/connection";
+import { useTranslation } from "react-i18next";
 
 export default function App() {
+  const { t } = useTranslation();
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
   const fetchConnectionState = useConnectionStore((s) => s.fetchState);
 
@@ -29,12 +31,12 @@ export default function App() {
       try {
         const { listen } = await import("@tauri-apps/api/event");
         unlisten = await listen<string>("singbox-error", (event) => {
-          toast.error("sing-box error", { description: event.payload, duration: 8000 });
+          toast.error(t("app.singboxError"), { description: event.payload, duration: 8000 });
         });
       } catch {}
     })();
     return () => { if (unlisten) unlisten(); };
-  }, [fetchSettings, fetchConnectionState]);
+  }, [fetchSettings, fetchConnectionState, t]);
 
   return (
     <>

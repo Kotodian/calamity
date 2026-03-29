@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTailnetStore } from "@/stores/tailnet";
 import { cn } from "@/lib/utils";
 import type { TailnetDevice } from "@/services/types";
+import { useTranslation } from "react-i18next";
 
 function deviceIcon(os: string) {
   switch (os.toLowerCase()) {
@@ -18,6 +19,7 @@ function deviceIcon(os: string) {
 }
 
 function DeviceCard({ device, index, onSetExitNode }: { device: TailnetDevice; index: number; onSetExitNode: (id: string | null) => void }) {
+  const { t } = useTranslation();
   const Icon = deviceIcon(device.os);
   const isOnline = device.status === "online";
 
@@ -36,7 +38,7 @@ function DeviceCard({ device, index, onSetExitNode }: { device: TailnetDevice; i
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium truncate text-sm">{device.name}</span>
-            {device.isSelf && <Badge variant="outline" className="text-[10px] border-primary/30 bg-primary/15 text-primary">This device</Badge>}
+            {device.isSelf && <Badge variant="outline" className="text-[10px] border-primary/30 bg-primary/15 text-primary">{t("tailnet.thisDevice")}</Badge>}
             <span className="relative">
               <span className={cn("block h-2 w-2 rounded-full", isOnline ? "bg-green-500" : "bg-muted-foreground/40")} />
               {isOnline && <span className="absolute inset-0 h-2 w-2 rounded-full bg-green-500 animate-ping opacity-75" />}
@@ -56,7 +58,7 @@ function DeviceCard({ device, index, onSetExitNode }: { device: TailnetDevice; i
             disabled={!isOnline}
           >
             <LogOut className="mr-2 h-3.5 w-3.5" />
-            {device.isCurrentExitNode ? "Active" : "Exit Node"}
+            {device.isCurrentExitNode ? t("tailnet.active") : t("tailnet.exitNode")}
           </Button>
         )}
       </div>
@@ -65,6 +67,7 @@ function DeviceCard({ device, index, onSetExitNode }: { device: TailnetDevice; i
 }
 
 function LoginPanel({ onLogin, loggingIn }: { onLogin: () => void; loggingIn: boolean }) {
+  const { t } = useTranslation();
   return (
     <div className="flex-1 flex items-center justify-center">
       <div className="text-center space-y-6 animate-slide-up">
@@ -72,9 +75,9 @@ function LoginPanel({ onLogin, loggingIn }: { onLogin: () => void; loggingIn: bo
           <Network className="h-10 w-10 text-muted-foreground" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold mb-1">Connect to Tailscale</h2>
+          <h2 className="text-lg font-semibold mb-1">{t("tailnet.connectTitle")}</h2>
           <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Sign in to your Tailscale account to access your mesh network devices
+            {t("tailnet.connectSubtitle")}
           </p>
         </div>
         <Button
@@ -83,13 +86,13 @@ function LoginPanel({ onLogin, loggingIn }: { onLogin: () => void; loggingIn: bo
           className="shadow-[0_0_20px_rgba(254,151,185,0.15)] px-6"
         >
           {loggingIn ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...</>
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("tailnet.connecting")}</>
           ) : (
-            <><LogIn className="mr-2 h-4 w-4" /> Sign in with Tailscale</>
+            <><LogIn className="mr-2 h-4 w-4" /> {t("tailnet.signIn")}</>
           )}
         </Button>
         <p className="text-[10px] text-muted-foreground/50">
-          This will open the Tailscale login flow in your browser
+          {t("tailnet.loginBrowserHint")}
         </p>
       </div>
     </div>
@@ -97,6 +100,7 @@ function LoginPanel({ onLogin, loggingIn }: { onLogin: () => void; loggingIn: bo
 }
 
 export function TailnetPage() {
+  const { t } = useTranslation();
   const { account, devices, funnels, loggingIn, fetchAccount, login, logout, fetchDevices, setExitNode, fetchFunnels, addFunnel, toggleFunnel, removeFunnel } = useTailnetStore();
   const [funnelPort, setFunnelPort] = useState("3000");
   const [funnelProtocol, setFunnelProtocol] = useState<"https" | "tcp" | "tls-terminated-tcp">("https");
@@ -120,8 +124,8 @@ export function TailnetPage() {
     return (
       <div className="p-6 flex flex-col min-h-full">
         <div className="animate-slide-up">
-          <h1 className="text-xl font-semibold">Tailnet</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Mesh VPN powered by Tailscale</p>
+          <h1 className="text-xl font-semibold">{t("tailnet.title")}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("tailnet.subtitle")}</p>
         </div>
         <LoginPanel onLogin={login} loggingIn={loggingIn} />
       </div>
@@ -134,10 +138,10 @@ export function TailnetPage() {
       {/* Header */}
       <div className="flex items-center justify-between animate-slide-up">
         <div>
-          <h1 className="text-xl font-semibold">Tailnet</h1>
+          <h1 className="text-xl font-semibold">{t("tailnet.title")}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {onlineCount}/{devices.length} devices online
-            {currentExit && ` • Exit node: ${currentExit.name}`}
+            {t("tailnet.devicesOnline", { online: onlineCount, total: devices.length })}
+            {currentExit && ` • ${t("tailnet.exitNodeSummary", { name: currentExit.name })}`}
           </p>
         </div>
       </div>
@@ -155,13 +159,13 @@ export function TailnetPage() {
         </div>
         <Button variant="outline" size="sm" className="border-white/[0.06] text-xs" onClick={logout}>
           <LogOut className="mr-1.5 h-3 w-3" />
-          Sign Out
+          {t("tailnet.signOut")}
         </Button>
       </div>
 
       {/* Exit Node */}
       <div className="rounded-xl border border-primary/20 bg-primary/[0.04] backdrop-blur-xl p-4 animate-slide-up shadow-[0_0_25px_rgba(254,151,185,0.06)]" style={{ animationDelay: "160ms" }}>
-        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Exit Node</p>
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">{t("tailnet.exitNode")}</p>
         {currentExit ? (
           <div className="flex items-center justify-between">
             <div>
@@ -169,11 +173,11 @@ export function TailnetPage() {
               <p className="text-xs text-muted-foreground">{currentExit.ip}</p>
             </div>
             <Button variant="outline" size="sm" className="border-white/[0.06]" onClick={() => setExitNode(null)}>
-              Disconnect
+              {t("tailnet.disconnect")}
             </Button>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No exit node selected</p>
+          <p className="text-sm text-muted-foreground">{t("tailnet.noExitNode")}</p>
         )}
       </div>
 
@@ -195,15 +199,15 @@ export function TailnetPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-medium">Funnel</h3>
+            <h3 className="text-sm font-medium">{t("tailnet.funnel")}</h3>
           </div>
-          <p className="text-[10px] text-muted-foreground">Expose local services to the internet</p>
+          <p className="text-[10px] text-muted-foreground">{t("tailnet.funnelSubtitle")}</p>
         </div>
 
         {/* Add funnel */}
         <div className="flex items-center gap-2">
           <Input
-            placeholder="Port"
+            placeholder={t("tailnet.port")}
             type="number"
             className="w-24 bg-muted/30 border-white/[0.06] h-8 text-xs"
             value={funnelPort}
@@ -226,7 +230,7 @@ export function TailnetPage() {
               addFunnel({ localPort: parseInt(funnelPort) || 3000, protocol: funnelProtocol, allowPublic: true });
             }}
           >
-            <Plus className="mr-1 h-3 w-3" /> Add
+            <Plus className="mr-1 h-3 w-3" /> {t("tailnet.add")}
           </Button>
         </div>
 
@@ -247,7 +251,7 @@ export function TailnetPage() {
                   </p>
                 </div>
                 <Badge variant={f.enabled ? "default" : "secondary"} className="text-[9px]">
-                  {f.enabled ? "Live" : "Off"}
+                  {f.enabled ? t("tailnet.live") : t("tailnet.off")}
                 </Badge>
                 <button
                   onClick={() => removeFunnel(f.id)}

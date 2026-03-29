@@ -18,6 +18,7 @@ import { useSettingsStore } from "@/stores/settings";
 import { useNodesStore } from "@/stores/nodes";
 import { useRulesStore } from "@/stores/rules";
 import type { DnsMode } from "@/services/types";
+import { useTranslation } from "react-i18next";
 
 const PRESET_SERVERS = [
   { id: "cf-https", name: "Cloudflare", address: "https://1.1.1.1/dns-query" },
@@ -30,15 +31,8 @@ const PRESET_SERVERS = [
   { id: "tailscale", name: "Tailscale", address: "100.100.100.100" },
 ] as const;
 
-const MATCH_TYPES = [
-  { value: "domain", label: "Domain" },
-  { value: "domain-suffix", label: "Domain Suffix" },
-  { value: "domain-keyword", label: "Domain Keyword" },
-  { value: "domain-regex", label: "Domain Regex" },
-  { value: "rule_set", label: "Rule Set" },
-] as const;
-
 export function DnsPage() {
+  const { t } = useTranslation();
   const {
     config,
     rules,
@@ -82,12 +76,20 @@ export function DnsPage() {
 
   if (!config) return null;
 
+  const MATCH_TYPES = [
+    { value: "domain", label: t("dns.matchTypes.domain") },
+    { value: "domain-suffix", label: t("dns.matchTypes.domainSuffix") },
+    { value: "domain-keyword", label: t("dns.matchTypes.domainKeyword") },
+    { value: "domain-regex", label: t("dns.matchTypes.domainRegex") },
+    { value: "rule_set", label: t("dns.matchTypes.ruleSet") },
+  ] as const;
+
   const existingServerIds = new Set(config.servers.map((s) => s.id));
   const availablePresets = PRESET_SERVERS.filter((p) => !existingServerIds.has(p.id));
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold animate-slide-up">DNS</h1>
+      <h1 className="text-2xl font-semibold animate-slide-up">{t("dns.title")}</h1>
 
       <Tabs defaultValue="config">
         <TabsList
@@ -98,13 +100,13 @@ export function DnsPage() {
             value="config"
             className="rounded-full text-xs px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200"
           >
-            Configuration
+            {t("dns.configuration")}
           </TabsTrigger>
           <TabsTrigger
             value="rules"
             className="rounded-full text-xs px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200"
           >
-            DNS Rules
+            {t("dns.rules")}
           </TabsTrigger>
         </TabsList>
 
@@ -117,7 +119,7 @@ export function DnsPage() {
           >
             <CardHeader>
               <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                DNS Mode
+                {t("dns.modeTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -130,15 +132,15 @@ export function DnsPage() {
                 </SelectTrigger>
                 <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                   <SelectItem value="fake-ip" disabled={!tunEnabled}>
-                    Fake-IP{!tunEnabled ? " (requires TUN)" : ""}
+                    {tunEnabled ? t("dns.modeFakeIp") : t("dns.modeFakeIpRequiresTun")}
                   </SelectItem>
-                  <SelectItem value="redir-host">Redir-Host</SelectItem>
-                  <SelectItem value="direct">Direct</SelectItem>
+                  <SelectItem value="redir-host">{t("dns.modeRedirHost")}</SelectItem>
+                  <SelectItem value="direct">{t("dns.modeDirect")}</SelectItem>
                 </SelectContent>
               </Select>
               {config.mode === "fake-ip" && (
                 <p className="text-xs text-muted-foreground">
-                  Fake-IP range: {config.fakeIpRange}
+                  {t("dns.fakeIpRange", { value: config.fakeIpRange })}
                 </p>
               )}
             </CardContent>
@@ -151,7 +153,7 @@ export function DnsPage() {
           >
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                DNS Servers
+                {t("dns.serversTitle")}
               </CardTitle>
               <Button
                 variant="outline"
@@ -160,7 +162,7 @@ export function DnsPage() {
                 onClick={() => setShowPresets(!showPresets)}
               >
                 <Plus className="mr-1 h-3 w-3" />
-                Add Server
+                {t("dns.addServer")}
               </Button>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -170,7 +172,7 @@ export function DnsPage() {
                   {availablePresets.length > 0 && (
                     <div className="space-y-1">
                       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                        Presets
+                        {t("dns.presets")}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {availablePresets.map((preset) => (
@@ -199,17 +201,17 @@ export function DnsPage() {
                   )}
                   <div className="space-y-1">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Custom
+                      {t("dns.custom")}
                     </p>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="Name"
+                        placeholder={t("dns.namePlaceholder")}
                         value={customName}
                         onChange={(e) => setCustomName(e.target.value)}
                         className="w-32 bg-muted/30 border-white/[0.06] text-xs"
                       />
                       <Input
-                        placeholder="Address (e.g. https://... or tls://... or IP)"
+                        placeholder={t("dns.addressPlaceholder")}
                         value={customAddress}
                         onChange={(e) => setCustomAddress(e.target.value)}
                         className="flex-1 bg-muted/30 border-white/[0.06] text-xs"
@@ -270,7 +272,7 @@ export function DnsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
-                      <SelectItem value="direct">Direct</SelectItem>
+                      <SelectItem value="direct">{t("dns.modeDirect")}</SelectItem>
                       {outboundOptions.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
                           {o.label}
@@ -305,7 +307,7 @@ export function DnsPage() {
           >
             <CardHeader>
               <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                DNS Rules
+                {t("dns.rules")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -326,7 +328,7 @@ export function DnsPage() {
                 {newMatchType === "rule_set" ? (
                   <Select value={newMatchValue || undefined} onValueChange={setNewMatchValue}>
                     <SelectTrigger className="flex-1 bg-muted/30 border-white/[0.06] text-xs">
-                      <SelectValue placeholder="Select rule set..." />
+                      <SelectValue placeholder={t("dns.selectRuleSet")} />
                     </SelectTrigger>
                     <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                       {ruleSetOptions.map((rs) => (
@@ -338,7 +340,7 @@ export function DnsPage() {
                   </Select>
                 ) : (
                   <Input
-                    placeholder="Value (e.g. .cn)"
+                    placeholder={t("dns.valuePlaceholder")}
                     value={newMatchValue}
                     onChange={(e) => setNewMatchValue(e.target.value)}
                     className="flex-1 bg-muted/30 border-white/[0.06] text-xs"
@@ -346,7 +348,7 @@ export function DnsPage() {
                 )}
                 <Select value={newRuleServer} onValueChange={setNewRuleServer}>
                   <SelectTrigger className="w-40 bg-muted/30 border-white/[0.06] text-xs">
-                    <SelectValue placeholder="Server" />
+                    <SelectValue placeholder={t("dns.serverPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                     {config.servers.map((s) => (
@@ -396,9 +398,9 @@ export function DnsPage() {
                           <Badge
                             variant="outline"
                             className="text-[10px] border-white/[0.06] bg-muted/30"
-                          >
-                            {matchLabel}
-                          </Badge>
+                      >
+                        {matchLabel}
+                      </Badge>
                           <p className="text-sm font-mono">{rule.matchValue}</p>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">→ {serverName}</p>
@@ -410,7 +412,7 @@ export function DnsPage() {
                             : "bg-muted/40 text-muted-foreground border-0"
                         }
                       >
-                        {rule.enabled ? "Active" : "Disabled"}
+                        {rule.enabled ? t("dns.active") : t("dns.disabled")}
                       </Badge>
                       <Button
                         variant="ghost"
@@ -430,7 +432,7 @@ export function DnsPage() {
                 })}
                 {rules.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    No DNS rules configured
+                    {t("dns.noRules")}
                   </p>
                 )}
               </div>

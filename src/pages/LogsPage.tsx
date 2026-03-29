@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLogsStore } from "@/stores/logs";
 import type { LogLevel } from "@/services/types";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const levelStyles: Record<LogLevel, string> = {
   debug: "bg-muted/40 text-muted-foreground",
@@ -18,6 +19,7 @@ const levelStyles: Record<LogLevel, string> = {
 };
 
 export function LogsPage() {
+  const { t, i18n } = useTranslation();
   const { filter, search, autoScroll, fetchLogs, setFilter, setSearch, clearLogs, subscribe, filteredLogs } =
     useLogsStore();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -39,25 +41,25 @@ export function LogsPage() {
   return (
     <div className="flex h-full flex-col p-6 gap-4">
       <div className="flex items-center justify-between animate-slide-up">
-        <h1 className="text-2xl font-semibold">Logs</h1>
+        <h1 className="text-2xl font-semibold">{t("logs.title")}</h1>
         <Button variant="outline" size="sm" className="border-white/[0.06] hover:bg-white/[0.04] transition-all duration-200" onClick={clearLogs}>
-          <Trash2 className="mr-2 h-3.5 w-3.5" /> Clear
+          <Trash2 className="mr-2 h-3.5 w-3.5" /> {t("common.actions.clear")}
         </Button>
       </div>
 
       <div className="flex items-center gap-3 animate-slide-up" style={{ animationDelay: "80ms" }}>
         <Tabs value={filter ?? "all"} onValueChange={(v) => setFilter(v === "all" ? null : (v as LogLevel))}>
           <TabsList className="bg-muted/30 border border-white/[0.06] backdrop-blur-xl rounded-full p-1">
-            <TabsTrigger value="all" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">All</TabsTrigger>
-            <TabsTrigger value="debug" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">Debug</TabsTrigger>
-            <TabsTrigger value="info" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">Info</TabsTrigger>
-            <TabsTrigger value="warn" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">Warn</TabsTrigger>
-            <TabsTrigger value="error" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">Error</TabsTrigger>
+            <TabsTrigger value="all" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">{t("logs.all")}</TabsTrigger>
+            <TabsTrigger value="debug" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">{t("logs.debug")}</TabsTrigger>
+            <TabsTrigger value="info" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">{t("logs.info")}</TabsTrigger>
+            <TabsTrigger value="warn" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">{t("logs.warn")}</TabsTrigger>
+            <TabsTrigger value="error" className="rounded-full text-xs px-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_15px_rgba(254,151,185,0.15)] transition-all duration-200">{t("logs.error")}</TabsTrigger>
           </TabsList>
         </Tabs>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search logs..." className="pl-9 bg-muted/30 border-white/[0.06] backdrop-blur-xl" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder={t("logs.searchPlaceholder")} className="pl-9 bg-muted/30 border-white/[0.06] backdrop-blur-xl" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -68,7 +70,7 @@ export function LogsPage() {
               {filtered.map((entry) => (
                 <div key={entry.id} className="flex items-center gap-3 px-4 py-2 text-xs font-mono hover:bg-white/[0.02] transition-colors duration-150">
                   <span className="shrink-0 text-muted-foreground">
-                    {new Date(entry.timestamp).toLocaleTimeString()}
+                    {new Date(entry.timestamp).toLocaleTimeString(i18n.language)}
                   </span>
                   <Badge className={cn("shrink-0 text-[9px] uppercase border-0", levelStyles[entry.level])}>
                     {entry.level}
@@ -84,7 +86,7 @@ export function LogsPage() {
 
       <div className="flex items-center justify-center gap-2 animate-slide-up" style={{ animationDelay: "240ms" }}>
         <p className="text-xs text-muted-foreground text-center">
-          {filtered.length} entries shown
+          {t("logs.entriesShown", { count: filtered.length })}
         </p>
         <span className="text-xs text-muted-foreground/40">•</span>
         <span className={cn(
@@ -92,7 +94,7 @@ export function LogsPage() {
           autoScroll ? "text-green-400" : "text-muted-foreground"
         )}>
           {autoScroll && <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />}
-          Auto-scroll {autoScroll ? "on" : "off"}
+          {t("logs.autoScroll")} {autoScroll ? t("logs.on") : t("logs.off")}
         </span>
       </div>
     </div>
