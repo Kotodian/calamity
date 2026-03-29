@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Capability for the main and tray windows","local":true,"windows":["main","tray"],"permissions":["core:default","shell:allow-open"]}}

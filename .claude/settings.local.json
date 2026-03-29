@@ -22,7 +22,12 @@
       "Bash(npm test:*)",
       "Bash(rustup show:*)",
       "Bash(cargo check:*)",
-      "Bash(rustup update:*)"
+      "Bash(rustup update:*)",
+      "Bash(pkill -f 'vite --host')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''app'''',{}\\).get\\(''''trayIcon'''',{}\\), indent=2\\)\\)\")",
+      "Bash(pkill -f \"tauri dev\")",
+      "Bash(pkill -f \"cargo\")",
+      "Bash(pkill -f \"vite\")"
     ]
   }
 }

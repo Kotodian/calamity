@@ -1,16 +1,14 @@
-use tauri::{
-    tray::TrayIconBuilder, Manager,
-};
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            // Build system tray
-            let _tray = TrayIconBuilder::new()
-                .tooltip("Calamity")
-                .on_tray_icon_event(|tray_handle, event| {
+            // Attach click handler to the declarative tray icon from tauri.conf.json
+            if let Some(tray) = app.tray_by_id("main-tray") {
+                let app_handle = app.handle().clone();
+                tray.on_tray_icon_event(move |_tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
                         button_state: tauri::tray::MouseButtonState::Up,
@@ -18,33 +16,24 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        let app = tray_handle.app_handle();
-                        if let Some(window) = app.get_webview_window("tray") {
+                        if let Some(window) = app_handle.get_webview_window("tray") {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
                             } else {
-                                let scale = window.scale_factor().unwrap_or(1.0);
-                                let width = 288.0;
-                                let height = 420.0;
+                                let width = 288_f64;
+                                let height = 420_f64;
+                                let x = position.x - width / 2.0;
+                                let y = position.y - height;
 
-                                let pos = tauri::PhysicalPosition::new(
-                                    (position.x - width / 2.0) * scale,
-                                    (position.y - height) * scale,
-                                );
-                                let size = tauri::PhysicalSize::new(
-                                    (width * scale) as u32,
-                                    (height * scale) as u32,
-                                );
-
-                                let _ = window.set_position(pos);
-                                let _ = window.set_size(size);
+                                let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+                                let _ = window.set_size(tauri::LogicalSize::new(width, height));
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
                         }
                     }
-                })
-                .build(app)?;
+                });
+            }
 
             // Hide tray window when it loses focus
             if let Some(tray_window) = app.get_webview_window("tray") {
