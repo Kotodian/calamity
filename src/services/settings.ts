@@ -7,7 +7,7 @@ export interface SettingsService {
 }
 
 let mockSettings: AppSettings = {
-  theme: "light",
+  theme: "dark",
   singboxPath: "/usr/local/bin/sing-box",
   autoStart: false,
   systemProxy: true,
