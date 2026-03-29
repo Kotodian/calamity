@@ -7,6 +7,7 @@ import {
   Network,
   Shell,
   Settings,
+  Cable,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection";
@@ -15,6 +16,7 @@ const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/nodes", icon: Globe, label: "Nodes" },
   { to: "/rules", icon: Route, label: "Rules" },
+  { to: "/connections", icon: Cable, label: "Connections" },
   { to: "/logs", icon: ScrollText, label: "Logs" },
   { to: "/tailnet", icon: Network, label: "Tailnet" },
   { to: "/dns", icon: Shell, label: "DNS" },
