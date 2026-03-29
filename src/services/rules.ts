@@ -15,9 +15,11 @@ let mockRules: RouteRule[] = [
   { id: "r4", name: "Ad Block", enabled: true, matchType: "geosite", matchValue: "category-ads-all", outbound: "reject", order: 3 },
   { id: "r5", name: "Home NAS", enabled: true, matchType: "domain-full", matchValue: "nas.home.arpa", outbound: "tailnet", outboundDevice: "homelab-nas", order: 4 },
   { id: "r6", name: "Streaming", enabled: false, matchType: "geosite", matchValue: "netflix", outbound: "proxy", outboundNode: "SG 01", order: 5 },
+  { id: "r7", name: "Torrent Direct", enabled: true, matchType: "process-name", matchValue: "qbittorrent", outbound: "direct", order: 6 },
+  { id: "r8", name: "Chrome Proxy", enabled: true, matchType: "process-path", matchValue: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", outbound: "proxy", outboundNode: "Tokyo 01", order: 7 },
 ];
 
-let nextId = 7;
+let nextId = 9;
 
 export const rulesService: RulesService = {
   async getRules() {

@@ -224,12 +224,33 @@ export function RulesPage() {
                 <SelectItem value="domain-suffix">domain-suffix</SelectItem>
                 <SelectItem value="domain-keyword">domain-keyword</SelectItem>
                 <SelectItem value="domain-full">domain-full</SelectItem>
+                <SelectItem value="domain-regex">domain-regex</SelectItem>
                 <SelectItem value="geosite">geosite</SelectItem>
                 <SelectItem value="geoip">geoip</SelectItem>
                 <SelectItem value="ip-cidr">ip-cidr</SelectItem>
+                <SelectItem value="process-name">process-name</SelectItem>
+                <SelectItem value="process-path">process-path</SelectItem>
+                <SelectItem value="process-path-regex">process-path-regex</SelectItem>
+                <SelectItem value="port">port</SelectItem>
+                <SelectItem value="port-range">port-range</SelectItem>
+                <SelectItem value="network">network (tcp/udp)</SelectItem>
               </SelectContent>
             </Select>
-            <Input placeholder="Match value" className="bg-muted/30 border-white/[0.06]" value={form.matchValue} onChange={(e) => setForm({ ...form, matchValue: e.target.value })} />
+            <Input
+              placeholder={
+                form.matchType === "process-name" ? "e.g. Chrome, qbittorrent" :
+                form.matchType === "process-path" ? "e.g. /Applications/Safari.app/Contents/MacOS/Safari" :
+                form.matchType === "process-path-regex" ? "e.g. ^/Applications/.+" :
+                form.matchType === "port" ? "e.g. 80, 443" :
+                form.matchType === "port-range" ? "e.g. 1000:2000" :
+                form.matchType === "network" ? "tcp or udp" :
+                form.matchType === "domain-regex" ? "e.g. ^stun\\..+" :
+                "Match value"
+              }
+              className="bg-muted/30 border-white/[0.06]"
+              value={form.matchValue}
+              onChange={(e) => setForm({ ...form, matchValue: e.target.value })}
+            />
             <Select value={form.outbound} onValueChange={(v) => setForm({ ...form, outbound: v as OutboundType })}>
               <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
               <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">

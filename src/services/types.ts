@@ -149,7 +149,7 @@ export interface RouteRule {
   id: string;
   name: string;
   enabled: boolean;
-  matchType: "domain-suffix" | "domain-keyword" | "domain-full" | "geosite" | "geoip" | "ip-cidr";
+  matchType: "domain-suffix" | "domain-keyword" | "domain-full" | "domain-regex" | "geosite" | "geoip" | "ip-cidr" | "process-name" | "process-path" | "process-path-regex" | "port" | "port-range" | "network";
   matchValue: string;
   outbound: OutboundType;
   outboundNode?: string;
