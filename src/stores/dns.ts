@@ -1,51 +1,49 @@
 import { create } from "zustand";
 import { dnsService } from "../services/dns";
-import type { DnsCacheEntry, DnsConfig, DnsRule } from "../services/types";
+import type { DnsConfig, DnsRule, DnsServer } from "../services/types";
 
 interface DnsStore {
   config: DnsConfig | null;
   rules: DnsRule[];
-  cache: DnsCacheEntry[];
-  fetchConfig: () => Promise<void>;
-  updateConfig: (config: Partial<DnsConfig>) => Promise<void>;
-  fetchRules: () => Promise<void>;
-  addRule: (rule: Omit<DnsRule, "id">) => Promise<void>;
+  fetchAll: () => Promise<void>;
+  updateConfig: (updates: { mode?: string; final?: string; fakeIpRange?: string }) => Promise<void>;
+  addServer: (server: DnsServer) => Promise<void>;
+  updateServer: (server: DnsServer) => Promise<void>;
+  deleteServer: (id: string) => Promise<void>;
+  addRule: (rule: DnsRule) => Promise<void>;
   deleteRule: (id: string) => Promise<void>;
-  fetchCache: () => Promise<void>;
-  clearCache: () => Promise<void>;
 }
 
-export const useDnsStore = create<DnsStore>((set, get) => ({
+export const useDnsStore = create<DnsStore>((set) => ({
   config: null,
   rules: [],
-  cache: [],
 
-  async fetchConfig() {
-    const config = await dnsService.getConfig();
-    set({ config });
+  async fetchAll() {
+    const { config, rules } = await dnsService.getSettings();
+    set({ config, rules });
   },
-  async updateConfig(config) {
-    await dnsService.updateConfig(config);
-    await get().fetchConfig();
+  async updateConfig(updates) {
+    const { config, rules } = await dnsService.updateConfig(updates);
+    set({ config, rules });
   },
-  async fetchRules() {
-    const rules = await dnsService.getRules();
-    set({ rules });
+  async addServer(server) {
+    const { config, rules } = await dnsService.addServer(server);
+    set({ config, rules });
+  },
+  async updateServer(server) {
+    const { config, rules } = await dnsService.updateServer(server);
+    set({ config, rules });
+  },
+  async deleteServer(id) {
+    const { config, rules } = await dnsService.deleteServer(id);
+    set({ config, rules });
   },
   async addRule(rule) {
-    await dnsService.addRule(rule);
-    await get().fetchRules();
+    const { config, rules } = await dnsService.addRule(rule);
+    set({ config, rules });
   },
   async deleteRule(id) {
-    await dnsService.deleteRule(id);
-    await get().fetchRules();
-  },
-  async fetchCache() {
-    const cache = await dnsService.getCache();
-    set({ cache });
-  },
-  async clearCache() {
-    await dnsService.clearCache();
-    set({ cache: [] });
+    const { config, rules } = await dnsService.deleteRule(id);
+    set({ config, rules });
   },
 }));

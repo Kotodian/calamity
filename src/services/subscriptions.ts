@@ -1,5 +1,3 @@
-export type AutoUpdateInterval = "1h" | "6h" | "12h" | "24h" | "never";
-
 export interface Subscription {
   id: string;
   name: string;
@@ -7,20 +5,24 @@ export interface Subscription {
   enabled: boolean;
   nodeCount: number;
   lastUpdated: string;
-  autoUpdateInterval: AutoUpdateInterval;
-  trafficUsed: number;  // bytes
+  autoUpdateInterval: number; // seconds, 0 = never
+  trafficUsed: number;  // bytes (upload + download)
   trafficTotal: number; // bytes, 0 = unlimited
+  expire: string | null; // ISO date string
   status: "active" | "updating" | "error";
 }
 
 export interface SubscriptionsService {
   getSubscriptions(): Promise<Subscription[]>;
-  addSubscription(input: { name: string; url: string }): Promise<Subscription>;
+  addSubscription(input: { name: string; url: string; autoUpdateInterval?: number }): Promise<Subscription>;
   removeSubscription(id: string): Promise<void>;
-  updateSubscription(id: string): Promise<void>;
+  updateSubscription(id: string): Promise<Subscription>;
+  updateAllSubscriptions(): Promise<void>;
   toggleSubscription(id: string, enabled: boolean): Promise<void>;
-  setAutoUpdateInterval(id: string, interval: AutoUpdateInterval): Promise<void>;
+  editSubscription(id: string, updates: { name?: string; url?: string; autoUpdateInterval?: number }): Promise<void>;
 }
+
+// ---- Mock Implementation ----
 
 let mockSubs: Subscription[] = [
   {
@@ -30,9 +32,10 @@ let mockSubs: Subscription[] = [
     enabled: true,
     nodeCount: 128,
     lastUpdated: new Date(Date.now() - 300000).toISOString(),
-    autoUpdateInterval: "12h",
+    autoUpdateInterval: 43200,
     trafficUsed: 42.5 * 1024 * 1024 * 1024,
     trafficTotal: 1024 * 1024 * 1024 * 1024,
+    expire: new Date(Date.now() + 30 * 86400000).toISOString(),
     status: "active",
   },
   {
@@ -42,28 +45,17 @@ let mockSubs: Subscription[] = [
     enabled: true,
     nodeCount: 24,
     lastUpdated: new Date(Date.now() - 3600000).toISOString(),
-    autoUpdateInterval: "6h",
+    autoUpdateInterval: 21600,
     trafficUsed: 8.2 * 1024 * 1024 * 1024,
     trafficTotal: 50 * 1024 * 1024 * 1024,
-    status: "active",
-  },
-  {
-    id: "sub-3",
-    name: "Backup Nodes",
-    url: "https://backup.example.com/singbox/sub",
-    enabled: false,
-    nodeCount: 12,
-    lastUpdated: new Date(Date.now() - 86400000).toISOString(),
-    autoUpdateInterval: "24h",
-    trafficUsed: 0,
-    trafficTotal: 0,
+    expire: null,
     status: "active",
   },
 ];
 
 let nextId = 4;
 
-export const subscriptionsService: SubscriptionsService = {
+const mockSubscriptionsService: SubscriptionsService = {
   async getSubscriptions() {
     return mockSubs.map((s) => ({ ...s }));
   },
@@ -73,19 +65,15 @@ export const subscriptionsService: SubscriptionsService = {
       name: input.name,
       url: input.url,
       enabled: true,
-      nodeCount: 0,
+      nodeCount: Math.floor(Math.random() * 50) + 5,
       lastUpdated: new Date().toISOString(),
-      autoUpdateInterval: "12h",
+      autoUpdateInterval: input.autoUpdateInterval ?? 43200,
       trafficUsed: 0,
       trafficTotal: 0,
-      status: "updating",
+      expire: null,
+      status: "active",
     };
     mockSubs.push(sub);
-    // Simulate fetch
-    setTimeout(() => {
-      sub.nodeCount = Math.floor(Math.random() * 50) + 5;
-      sub.status = "active";
-    }, 500);
     return { ...sub };
   },
   async removeSubscription(id) {
@@ -94,18 +82,117 @@ export const subscriptionsService: SubscriptionsService = {
   async updateSubscription(id) {
     const sub = mockSubs.find((s) => s.id === id);
     if (sub) {
-      sub.status = "updating";
       sub.lastUpdated = new Date().toISOString();
       sub.nodeCount = Math.floor(Math.random() * 50) + 5;
-      sub.status = "active";
+    }
+    return { ...sub! };
+  },
+  async updateAllSubscriptions() {
+    for (const sub of mockSubs) {
+      if (sub.enabled) {
+        sub.lastUpdated = new Date().toISOString();
+      }
     }
   },
   async toggleSubscription(id, enabled) {
     const sub = mockSubs.find((s) => s.id === id);
     if (sub) sub.enabled = enabled;
   },
-  async setAutoUpdateInterval(id, interval) {
+  async editSubscription(id, updates) {
     const sub = mockSubs.find((s) => s.id === id);
-    if (sub) sub.autoUpdateInterval = interval;
+    if (sub) {
+      if (updates.name !== undefined) sub.name = updates.name;
+      if (updates.url !== undefined) sub.url = updates.url;
+      if (updates.autoUpdateInterval !== undefined) sub.autoUpdateInterval = updates.autoUpdateInterval;
+    }
   },
 };
+
+// ---- Tauri Implementation ----
+
+interface RawSubscriptionConfig {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  autoUpdateInterval: number;
+  lastUpdated: string | null;
+  nodeCount: number;
+  groupId: string;
+  trafficUpload: number;
+  trafficDownload: number;
+  trafficTotal: number;
+  expire: string | null;
+}
+
+interface RawSubscriptionsData {
+  subscriptions: RawSubscriptionConfig[];
+}
+
+function toSubscription(raw: RawSubscriptionConfig): Subscription {
+  return {
+    id: raw.id,
+    name: raw.name,
+    url: raw.url,
+    enabled: raw.enabled,
+    nodeCount: raw.nodeCount,
+    lastUpdated: raw.lastUpdated ?? new Date().toISOString(),
+    autoUpdateInterval: raw.autoUpdateInterval,
+    trafficUsed: raw.trafficUpload + raw.trafficDownload,
+    trafficTotal: raw.trafficTotal,
+    expire: raw.expire,
+    status: "active",
+  };
+}
+
+function createTauriSubscriptionsService(): SubscriptionsService {
+  return {
+    async getSubscriptions() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const raw = await invoke<RawSubscriptionsData>("get_subscriptions");
+      return raw.subscriptions.map(toSubscription);
+    },
+    async addSubscription(input) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const raw = await invoke<RawSubscriptionConfig>("add_subscription", {
+        name: input.name,
+        url: input.url,
+        autoUpdateInterval: input.autoUpdateInterval ?? null,
+      });
+      return toSubscription(raw);
+    },
+    async removeSubscription(id) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("delete_subscription", { id });
+    },
+    async updateSubscription(id) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const raw = await invoke<RawSubscriptionConfig>("update_subscription", { id });
+      return toSubscription(raw);
+    },
+    async updateAllSubscriptions() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("update_all_subscriptions");
+    },
+    async toggleSubscription(id, enabled) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("toggle_subscription", { id, enabled });
+    },
+    async editSubscription(id, updates) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("edit_subscription", {
+        id,
+        name: updates.name ?? null,
+        url: updates.url ?? null,
+        autoUpdateInterval: updates.autoUpdateInterval ?? null,
+      });
+    },
+  };
+}
+
+// ---- Export ----
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const subscriptionsService: SubscriptionsService = isTauri
+  ? createTauriSubscriptionsService()
+  : mockSubscriptionsService;

@@ -1,0 +1,167 @@
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_autostart::AutoLaunchManager;
+
+use crate::singbox::process::SingboxProcess;
+use crate::singbox::storage::{self, AppSettings};
+
+#[tauri::command]
+pub async fn get_settings() -> Result<AppSettings, String> {
+    Ok(storage::load_settings())
+}
+
+#[tauri::command]
+pub async fn update_settings(app: AppHandle, updates: serde_json::Value) -> Result<AppSettings, String> {
+    let mut settings = storage::load_settings();
+    let old_key = restart_key(&settings);
+    let old_system_proxy = settings.system_proxy;
+
+    // Merge updates into settings
+    let mut json = serde_json::to_value(&settings).map_err(|e| e.to_string())?;
+    if let (Some(base), Some(patch)) = (json.as_object_mut(), updates.as_object()) {
+        for (k, v) in patch {
+            base.insert(k.clone(), v.clone());
+        }
+    }
+    settings = serde_json::from_value(json).map_err(|e| e.to_string())?;
+
+    storage::save_settings(&settings)?;
+
+    // Handle auto start toggle
+    if let Some(auto_start) = updates.get("autoStart").and_then(|v| v.as_bool()) {
+        if let Some(manager) = app.try_state::<AutoLaunchManager>() {
+            let _ = if auto_start {
+                manager.enable()
+            } else {
+                manager.disable()
+            };
+        }
+    }
+
+    // Handle system proxy toggle
+    if settings.system_proxy != old_system_proxy {
+        if settings.system_proxy {
+            set_system_proxy(settings.http_port, settings.socks_port);
+        } else {
+            clear_system_proxy();
+        }
+    }
+
+    // Always ensure sing-box is running with latest config
+    let new_key = restart_key(&settings);
+    let process = app.state::<Arc<SingboxProcess>>().inner().clone();
+    if old_key != new_key || !process.is_running().await {
+        match process.restart(&settings).await {
+            Ok(()) => { let _ = app.emit("singbox-restarted", ()); }
+            Err(e) => { let _ = app.emit("singbox-error", &e); }
+        }
+    }
+
+    Ok(settings)
+}
+
+fn restart_key(s: &AppSettings) -> String {
+    format!(
+        "{}:{}:{}:{}:{}",
+        s.mixed_port, s.http_port, s.socks_port, s.log_level, s.allow_lan
+    )
+}
+
+/// Get active network services (e.g. "Wi-Fi", "Ethernet").
+/// Returns all services that have an IP address assigned.
+fn get_active_network_services() -> Vec<String> {
+    let output = match std::process::Command::new("networksetup")
+        .args(["-listallnetworkservices"])
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return vec![],
+    };
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut services = Vec::new();
+
+    for line in text.lines().skip(1) {
+        // Skip disabled services (prefixed with *)
+        let name = line.trim();
+        if name.is_empty() || name.starts_with('*') {
+            continue;
+        }
+        // Check if this service has an IP (is active)
+        if let Ok(info) = std::process::Command::new("networksetup")
+            .args(["-getinfo", name])
+            .output()
+        {
+            let info_text = String::from_utf8_lossy(&info.stdout);
+            // Has a real IP address (not empty or "none")
+            let has_ip = info_text.lines().any(|l| {
+                l.starts_with("IP address:") && !l.contains("none") && l.len() > 12
+            });
+            if has_ip {
+                services.push(name.to_string());
+            }
+        }
+    }
+    services
+}
+
+fn set_system_proxy(http_port: u16, socks_port: u16) {
+    let services = get_active_network_services();
+    if services.is_empty() {
+        eprintln!("[system-proxy] no active network services found");
+        return;
+    }
+
+    let http_str = http_port.to_string();
+    let socks_str = socks_port.to_string();
+
+    for service in &services {
+        eprintln!("[system-proxy] setting proxy on: {}", service);
+        let cmds: Vec<Vec<&str>> = vec![
+            vec!["-setwebproxy", service, "127.0.0.1", &http_str],
+            vec!["-setwebproxystate", service, "on"],
+            vec!["-setsecurewebproxy", service, "127.0.0.1", &http_str],
+            vec!["-setsecurewebproxystate", service, "on"],
+            vec!["-setsocksfirewallproxy", service, "127.0.0.1", &socks_str],
+            vec!["-setsocksfirewallproxystate", service, "on"],
+        ];
+        for args in &cmds {
+            let _ = std::process::Command::new("networksetup")
+                .args(args)
+                .output();
+        }
+    }
+}
+
+fn clear_system_proxy() {
+    let services = get_active_network_services();
+    if services.is_empty() {
+        eprintln!("[system-proxy] no active network services found");
+        return;
+    }
+
+    for service in &services {
+        eprintln!("[system-proxy] clearing proxy on: {}", service);
+        let cmds: Vec<Vec<&str>> = vec![
+            vec!["-setwebproxystate", service, "off"],
+            vec!["-setsecurewebproxystate", service, "off"],
+            vec!["-setsocksfirewallproxystate", service, "off"],
+        ];
+        for args in &cmds {
+            let _ = std::process::Command::new("networksetup")
+                .args(args)
+                .output();
+        }
+    }
+}
+
+/// Set system proxy on startup if enabled, clear on exit.
+pub fn apply_system_proxy_on_start(settings: &AppSettings) {
+    if settings.system_proxy {
+        set_system_proxy(settings.http_port, settings.socks_port);
+    }
+}
+
+pub fn clear_system_proxy_on_exit() {
+    clear_system_proxy();
+}

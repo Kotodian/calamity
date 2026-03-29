@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { subscriptionsService } from "../subscriptions";
 
 describe("subscriptionsService", () => {
-  it("getSubscriptions returns initial list", async () => {
+  it("getSubscriptions returns initial list with expected fields", async () => {
     const subs = await subscriptionsService.getSubscriptions();
     expect(subs.length).toBeGreaterThan(0);
     expect(subs[0]).toHaveProperty("id");
@@ -12,6 +12,8 @@ describe("subscriptionsService", () => {
     expect(subs[0]).toHaveProperty("trafficUsed");
     expect(subs[0]).toHaveProperty("trafficTotal");
     expect(subs[0]).toHaveProperty("autoUpdateInterval");
+    expect(subs[0]).toHaveProperty("expire");
+    expect(typeof subs[0].autoUpdateInterval).toBe("number");
   });
 
   it("addSubscription creates a new entry", async () => {
@@ -41,7 +43,9 @@ describe("subscriptionsService", () => {
     await subscriptionsService.updateSubscription(target.id);
     const after = await subscriptionsService.getSubscriptions();
     const updated = after.find((s) => s.id === target.id)!;
-    expect(new Date(updated.lastUpdated).getTime()).toBeGreaterThanOrEqual(new Date(target.lastUpdated).getTime());
+    expect(new Date(updated.lastUpdated).getTime()).toBeGreaterThanOrEqual(
+      new Date(target.lastUpdated).getTime()
+    );
   });
 
   it("toggleSubscription changes enabled state", async () => {
@@ -53,11 +57,16 @@ describe("subscriptionsService", () => {
     await subscriptionsService.toggleSubscription(target.id, true);
   });
 
-  it("setAutoUpdateInterval changes interval", async () => {
+  it("editSubscription changes name and interval", async () => {
     const subs = await subscriptionsService.getSubscriptions();
     const target = subs[0];
-    await subscriptionsService.setAutoUpdateInterval(target.id, "24h");
+    await subscriptionsService.editSubscription(target.id, {
+      name: "Renamed",
+      autoUpdateInterval: 86400,
+    });
     const after = await subscriptionsService.getSubscriptions();
-    expect(after.find((s) => s.id === target.id)!.autoUpdateInterval).toBe("24h");
+    const updated = after.find((s) => s.id === target.id)!;
+    expect(updated.name).toBe("Renamed");
+    expect(updated.autoUpdateInterval).toBe(86400);
   });
 });

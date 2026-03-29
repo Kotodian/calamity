@@ -1,53 +1,116 @@
-import type { ConnectionState, ProxyMode, SpeedRecord } from "./types";
+import type { ConnectionState, ProxyMode } from "./types";
+
+export interface DashboardInfo {
+  running: boolean;
+  version: string;
+  activeConnections: number;
+  uploadTotal: number;
+  downloadTotal: number;
+  memoryInuse: number;
+}
 
 export interface ConnectionService {
   getState(): Promise<ConnectionState>;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   setMode(mode: ProxyMode): Promise<void>;
-  getSpeedHistory(minutes: number): Promise<SpeedRecord[]>;
+  subscribeTraffic(onUpdate: (up: number, down: number) => void): () => void;
+  getDashboardInfo(): Promise<DashboardInfo>;
 }
 
-let mockState: ConnectionState = {
-  status: "connected",
-  mode: "rule",
-  activeNode: "Tokyo 01",
-  uploadSpeed: 2.4 * 1024 * 1024,
-  downloadSpeed: 15.7 * 1024 * 1024,
-  totalUpload: 0.3 * 1024 * 1024 * 1024,
-  totalDownload: 1.2 * 1024 * 1024 * 1024,
-  latency: 32,
-};
+function createTauriConnectionService(): ConnectionService {
+  return {
+    async getState() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const status = await invoke<{ running: boolean; version: string }>("singbox_status");
+      const nodesData = await invoke<{ activeNode: string | null }>("get_nodes");
+      const isConnected = status.running && !!nodesData.activeNode;
 
-function generateSpeedHistory(minutes: number): SpeedRecord[] {
-  const records: SpeedRecord[] = [];
-  const now = Date.now();
-  for (let i = minutes; i >= 0; i--) {
-    const time = new Date(now - i * 60000);
-    records.push({
-      time: time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      upload: Math.random() * 2 * 1024 * 1024,
-      download: Math.random() * 15 * 1024 * 1024,
-    });
-  }
-  return records;
+      return {
+        status: isConnected ? "connected" : "disconnected",
+        mode: "rule" as ProxyMode,
+        activeNode: nodesData.activeNode,
+        uploadSpeed: 0,
+        downloadSpeed: 0,
+        totalUpload: 0,
+        totalDownload: 0,
+        latency: 0,
+      };
+    },
+
+    async connect() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("singbox_start");
+    },
+
+    async disconnect() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("disconnect_node");
+    },
+
+    async setMode(_mode: ProxyMode) {
+      // Mode switching not yet implemented in backend
+    },
+
+    subscribeTraffic(onUpdate) {
+      let unlisten: (() => void) | null = null;
+      let cancelled = false;
+
+      (async () => {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const { listen } = await import("@tauri-apps/api/event");
+
+          unlisten = await listen<{ up: number; down: number }>("traffic-update", (event) => {
+            if (!cancelled) {
+              onUpdate(event.payload.up, event.payload.down);
+            }
+          });
+
+          await invoke("subscribe_traffic");
+        } catch (e) {
+          console.error("[traffic] subscribe failed:", e);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+        if (unlisten) unlisten();
+      };
+    },
+
+    async getDashboardInfo() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return invoke<DashboardInfo>("get_dashboard_info");
+    },
+  };
 }
 
-export const connectionService: ConnectionService = {
-  async getState() {
-    return { ...mockState };
-  },
-  async connect() {
-    await new Promise((r) => setTimeout(r, 1500));
-    mockState.status = "connected";
-  },
-  async disconnect() {
-    mockState.status = "disconnected";
-  },
-  async setMode(mode: ProxyMode) {
-    mockState.mode = mode;
-  },
-  async getSpeedHistory(minutes: number) {
-    return generateSpeedHistory(minutes);
-  },
-};
+function createMockConnectionService(): ConnectionService {
+  return {
+    async getState() {
+      return {
+        status: "disconnected" as const,
+        mode: "rule" as ProxyMode,
+        activeNode: null,
+        uploadSpeed: 0,
+        downloadSpeed: 0,
+        totalUpload: 0,
+        totalDownload: 0,
+        latency: 0,
+      };
+    },
+    async connect() {},
+    async disconnect() {},
+    async setMode() {},
+    subscribeTraffic() { return () => {}; },
+    async getDashboardInfo() {
+      return { running: false, version: "mock", activeConnections: 0, uploadTotal: 0, downloadTotal: 0, memoryInuse: 0 };
+    },
+  };
+}
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const connectionService: ConnectionService = isTauri
+  ? createTauriConnectionService()
+  : createMockConnectionService();

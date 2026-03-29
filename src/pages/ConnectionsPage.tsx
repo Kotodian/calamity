@@ -110,76 +110,54 @@ export function ConnectionsPage() {
         </div>
       </div>
 
-      {/* Table Header */}
-      <div className="grid grid-cols-[100px_1fr_150px_140px_70px_60px_32px] gap-2 px-3 text-[10px] text-muted-foreground uppercase tracking-wider animate-slide-up" style={{ animationDelay: "240ms" }}>
-        <span>Time</span>
-        <span>Host</span>
-        <span>Rule</span>
-        <span>Outbound</span>
-        <span>Duration</span>
-        <span>Network</span>
-        <span />
-      </div>
-
       {/* Records */}
-      <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+      <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
         {records.map((r, i) => {
           const Icon = outboundIcon[r.outbound] ?? Globe;
           return (
             <div
               key={r.id}
               className={cn(
-                "grid grid-cols-[100px_1fr_150px_140px_70px_60px_32px] gap-2 items-center rounded-lg border border-white/[0.04] px-3 py-2 text-xs transition-all hover:bg-card/60",
+                "rounded-lg border border-white/[0.04] px-3 py-2.5 text-xs transition-all hover:bg-card/60",
                 r.status === "active" && "border-primary/10 bg-primary/[0.02]",
                 i < 3 && "animate-slide-up"
               )}
             >
-              {/* Time */}
-              <span className="text-muted-foreground font-mono tabular-nums text-[11px]">
-                {new Date(r.timestamp).toLocaleTimeString()}
-              </span>
-
-              {/* Host */}
-              <div className="min-w-0">
-                <p className="font-medium truncate">{r.host}</p>
-                {r.process && (
-                  <p className="text-[10px] text-muted-foreground/60 truncate">{r.process} • :{r.port}</p>
+              {/* Row 1: Host + Close */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Icon className={cn("h-3.5 w-3.5 shrink-0", outboundColor[r.outbound])} />
+                  <span className="font-medium truncate">{r.host}</span>
+                  <Badge variant="outline" className="text-[9px] border-white/[0.06] bg-muted/20 shrink-0">
+                    {r.network.toUpperCase()}
+                  </Badge>
+                  <span className="text-muted-foreground/50 text-[10px] shrink-0">:{r.port}</span>
+                </div>
+                {r.status === "active" && (
+                  <button
+                    onClick={() => closeConnection(r.id)}
+                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 )}
               </div>
-
-              {/* Rule */}
-              <Badge variant="outline" className="text-[10px] border-white/[0.06] bg-muted/20 justify-self-start truncate">
-                {r.matchedRule}
-              </Badge>
-
-              {/* Outbound */}
-              <div className={cn("flex items-center gap-1.5", outboundColor[r.outbound])}>
-                <Icon className="h-3 w-3" />
-                <span className="truncate">{r.outboundNode}</span>
+              {/* Row 2: Details */}
+              <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
+                <span className="font-mono tabular-nums">
+                  {new Date(r.timestamp).toLocaleTimeString()}
+                </span>
+                <span className={cn("shrink-0", outboundColor[r.outbound])}>
+                  {r.outboundNode}
+                </span>
+                <span className="truncate">{r.matchedRule}</span>
+                <span className="ml-auto shrink-0 flex items-center gap-2">
+                  {r.process && <span className="text-muted-foreground/50">{r.process}</span>}
+                  <span className="font-mono tabular-nums">
+                    {r.upload > 1024 ? `${(r.upload / 1024).toFixed(1)}K` : `${r.upload}B`} / {r.download > 1024 ? `${(r.download / 1024).toFixed(1)}K` : `${r.download}B`}
+                  </span>
+                </span>
               </div>
-
-              {/* Duration */}
-              <span className={cn(
-                "font-mono tabular-nums",
-                r.duration < 100 ? "text-green-400" : r.duration < 200 ? "text-yellow-400" : "text-red-400"
-              )}>
-                {r.duration}ms
-              </span>
-
-              {/* Network */}
-              <Badge variant="outline" className="text-[9px] border-white/[0.06] bg-muted/20">
-                {r.network.toUpperCase()}
-              </Badge>
-
-              {/* Close */}
-              {r.status === "active" && (
-                <button
-                  onClick={() => closeConnection(r.id)}
-                  className="text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
             </div>
           );
         })}

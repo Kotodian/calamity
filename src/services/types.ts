@@ -47,7 +47,13 @@ export type ProtocolConfig =
   | ShadowsocksConfig
   | Hysteria2Config
   | TUICConfig
-  | AnyTLSConfig;
+  | AnyTLSConfig
+  | ChainConfig;
+
+export interface ChainConfig {
+  type: "chain";
+  chain: string[]; // ordered node IDs: [first-hop, second-hop, ...]
+}
 
 // Shared TLS config
 export interface TlsConfig {
@@ -152,6 +158,7 @@ export interface RouteRule {
   matchType: "domain-suffix" | "domain-keyword" | "domain-full" | "domain-regex" | "geosite" | "geoip" | "ip-cidr" | "process-name" | "process-path" | "process-path-regex" | "port" | "port-range" | "network";
   // For geosite/geoip rule sets
   ruleSetUrl?: string;
+  ruleSetLocalPath?: string;
   downloadDetour?: string;
   matchValue: string;
   outbound: OutboundType;
@@ -193,6 +200,7 @@ export type DnsMode = "fake-ip" | "redir-host" | "direct";
 
 export interface DnsConfig {
   mode: DnsMode;
+  final: string;
   servers: DnsServer[];
   fakeIpRange: string;
 }
@@ -202,20 +210,16 @@ export interface DnsServer {
   name: string;
   address: string;
   enabled: boolean;
+  detour?: string;
+  domainResolver?: string;
 }
 
 export interface DnsRule {
   id: string;
-  domain: string;
+  matchType: "domain" | "domain-suffix" | "domain-keyword" | "domain-regex" | "rule_set";
+  matchValue: string;
   server: string;
   enabled: boolean;
-}
-
-export interface DnsCacheEntry {
-  domain: string;
-  ip: string;
-  ttl: number;
-  type: string;
 }
 
 // Settings

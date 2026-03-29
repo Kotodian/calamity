@@ -23,7 +23,13 @@ export function TrayActions() {
           onCheckedChange={(v) => updateSettings({ systemProxy: v })}
         />
       </div>
-      <button className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+      <button
+        onClick={() => {
+          const port = settings?.mixedPort ?? 7893;
+          navigator.clipboard?.writeText(`127.0.0.1:${port}`);
+        }}
+        className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+      >
         <Copy className="h-3.5 w-3.5" />
         Copy Proxy Address
       </button>

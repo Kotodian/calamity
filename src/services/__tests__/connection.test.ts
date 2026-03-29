@@ -1,45 +1,36 @@
 import { describe, it, expect } from "vitest";
 import { connectionService } from "../connection";
 
-describe("connectionService", () => {
-  it("returns initial connected state", async () => {
-    const state = await connectionService.getState();
-    expect(state.status).toBe("connected");
-    expect(state.mode).toBe("rule");
-    expect(state.activeNode).toBeTruthy();
-    expect(state.latency).toBeGreaterThan(0);
-  });
-
-  it("disconnect changes status", async () => {
-    await connectionService.disconnect();
+describe("connectionService (mock)", () => {
+  it("returns initial disconnected state", async () => {
     const state = await connectionService.getState();
     expect(state.status).toBe("disconnected");
+    expect(state.mode).toBe("rule");
+    expect(state.activeNode).toBeNull();
   });
 
-  it("connect changes status back", async () => {
+  it("connect and disconnect are callable", async () => {
     await connectionService.connect();
-    const state = await connectionService.getState();
-    expect(state.status).toBe("connected");
+    await connectionService.disconnect();
   });
 
-  it("setMode changes proxy mode", async () => {
-    await connectionService.setMode("global");
-    const state = await connectionService.getState();
-    expect(state.mode).toBe("global");
-    // Reset
-    await connectionService.setMode("rule");
+  it("subscribeTraffic returns an unsubscribe function", () => {
+    const unsub = connectionService.subscribeTraffic(() => {});
+    expect(typeof unsub).toBe("function");
+    unsub();
   });
 
-  it("getSpeedHistory returns records with expected shape", async () => {
-    const history = await connectionService.getSpeedHistory(5);
-    expect(history.length).toBeGreaterThan(0);
-    expect(history[0]).toHaveProperty("time");
-    expect(history[0]).toHaveProperty("upload");
-    expect(history[0]).toHaveProperty("download");
-    expect(typeof history[0].upload).toBe("number");
+  it("getDashboardInfo returns expected shape", async () => {
+    const info = await connectionService.getDashboardInfo();
+    expect(info).toHaveProperty("running");
+    expect(info).toHaveProperty("version");
+    expect(info).toHaveProperty("activeConnections");
+    expect(info).toHaveProperty("uploadTotal");
+    expect(info).toHaveProperty("downloadTotal");
+    expect(info).toHaveProperty("memoryInuse");
   });
 
-  it("getState returns a copy, not reference", async () => {
+  it("getState returns a new object each call", async () => {
     const a = await connectionService.getState();
     const b = await connectionService.getState();
     expect(a).not.toBe(b);

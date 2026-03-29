@@ -27,9 +27,11 @@ export interface ConnectionsService {
   getConnections(): Promise<ConnectionRecord[]>;
   getStats(): Promise<ConnectionStats>;
   clearConnections(): Promise<void>;
-  subscribe(callback: (record: ConnectionRecord) => void): () => void;
+  subscribe(callback: (records: ConnectionRecord[]) => void): () => void;
   closeConnection(id: string): Promise<void>;
 }
+
+// ---- Mock Implementation ----
 
 const sampleHosts = [
   { host: "www.google.com", rule: "GeoSite:google", outbound: "proxy", node: "HK-Premium-01" },
@@ -38,15 +40,9 @@ const sampleHosts = [
   { host: "www.baidu.com", rule: "GeoSite:cn", outbound: "direct", node: "Direct" },
   { host: "ads.tracking.com", rule: "AdBlock", outbound: "reject", node: "Reject" },
   { host: "192.168.1.1", rule: "Local", outbound: "direct", node: "Direct" },
-  { host: "play.google.com", rule: "GeoSite:google", outbound: "proxy", node: "HK-Premium-01" },
-  { host: "raw.githubusercontent.com", rule: "Global-Rule", outbound: "proxy", node: "Tokyo-01" },
-  { host: "www.bilibili.com", rule: "GeoSite:bilibili", outbound: "direct", node: "Direct" },
-  { host: "analytics.tiktok.com", rule: "AdBlock", outbound: "reject", node: "Reject" },
-  { host: "api.openai.com", rule: "GeoSite:openai", outbound: "proxy", node: "US-East-Proxy" },
-  { host: "registry.npmjs.org", rule: "Global-Rule", outbound: "proxy", node: "Tokyo-01" },
 ];
 
-const processes = ["Google Chrome", "Safari", "curl", "node", "git", "Code", "Slack", undefined];
+const processes = ["Google Chrome", "Safari", "curl", "node", "git", undefined];
 
 let mockRecords: ConnectionRecord[] = [];
 let recordId = 0;
@@ -59,7 +55,7 @@ function generateRecord(): ConnectionRecord {
     timestamp: new Date().toISOString(),
     host: sample.host,
     destinationIp: `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-    port: [80, 443, 8080, 8443][Math.floor(Math.random() * 4)],
+    port: [80, 443, 8080][Math.floor(Math.random() * 3)],
     network: Math.random() > 0.2 ? "tcp" : "udp",
     matchedRule: sample.rule,
     outbound: sample.outbound,
@@ -72,12 +68,11 @@ function generateRecord(): ConnectionRecord {
   };
 }
 
-// Pre-populate
 for (let i = 0; i < 30; i++) {
   mockRecords.push(generateRecord());
 }
 
-export const connectionsService: ConnectionsService = {
+const mockConnectionsService: ConnectionsService = {
   async getConnections() {
     return mockRecords.map((r) => ({ ...r }));
   },
@@ -98,7 +93,7 @@ export const connectionsService: ConnectionsService = {
       const record = generateRecord();
       mockRecords.push(record);
       if (mockRecords.length > 500) mockRecords = mockRecords.slice(-500);
-      callback(record);
+      callback([...mockRecords]);
     }, 1000);
     return () => clearInterval(interval);
   },
@@ -107,3 +102,117 @@ export const connectionsService: ConnectionsService = {
     if (r) r.status = "closed";
   },
 };
+
+// ---- Tauri Implementation ----
+
+interface RawConnection {
+  id: string;
+  metadata: {
+    host: string;
+    destinationIP: string;
+    destinationPort: string;
+    sourceIP: string;
+    sourcePort: string;
+    network: string;
+    type: string;
+    processPath: string;
+    dnsMode: string;
+  };
+  upload: number;
+  download: number;
+  start: string;
+  chains: string[];
+  rule: string;
+  rulePayload: string;
+}
+
+interface RawConnectionsSnapshot {
+  connections: RawConnection[] | null;
+  uploadTotal: number;
+  downloadTotal: number;
+  memory: number;
+}
+
+function mapConnection(raw: RawConnection): ConnectionRecord {
+  const startTime = new Date(raw.start).getTime();
+  const duration = Date.now() - startTime;
+
+  // Parse outbound type from rule string: "rule_set=geosite-cn => route(direct-out)" or "final => route(node-name)"
+  let outbound = "proxy";
+  const chains = raw.chains ?? [];
+  const firstChain = chains[0] ?? "";
+  if (firstChain === "direct-out" || firstChain.toLowerCase() === "direct") {
+    outbound = "direct";
+  } else if (firstChain === "block-out" || firstChain.toLowerCase() === "reject") {
+    outbound = "reject";
+  }
+
+  // Extract process name from processPath
+  const processPath = raw.metadata.processPath ?? "";
+  const process = processPath ? processPath.split("/").pop() : undefined;
+
+  return {
+    id: raw.id,
+    timestamp: raw.start,
+    host: raw.metadata.host || raw.metadata.destinationIP || "unknown",
+    destinationIp: raw.metadata.destinationIP || "",
+    port: parseInt(raw.metadata.destinationPort, 10) || 0,
+    network: (raw.metadata.network as "tcp" | "udp") || "tcp",
+    matchedRule: raw.rule || "final",
+    outbound,
+    outboundNode: firstChain || "direct-out",
+    duration: Math.max(0, duration),
+    upload: raw.upload ?? 0,
+    download: raw.download ?? 0,
+    process,
+    status: "active",
+  };
+}
+
+function createTauriConnectionsService(): ConnectionsService {
+  return {
+    async getConnections() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const raw = await invoke<RawConnectionsSnapshot>("get_dashboard_info");
+      // get_dashboard_info doesn't return full connections, use subscribe instead
+      return [];
+    },
+    async getStats() {
+      return { total: 0, proxy: 0, direct: 0, reject: 0, active: 0 };
+    },
+    async clearConnections() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("close_all_connections");
+    },
+    subscribe(callback) {
+      let unlisten: (() => void) | null = null;
+
+      (async () => {
+        const { listen } = await import("@tauri-apps/api/event");
+        const { invoke } = await import("@tauri-apps/api/core");
+
+        unlisten = (await listen<RawConnectionsSnapshot>("connections-update", (event) => {
+          const raw = event.payload;
+          const connections = (raw.connections ?? []).map(mapConnection);
+          callback(connections);
+        })).unlisten ?? (() => {});
+
+        // Start the subscription
+        await invoke("subscribe_connections").catch(() => {});
+      })();
+
+      return () => {
+        if (unlisten) unlisten();
+      };
+    },
+    async closeConnection(id) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("close_connection", { id });
+    },
+  };
+}
+
+// ---- Export ----
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const connectionsService: ConnectionsService = isTauri ? createTauriConnectionsService() : mockConnectionsService;

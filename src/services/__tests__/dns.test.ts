@@ -2,57 +2,64 @@ import { describe, it, expect } from "vitest";
 import { dnsService } from "../dns";
 
 describe("dnsService", () => {
-  it("getConfig returns config with servers", async () => {
-    const config = await dnsService.getConfig();
+  it("getSettings returns config and rules", async () => {
+    const { config, rules } = await dnsService.getSettings();
     expect(config.mode).toBeTruthy();
     expect(config.servers.length).toBeGreaterThan(0);
     expect(config.fakeIpRange).toBeTruthy();
+    expect(rules.length).toBeGreaterThan(0);
   });
 
   it("updateConfig changes mode", async () => {
+    await dnsService.updateConfig({ mode: "direct" });
+    const { config } = await dnsService.getSettings();
+    expect(config.mode).toBe("direct");
     await dnsService.updateConfig({ mode: "redir-host" });
-    const config = await dnsService.getConfig();
-    expect(config.mode).toBe("redir-host");
-    await dnsService.updateConfig({ mode: "fake-ip" });
   });
 
-  it("getRules returns DNS rules", async () => {
-    const rules = await dnsService.getRules();
-    expect(rules.length).toBeGreaterThan(0);
-    expect(rules[0]).toHaveProperty("domain");
+  it("rules have matchType and matchValue", async () => {
+    const { rules } = await dnsService.getSettings();
+    expect(rules[0]).toHaveProperty("matchType");
+    expect(rules[0]).toHaveProperty("matchValue");
     expect(rules[0]).toHaveProperty("server");
   });
 
   it("addRule creates a new DNS rule", async () => {
-    const before = await dnsService.getRules();
-    const newRule = await dnsService.addRule({
-      domain: "*.test.com",
-      server: "TestDNS",
+    const before = (await dnsService.getSettings()).rules;
+    await dnsService.addRule({
+      id: "test-rule",
+      matchType: "domain-suffix",
+      matchValue: ".test.com",
+      server: "cf-https",
       enabled: true,
     });
-    expect(newRule.id).toBeTruthy();
-    const after = await dnsService.getRules();
+    const after = (await dnsService.getSettings()).rules;
     expect(after.length).toBe(before.length + 1);
   });
 
   it("deleteRule removes a DNS rule", async () => {
-    const rules = await dnsService.getRules();
+    const { rules } = await dnsService.getSettings();
     const target = rules[rules.length - 1];
     await dnsService.deleteRule(target.id);
-    const after = await dnsService.getRules();
+    const after = (await dnsService.getSettings()).rules;
     expect(after.find((r) => r.id === target.id)).toBeUndefined();
   });
 
-  it("getCache returns cache entries", async () => {
-    const cache = await dnsService.getCache();
-    expect(cache.length).toBeGreaterThan(0);
-    expect(cache[0]).toHaveProperty("domain");
-    expect(cache[0]).toHaveProperty("ip");
+  it("addServer adds a DNS server", async () => {
+    const before = (await dnsService.getSettings()).config.servers;
+    await dnsService.addServer({
+      id: "test-server",
+      name: "Test",
+      address: "1.2.3.4",
+      enabled: true,
+    });
+    const after = (await dnsService.getSettings()).config.servers;
+    expect(after.length).toBe(before.length + 1);
   });
 
-  it("clearCache empties the cache", async () => {
-    await dnsService.clearCache();
-    const cache = await dnsService.getCache();
-    expect(cache.length).toBe(0);
+  it("deleteServer removes server and related rules", async () => {
+    await dnsService.deleteServer("test-server");
+    const { config } = await dnsService.getSettings();
+    expect(config.servers.find((s) => s.id === "test-server")).toBeUndefined();
   });
 });

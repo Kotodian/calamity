@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
 import { AppLayout } from "./components/AppLayout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { NodesPage } from "./pages/NodesPage";
@@ -10,6 +11,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage";
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { useSettingsStore } from "./stores/settings";
 import { useConnectionStore } from "./stores/connection";
 
@@ -20,9 +22,23 @@ export default function App() {
   useEffect(() => {
     fetchSettings();
     fetchConnectionState();
+
+    // Listen for sing-box errors
+    let unlisten: (() => void) | null = null;
+    (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen<string>("singbox-error", (event) => {
+          toast.error("sing-box error", { description: event.payload, duration: 8000 });
+        });
+      } catch {}
+    })();
+    return () => { if (unlisten) unlisten(); };
   }, [fetchSettings, fetchConnectionState]);
 
   return (
+    <>
+    <Toaster theme="dark" position="top-center" richColors />
     <BrowserRouter>
       <Routes>
         <Route element={<AppLayout />}>
@@ -38,5 +54,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </>
   );
 }

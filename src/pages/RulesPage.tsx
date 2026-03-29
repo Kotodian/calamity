@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GripVertical, Plus, Trash2, Pencil } from "lucide-react";
+import { GripVertical, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,21 +36,20 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRulesStore } from "@/stores/rules";
+import { useNodesStore } from "@/stores/nodes";
 import type { OutboundType, RouteRule } from "@/services/types";
 import { cn } from "@/lib/utils";
 
-const outboundColors: Record<OutboundType, string> = {
+const outboundColors: Record<string, string> = {
   proxy: "border-l-primary",
   direct: "border-l-green-500",
   reject: "border-l-red-500",
-  tailnet: "border-l-teal-500",
 };
 
-const outboundLabels: Record<OutboundType, string> = {
+const outboundLabels: Record<string, string> = {
   proxy: "Proxy",
   direct: "DIRECT",
   reject: "REJECT",
-  tailnet: "Tailnet",
 };
 
 function SortableRule({
@@ -62,10 +61,11 @@ function SortableRule({
 }: {
   rule: RouteRule;
   index: number;
-  onToggle: () => void;
+  onToggle: () => Promise<void>;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
 }) {
+  const [busy, setBusy] = useState<"toggle" | "delete" | null>(null);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: rule.id });
   const style = { transform: CSS.Transform.toString(transform), transition, animationDelay: `${index * 80}ms` };
 
@@ -91,16 +91,19 @@ function SortableRule({
           <p className="text-xs text-muted-foreground truncate">
             {rule.matchValue} → {outboundLabels[rule.outbound]}
             {rule.outboundNode && `: ${rule.outboundNode}`}
-            {rule.outboundDevice && `: ${rule.outboundDevice}`}
             {rule.downloadDetour && <span className="text-muted-foreground/50"> (via {rule.downloadDetour})</span>}
           </p>
         </div>
-        <Switch checked={rule.enabled} onCheckedChange={onToggle} />
-        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/[0.04] transition-all duration-200" onClick={onEdit}>
+        <Switch checked={rule.enabled} disabled={!!busy} onCheckedChange={async () => {
+          setBusy("toggle"); try { await onToggle(); } finally { setBusy(null); }
+        }} />
+        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/[0.04] transition-all duration-200" disabled={!!busy} onClick={onEdit}>
           <Pencil className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-red-500/10 transition-all duration-200" onClick={onDelete}>
-          <Trash2 className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-red-500/10 transition-all duration-200" disabled={!!busy} onClick={async () => {
+          setBusy("delete"); try { await onDelete(); } finally { setBusy(null); }
+        }}>
+          {busy === "delete" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
         </Button>
       </CardContent>
     </Card>
@@ -116,20 +119,25 @@ const defaultForm: RuleFormData = {
   matchValue: "",
   outbound: "proxy",
   outboundNode: "",
-  outboundDevice: "",
   ruleSetUrl: "",
+  ruleSetLocalPath: "",
   downloadDetour: "direct",
 };
 
 export function RulesPage() {
   const { rules, fetchRules, addRule, updateRule, deleteRule, reorderRules } = useRulesStore();
+  const { groups, fetchGroups } = useNodesStore();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<RuleFormData>(defaultForm);
 
   useEffect(() => {
     fetchRules();
-  }, [fetchRules]);
+    fetchGroups();
+  }, [fetchRules, fetchGroups]);
+
+  const allNodes = groups.flatMap((g) => g.nodes);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -164,20 +172,31 @@ export function RulesPage() {
       matchValue: rule.matchValue,
       outbound: rule.outbound,
       outboundNode: rule.outboundNode,
-      outboundDevice: rule.outboundDevice,
       ruleSetUrl: rule.ruleSetUrl,
+      ruleSetLocalPath: rule.ruleSetLocalPath,
       downloadDetour: rule.downloadDetour ?? "direct",
     });
     setDialogOpen(true);
   }
 
   async function handleSave() {
-    if (editingId) {
-      await updateRule(editingId, form);
-    } else {
-      await addRule(form);
+    setSaving(true);
+    try {
+      const toSave = { ...form };
+      // Clean up empty optional strings to undefined
+      if (!toSave.outboundNode) toSave.outboundNode = undefined;
+      if (!toSave.ruleSetUrl) toSave.ruleSetUrl = undefined;
+      if (!toSave.ruleSetLocalPath) toSave.ruleSetLocalPath = undefined;
+      if (!toSave.downloadDetour) toSave.downloadDetour = undefined;
+      if (editingId) {
+        await updateRule(editingId, toSave);
+      } else {
+        await addRule(toSave);
+      }
+      setDialogOpen(false);
+    } finally {
+      setSaving(false);
     }
-    setDialogOpen(false);
   }
 
   const activeCount = rules.filter((r) => r.enabled).length;
@@ -250,6 +269,8 @@ export function RulesPage() {
                 form.matchType === "port-range" ? "e.g. 1000:2000" :
                 form.matchType === "network" ? "tcp or udp" :
                 form.matchType === "domain-regex" ? "e.g. ^stun\\..+" :
+                form.matchType === "geosite" ? "e.g. cn, geolocation-!cn, google, netflix" :
+                form.matchType === "geoip" ? "e.g. cn, us, jp" :
                 "Match value"
               }
               className="bg-muted/30 border-white/[0.06]"
@@ -262,20 +283,29 @@ export function RulesPage() {
                 <SelectItem value="proxy">Proxy</SelectItem>
                 <SelectItem value="direct">DIRECT</SelectItem>
                 <SelectItem value="reject">REJECT</SelectItem>
-                <SelectItem value="tailnet">Tailnet</SelectItem>
               </SelectContent>
             </Select>
             {form.outbound === "proxy" && (
-              <Input placeholder="Node name (e.g. Tokyo 01)" className="bg-muted/30 border-white/[0.06]" value={form.outboundNode ?? ""} onChange={(e) => setForm({ ...form, outboundNode: e.target.value })} />
-            )}
-            {form.outbound === "tailnet" && (
-              <Input placeholder="Tailnet device name" className="bg-muted/30 border-white/[0.06]" value={form.outboundDevice ?? ""} onChange={(e) => setForm({ ...form, outboundDevice: e.target.value })} />
+              <Select value={form.outboundNode || undefined} onValueChange={(v) => setForm({ ...form, outboundNode: v })}>
+                <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Select node..." /></SelectTrigger>
+                <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
+                  {allNodes.map((node) => (
+                    <SelectItem key={node.id} value={node.name}>{node.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
             {(form.matchType === "geosite" || form.matchType === "geoip") && (
               <div className="space-y-2 rounded-lg border border-white/[0.04] bg-muted/10 p-3">
                 <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Rule Set Download</label>
                 <Input
-                  placeholder="Rule set URL (auto-generated if empty)"
+                  placeholder="Local .srs file path (optional, overrides URL)"
+                  className="bg-muted/30 border-white/[0.06] text-xs font-mono"
+                  value={form.ruleSetLocalPath ?? ""}
+                  onChange={(e) => setForm({ ...form, ruleSetLocalPath: e.target.value })}
+                />
+                <Input
+                  placeholder="Remote URL (auto-generated if empty)"
                   className="bg-muted/30 border-white/[0.06] text-xs font-mono"
                   value={form.ruleSetUrl ?? ""}
                   onChange={(e) => setForm({ ...form, ruleSetUrl: e.target.value })}
@@ -283,19 +313,16 @@ export function RulesPage() {
                 <Select value={form.downloadDetour ?? "direct"} onValueChange={(v) => setForm({ ...form, downloadDetour: v })}>
                   <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Download via..." /></SelectTrigger>
                   <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
-                    <SelectItem value="direct">DIRECT (直连下载)</SelectItem>
-                    <SelectItem value="proxy">Default Proxy</SelectItem>
-                    <SelectItem value="Tokyo 01">Tokyo 01</SelectItem>
-                    <SelectItem value="US West">US West</SelectItem>
-                    <SelectItem value="SG 01">Singapore 01</SelectItem>
+                    <SelectItem value="direct">DIRECT</SelectItem>
+                    <SelectItem value="proxy">Proxy</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-white/[0.06] hover:bg-white/[0.04]" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} className="shadow-[0_0_15px_rgba(254,151,185,0.15)]">Save</Button>
+            <Button variant="outline" className="border-white/[0.06] hover:bg-white/[0.04]" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving} className="shadow-[0_0_15px_rgba(254,151,185,0.15)]">{saving ? "Saving..." : "Save"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

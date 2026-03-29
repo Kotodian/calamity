@@ -10,11 +10,16 @@ import { useSettingsStore } from "@/stores/settings";
 export function TrayApp() {
   const fetchState = useConnectionStore((s) => s.fetchState);
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const subscribeTraffic = useConnectionStore((s) => s.subscribeTraffic);
+  const fetchDashboardInfo = useConnectionStore((s) => s.fetchDashboardInfo);
 
   useEffect(() => {
     fetchState();
     fetchSettings();
-  }, [fetchState, fetchSettings]);
+    fetchDashboardInfo();
+    const unsub = subscribeTraffic();
+    return unsub;
+  }, [fetchState, fetchSettings, subscribeTraffic, fetchDashboardInfo]);
 
   return (
     <div className="p-2">

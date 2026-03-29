@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Power, ArrowUp, ArrowDown, Shield, Database, LogOut } from "lucide-react";
+import { Power, ArrowUp, ArrowDown, Shield, Database, LogOut, Wifi, Cpu, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useConnectionStore } from "@/stores/connection";
 import { useNodesStore } from "@/stores/nodes";
@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { countryFlag } from "@/lib/flags";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -25,26 +26,66 @@ function formatSpeed(bytesPerSec: number): string {
   return `${formatBytes(bytesPerSec)}/s`;
 }
 
-import { countryFlag } from "@/lib/flags";
+function formatUptime(startedAt: number | null): string {
+  if (!startedAt) return "0s";
+  const seconds = Math.floor((Date.now() - startedAt) / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
+}
 
 export function DashboardPage() {
   const {
     status, activeNode, uploadSpeed, downloadSpeed,
     totalUpload, totalDownload, latency, speedHistory,
-    fetchState, toggleConnection, fetchSpeedHistory,
+    activeConnections, memoryInuse, version, startedAt,
+    fetchState, subscribeTraffic, fetchDashboardInfo, toggleConnection,
   } = useConnectionStore();
   const { groups, fetchGroups } = useNodesStore();
   const { devices, fetchAccount, fetchDevices } = useTailnetStore();
   const [justConnected, setJustConnected] = useState(false);
+  const [uptimeStr, setUptimeStr] = useState("0s");
   const prevStatusRef = useRef(status);
 
+  // Subscribe to traffic stream
   useEffect(() => {
     fetchState();
-    fetchSpeedHistory();
+    fetchDashboardInfo();
     fetchGroups();
     fetchAccount();
     fetchDevices();
-  }, [fetchState, fetchSpeedHistory, fetchGroups, fetchAccount, fetchDevices]);
+
+    let unsubTraffic = subscribeTraffic();
+
+    // Re-subscribe when sing-box restarts
+    let unlistenRestart: (() => void) | null = null;
+    (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlistenRestart = await listen("singbox-restarted", () => {
+          unsubTraffic();
+          unsubTraffic = subscribeTraffic();
+          fetchState();
+          fetchDashboardInfo();
+        });
+      } catch {}
+    })();
+
+    return () => {
+      unsubTraffic();
+      if (unlistenRestart) unlistenRestart();
+    };
+  }, [fetchState, fetchDashboardInfo, subscribeTraffic, fetchGroups, fetchAccount, fetchDevices]);
+
+  // Update uptime every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUptimeStr(formatUptime(startedAt));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
 
   useEffect(() => {
     if (prevStatusRef.current === "connecting" && status === "connected") {
@@ -75,28 +116,20 @@ export function DashboardPage() {
 
       {/* Center Power Ring */}
       <div className="flex-1 flex flex-col items-center justify-center -mt-4">
-        {/* Power Button with Rings */}
         <div className="relative mb-6">
-          {/* Outer decorative ring */}
           <div className={cn(
             "absolute inset-[-20px] rounded-full border transition-all duration-1000",
             isConnected ? "border-primary/20" : "border-white/[0.04]",
             isConnecting && "animate-spin border-yellow-500/30"
           )} style={{ animationDuration: "3s" }} />
-
-          {/* Middle ring */}
           <div className={cn(
             "absolute inset-[-10px] rounded-full border transition-all duration-700",
             isConnected ? "border-primary/30" : "border-white/[0.06]",
             isConnecting && "animate-spin border-yellow-500/20"
           )} style={{ animationDuration: "2s", animationDirection: "reverse" }} />
-
-          {/* Glow burst */}
           {justConnected && (
             <div className="absolute inset-[-30px] rounded-full bg-primary/20 animate-glow-expand" />
           )}
-
-          {/* Main button */}
           <button
             onClick={toggleConnection}
             className={cn(
@@ -110,7 +143,6 @@ export function DashboardPage() {
               "h-10 w-10 transition-all duration-700",
               isConnecting && "rotate-180 scale-90"
             )} />
-
             {isConnecting && (
               <div className="absolute inset-0 rounded-full overflow-hidden">
                 <div className="absolute inset-x-0 h-1/3 bg-gradient-to-b from-yellow-400/25 to-transparent animate-scan-line" />
@@ -148,13 +180,13 @@ export function DashboardPage() {
                 <LogOut className="h-4 w-4 text-purple-400" />
                 <span className="text-sm font-medium">{exitNode.name}</span>
                 <Badge variant="outline" className="text-[9px] border-purple-500/30 bg-purple-500/10 text-purple-400">Exit Node</Badge>
-                <span className="text-xs text-muted-foreground">• {exitNode.ip}</span>
+                <span className="text-xs text-muted-foreground">- {exitNode.ip}</span>
               </>
             ) : activeNodeObj ? (
               <>
                 <span className="text-lg">{countryFlag(activeNodeObj.countryCode)}</span>
                 <span className="text-sm font-medium">{activeNode}</span>
-                <span className="text-xs text-muted-foreground">• {latency}ms</span>
+                <span className="text-xs text-muted-foreground">{latency > 0 ? `- ${latency}ms` : ""}</span>
               </>
             ) : null}
           </div>
@@ -162,43 +194,28 @@ export function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          {
-            label: "Upload Speed",
-            value: formatSpeed(uploadSpeed),
-            icon: ArrowUp,
-            iconColor: "text-primary",
-            gradient: "from-primary/10 to-transparent",
-          },
-          {
-            label: "Download Speed",
-            value: formatSpeed(downloadSpeed),
-            icon: ArrowDown,
-            iconColor: "text-green-400",
-            gradient: "from-green-500/10 to-transparent",
-          },
-          {
-            label: "Session Traffic",
-            value: formatBytes(totalDownload + totalUpload),
-            icon: Database,
-            iconColor: "text-purple-400",
-            gradient: "from-purple-500/10 to-transparent",
-          },
+          { label: "Upload", value: formatSpeed(uploadSpeed), icon: ArrowUp, iconColor: "text-primary", gradient: "from-primary/10 to-transparent" },
+          { label: "Download", value: formatSpeed(downloadSpeed), icon: ArrowDown, iconColor: "text-green-400", gradient: "from-green-500/10 to-transparent" },
+          { label: "Traffic", value: formatBytes(totalDownload + totalUpload), icon: Database, iconColor: "text-purple-400", gradient: "from-purple-500/10 to-transparent" },
+          { label: "Connections", value: `${activeConnections}`, icon: Wifi, iconColor: "text-blue-400", gradient: "from-blue-500/10 to-transparent" },
+          { label: "Memory", value: formatBytes(memoryInuse), icon: Cpu, iconColor: "text-orange-400", gradient: "from-orange-500/10 to-transparent" },
+          { label: "Uptime", value: uptimeStr, icon: Clock, iconColor: "text-cyan-400", gradient: "from-cyan-500/10 to-transparent" },
         ].map((card, i) => (
           <div
             key={card.label}
             className={cn(
-              "rounded-xl border border-white/[0.06] bg-gradient-to-b p-4 backdrop-blur-xl animate-slide-up",
+              "rounded-xl border border-white/[0.06] bg-gradient-to-b p-3.5 backdrop-blur-xl animate-slide-up",
               card.gradient
             )}
-            style={{ animationDelay: `${i * 80}ms` }}
+            style={{ animationDelay: `${i * 60}ms` }}
           >
-            <div className="flex items-center justify-between mb-2">
-              <card.icon className={cn("h-4 w-4", card.iconColor)} />
+            <div className="flex items-center justify-between mb-1.5">
+              <card.icon className={cn("h-3.5 w-3.5", card.iconColor)} />
               <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">{card.label}</span>
             </div>
-            <p className="text-xl font-bold tabular-nums">{card.value}</p>
+            <p className="text-lg font-bold tabular-nums">{card.value}</p>
           </div>
         ))}
       </div>
@@ -207,8 +224,9 @@ export function DashboardPage() {
       <div className="rounded-2xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium">Bandwidth History</h3>
+          <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Last 5 min</span>
         </div>
-        <div className="h-40">
+        <div className="h-36">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={speedHistory}>
               <defs>
@@ -221,14 +239,14 @@ export function DashboardPage() {
                   <stop offset="100%" stopColor="#a4a1ff" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="time" tick={{ fill: "#444", fontSize: 9 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="time" tick={{ fill: "#444", fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tickFormatter={(v: number) => formatBytes(v)} tick={{ fill: "#444", fontSize: 9 }} axisLine={false} tickLine={false} width={60} />
               <Tooltip
                 formatter={(v) => formatSpeed(Number(v))}
                 contentStyle={{ backgroundColor: "rgba(35,35,63,0.95)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "0.5rem", fontSize: "11px", color: "#e5e3ff" }}
               />
-              <Area type="natural" dataKey="download" stroke="#fe97b9" strokeWidth={2} fill="url(#dlGrad)" name="Download" animationDuration={1200} />
-              <Area type="natural" dataKey="upload" stroke="#a4a1ff" strokeWidth={1.5} fill="url(#ulGrad)" name="Upload" animationDuration={1400} />
+              <Area type="natural" dataKey="download" stroke="#fe97b9" strokeWidth={2} fill="url(#dlGrad)" name="Download" animationDuration={300} />
+              <Area type="natural" dataKey="upload" stroke="#a4a1ff" strokeWidth={1.5} fill="url(#ulGrad)" name="Upload" animationDuration={300} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -238,7 +256,7 @@ export function DashboardPage() {
       <div className="flex items-center justify-center gap-3 pt-4 pb-1">
         <div className="h-px flex-1 bg-white/[0.04]" />
         <p className="text-[9px] text-muted-foreground/30 tracking-[0.15em] uppercase">
-          TLS 1.3 • AES-256-GCM • SingBox 1.8.4
+          TLS 1.3 - AES-256-GCM - SingBox {version || "1.13.4"}
         </p>
         <div className="h-px flex-1 bg-white/[0.04]" />
       </div>

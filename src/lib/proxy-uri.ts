@@ -1,18 +1,51 @@
 import type { NewNodeInput } from "../services/nodes";
 
+const COUNTRY_PATTERNS: [RegExp, string, string][] = [
+  [/\b(HK|Hong\s*Kong|香港|🇭🇰)\b/i, "Hong Kong", "HK"],
+  [/\b(JP|Japan|日本|东京|Tokyo|Osaka|大阪|🇯🇵)\b/i, "Japan", "JP"],
+  [/\b(US|USA|United\s*States|美国|Los\s*Angeles|San\s*Jose|Seattle|🇺🇸)\b/i, "United States", "US"],
+  [/\b(SG|Singapore|新加坡|🇸🇬)\b/i, "Singapore", "SG"],
+  [/\b(KR|Korea|韩国|首尔|Seoul|🇰🇷)\b/i, "South Korea", "KR"],
+  [/\b(TW|Taiwan|台湾|🇹🇼)\b/i, "Taiwan", "TW"],
+  [/\b(DE|Germany|德国|🇩🇪)\b/i, "Germany", "DE"],
+  [/\b(GB|UK|United\s*Kingdom|英国|London|🇬🇧)\b/i, "United Kingdom", "GB"],
+  [/\b(FR|France|法国|🇫🇷)\b/i, "France", "FR"],
+  [/\b(AU|Australia|澳大利亚|🇦🇺)\b/i, "Australia", "AU"],
+  [/\b(CA|Canada|加拿大|🇨🇦)\b/i, "Canada", "CA"],
+  [/\b(IN|India|印度|🇮🇳)\b/i, "India", "IN"],
+  [/\b(RU|Russia|俄罗斯|🇷🇺)\b/i, "Russia", "RU"],
+  [/\b(NL|Netherlands|荷兰|🇳🇱)\b/i, "Netherlands", "NL"],
+  [/\b(TR|Turkey|土耳其|🇹🇷)\b/i, "Turkey", "TR"],
+];
+
+export function inferCountry(name: string): { country: string; countryCode: string } {
+  for (const [pattern, country, code] of COUNTRY_PATTERNS) {
+    if (pattern.test(name)) {
+      return { country, countryCode: code };
+    }
+  }
+  return { country: "", countryCode: "" };
+}
+
 export function parseProxyUri(uri: string): (NewNodeInput & { name: string }) | null {
   uri = uri.trim();
+  let result: (NewNodeInput & { name: string }) | null = null;
   try {
-    if (uri.startsWith("vmess://")) return parseVMess(uri);
-    if (uri.startsWith("vless://")) return parseVLESS(uri);
-    if (uri.startsWith("trojan://")) return parseTrojan(uri);
-    if (uri.startsWith("ss://")) return parseSS(uri);
-    if (uri.startsWith("hy2://") || uri.startsWith("hysteria2://")) return parseHy2(uri);
-    if (uri.startsWith("tuic://")) return parseTUIC(uri);
+    if (uri.startsWith("vmess://")) result = parseVMess(uri);
+    else if (uri.startsWith("vless://")) result = parseVLESS(uri);
+    else if (uri.startsWith("trojan://")) result = parseTrojan(uri);
+    else if (uri.startsWith("ss://")) result = parseSS(uri);
+    else if (uri.startsWith("hy2://") || uri.startsWith("hysteria2://")) result = parseHy2(uri);
+    else if (uri.startsWith("tuic://")) result = parseTUIC(uri);
   } catch {
     return null;
   }
-  return null;
+  if (result && !result.countryCode) {
+    const { country, countryCode } = inferCountry(result.name);
+    result.country = country;
+    result.countryCode = countryCode;
+  }
+  return result;
 }
 
 export function parseMultipleUris(text: string): (NewNodeInput & { name: string })[] {
@@ -131,25 +164,54 @@ function parseTrojan(uri: string): NewNodeInput & { name: string } {
 }
 
 function parseSS(uri: string): NewNodeInput & { name: string } {
-  const { userinfo, host, port, fragment } = parseStandardUri(uri);
+  // SS has two formats:
+  // Legacy: ss://BASE64(method:password@host:port)#name
+  // SIP002: ss://BASE64(method:password)@host:port#name
+  const hashIdx = uri.indexOf("#");
+  const fragment = hashIdx >= 0 ? decodeURIComponent(uri.slice(hashIdx + 1)) : "";
+  const withoutFragment = hashIdx >= 0 ? uri.slice(0, hashIdx) : uri;
+  const content = withoutFragment.slice(5); // remove "ss://"
+
   let method = "aes-256-gcm";
   let password = "";
-  try {
-    const decoded = atob(userinfo);
+  let server = "";
+  let port = 443;
+
+  if (content.includes("@")) {
+    // SIP002: BASE64(method:password)@host:port
+    const atIdx = content.indexOf("@");
+    const userPart = content.slice(0, atIdx);
+    const hostPart = content.slice(atIdx + 1);
+
+    let decoded: string;
+    try { decoded = atob(userPart); } catch { decoded = decodeURIComponent(userPart); }
     const colonIdx = decoded.indexOf(":");
     method = decoded.slice(0, colonIdx);
     password = decoded.slice(colonIdx + 1);
-  } catch {
-    // SIP002 format: method:password (already decoded)
-    const colonIdx = userinfo.indexOf(":");
-    if (colonIdx >= 0) {
-      method = userinfo.slice(0, colonIdx);
-      password = userinfo.slice(colonIdx + 1);
-    }
+
+    const lastColon = hostPart.lastIndexOf(":");
+    server = lastColon >= 0 ? hostPart.slice(0, lastColon) : hostPart;
+    port = lastColon >= 0 ? parseInt(hostPart.slice(lastColon + 1)) || 443 : 443;
+  } else {
+    // Legacy: BASE64(method:password@host:port)
+    let decoded: string;
+    try { decoded = atob(content); } catch { decoded = content; }
+    const atIdx = decoded.indexOf("@");
+    const userPart = decoded.slice(0, atIdx);
+    const hostPart = decoded.slice(atIdx + 1);
+
+    const colonIdx = userPart.indexOf(":");
+    method = userPart.slice(0, colonIdx);
+    password = userPart.slice(colonIdx + 1);
+
+    const lastColon = hostPart.lastIndexOf(":");
+    server = lastColon >= 0 ? hostPart.slice(0, lastColon) : hostPart;
+    port = lastColon >= 0 ? parseInt(hostPart.slice(lastColon + 1)) || 443 : 443;
   }
+
   return {
     name: fragment || "SS Node",
-    server: host,
+    server,
     port,
     protocol: "Shadowsocks",
     country: "",

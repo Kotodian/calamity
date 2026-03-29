@@ -28,13 +28,14 @@ describe("connectionsService", () => {
     expect(records.length).toBe(0);
   });
 
-  it("subscribe emits new connection records", async () => {
+  it("subscribe emits connection record arrays", async () => {
     vi.useFakeTimers();
-    const entries: unknown[] = [];
-    const unsub = connectionsService.subscribe((entry) => entries.push(entry));
+    const snapshots: unknown[][] = [];
+    const unsub = connectionsService.subscribe((records) => snapshots.push(records));
     await vi.advanceTimersByTimeAsync(3100);
     unsub();
     vi.useRealTimers();
-    expect(entries.length).toBe(3);
+    expect(snapshots.length).toBe(3);
+    expect(Array.isArray(snapshots[0])).toBe(true);
   });
 });

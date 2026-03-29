@@ -8,26 +8,25 @@ export interface RulesService {
   reorderRules(orderedIds: string[]): Promise<void>;
 }
 
+// ---- Mock Implementation ----
+
 let mockRules: RouteRule[] = [
   { id: "r1", name: "Google Services", enabled: true, matchType: "domain-suffix", matchValue: "google.com", outbound: "proxy", outboundNode: "Tokyo 01", order: 0 },
   { id: "r2", name: "GitHub", enabled: true, matchType: "domain-suffix", matchValue: "github.com", outbound: "proxy", outboundNode: "US West", order: 1 },
   { id: "r3", name: "China Direct", enabled: true, matchType: "geosite", matchValue: "cn", outbound: "direct", order: 2, ruleSetUrl: "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs", downloadDetour: "direct" },
   { id: "r4", name: "Ad Block", enabled: true, matchType: "geosite", matchValue: "category-ads-all", outbound: "reject", order: 3, ruleSetUrl: "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs", downloadDetour: "direct" },
-  { id: "r5", name: "Home NAS", enabled: true, matchType: "domain-full", matchValue: "nas.home.arpa", outbound: "tailnet", outboundDevice: "homelab-nas", order: 4 },
+  { id: "r5", name: "Torrent Direct", enabled: true, matchType: "process-name", matchValue: "qbittorrent", outbound: "direct", order: 4 },
   { id: "r6", name: "Streaming", enabled: false, matchType: "geosite", matchValue: "netflix", outbound: "proxy", outboundNode: "SG 01", order: 5 },
-  { id: "r7", name: "Torrent Direct", enabled: true, matchType: "process-name", matchValue: "qbittorrent", outbound: "direct", order: 6 },
-  { id: "r8", name: "Chrome Proxy", enabled: true, matchType: "process-path", matchValue: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", outbound: "proxy", outboundNode: "Tokyo 01", order: 7 },
 ];
 
-let nextId = 9;
+let nextId = 7;
 
-export const rulesService: RulesService = {
+const mockRulesService: RulesService = {
   async getRules() {
     return mockRules.map((r) => ({ ...r })).sort((a, b) => a.order - b.order);
   },
   async addRule(rule) {
     const newRule: RouteRule = { ...rule, id: `r${nextId++}`, order: mockRules.length };
-    // Auto-populate ruleSetUrl for geo types if not provided
     if (newRule.matchType === "geosite" && !newRule.ruleSetUrl) {
       newRule.ruleSetUrl = `https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-${newRule.matchValue}.srs`;
     }
@@ -50,3 +49,55 @@ export const rulesService: RulesService = {
     });
   },
 };
+
+// ---- Tauri Implementation ----
+
+interface RawRulesData {
+  rules: RouteRule[];
+  updateInterval: number;
+}
+
+function toRouteRules(raw: RawRulesData): RouteRule[] {
+  return raw.rules
+    .map((r) => ({ ...r }))
+    .sort((a, b) => a.order - b.order);
+}
+
+function createTauriRulesService(): RulesService {
+  return {
+    async getRules() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const raw = await invoke<RawRulesData>("get_rules");
+      return toRouteRules(raw);
+    },
+    async addRule(rule) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const id = `rule-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const fullRule: RouteRule = { ...rule, id, order: 0 };
+      const raw = await invoke<RawRulesData>("add_rule", { rule: fullRule });
+      const rules = toRouteRules(raw);
+      return rules[rules.length - 1];
+    },
+    async updateRule(id, updates) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const raw = await invoke<RawRulesData>("get_rules");
+      const current = raw.rules.find((r) => r.id === id);
+      if (!current) throw new Error(`Rule ${id} not found`);
+      const merged = { ...current, ...updates };
+      await invoke("update_rule", { rule: merged });
+    },
+    async deleteRule(id) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("delete_rule", { id });
+    },
+    async reorderRules(orderedIds) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("reorder_rules", { orderedIds });
+    },
+  };
+}
+
+// ---- Export ----
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const rulesService: RulesService = isTauri ? createTauriRulesService() : mockRulesService;

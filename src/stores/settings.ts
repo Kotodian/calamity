@@ -30,6 +30,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     applyTheme(settings.theme);
   },
   async updateSettings(updates) {
+    // Optimistic update: apply locally first for responsive UI
+    const current = get().settings;
+    if (current) {
+      set({ settings: { ...current, ...updates } });
+    }
     await settingsService.updateSettings(updates);
     await get().fetchSettings();
   },

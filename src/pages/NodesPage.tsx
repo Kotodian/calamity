@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Wifi, Search, RefreshCw, X, Zap, Plus, Trash2, ClipboardPaste } from "lucide-react";
+import { Check, Wifi, Search, RefreshCw, X, Zap, Plus, Trash2, ClipboardPaste, Link2, ArrowRight, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +20,7 @@ import { useNodesStore } from "@/stores/nodes";
 import type { ProtocolConfig, ProxyNode } from "@/services/types";
 import { cn } from "@/lib/utils";
 import { countryFlag } from "@/lib/flags";
+import { inferCountry } from "@/lib/proxy-uri";
 import { parseMultipleUris } from "@/lib/proxy-uri";
 
 function latencyColor(ms: number | null): string {
@@ -31,7 +32,11 @@ function latencyColor(ms: number | null): string {
 
 const countryFilters = ["All", "HK", "JP", "US", "SG", "KR", "DE", "GB"];
 
-function QuickInfoPanel({ node, onClose, onConnect, onDelete }: { node: ProxyNode; onClose: () => void; onConnect: () => void; onDelete: (id: string) => void }) {
+function QuickInfoPanel({ node, onClose, onConnect, onDisconnect, onEdit, onDelete, allNodes }: { node: ProxyNode; onClose: () => void; onConnect: () => void; onDisconnect: () => void; onEdit: (id: string) => void; onDelete: (id: string) => void; allNodes: ProxyNode[] }) {
+  const isChain = node.protocol === "Chain" && node.protocolConfig?.type === "chain";
+  const chainIds = isChain ? (node.protocolConfig as { chain: string[] }).chain : [];
+  const chainHops = chainIds.map((id: string) => allNodes.find((n) => n.id === id)).filter(Boolean) as ProxyNode[];
+
   return (
     <div className="rounded-xl border border-white/[0.06] bg-card/90 backdrop-blur-2xl p-4 space-y-4 animate-slide-up shadow-[0_0_40px_rgba(0,0,0,0.4)]">
       <div className="flex items-center justify-between">
@@ -42,17 +47,35 @@ function QuickInfoPanel({ node, onClose, onConnect, onDelete }: { node: ProxyNod
       </div>
 
       <div className="space-y-3">
-        <div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Current Node IP</p>
-          <p className="text-sm font-mono bg-muted/30 rounded-lg px-3 py-1.5">{node.server}</p>
-        </div>
-        <div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Protocol</p>
-          <div className="flex items-center gap-2">
-            <Zap className="h-3.5 w-3.5 text-primary" />
-            <span className="text-sm">{node.protocol}</span>
+        {isChain ? (
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Chain Route</p>
+            <div className="space-y-1.5">
+              {chainHops.map((hop, i) => (
+                <div key={hop.id} className="flex items-center gap-2">
+                  <span className="text-[9px] text-muted-foreground w-3">{i + 1}</span>
+                  <span className="text-xs">{countryFlag(hop.countryCode)}</span>
+                  <span className="text-xs font-medium truncate">{hop.name}</span>
+                  <span className="text-[9px] text-muted-foreground ml-auto">{hop.protocol}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Current Node IP</p>
+              <p className="text-sm font-mono bg-muted/30 rounded-lg px-3 py-1.5">{node.server}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Protocol</p>
+              <div className="flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5 text-primary" />
+                <span className="text-sm">{node.protocol}</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <Button onClick={onConnect} className="w-full bg-primary hover:bg-primary/90">
@@ -60,11 +83,21 @@ function QuickInfoPanel({ node, onClose, onConnect, onDelete }: { node: ProxyNod
         Quick Connect
       </Button>
 
+      {node.active && (
+        <button
+          onClick={() => { onDisconnect(); onClose(); }}
+          className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+        >
+          Disconnect
+        </button>
+      )}
+
       <button
-        onClick={onClose}
-        className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+        onClick={() => { onEdit(node.id); onClose(); }}
+        className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
       >
-        Disconnect
+        <Pencil className="h-3 w-3" />
+        Edit Node
       </button>
 
       <button
@@ -157,12 +190,72 @@ function TransportFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeF
   );
 }
 
-function ProtocolFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeForm) => void }) {
+function ChainFields({ form, setForm, allNodes }: { form: NodeForm; setForm: (f: NodeForm) => void; allNodes: ProxyNode[] }) {
+  const availableNodes = allNodes.filter((n) => n.protocol !== "Chain");
+  const chainNodes = form.chainNodeIds.map((id) => availableNodes.find((n) => n.id === id)).filter(Boolean) as ProxyNode[];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] text-muted-foreground">Select nodes in order. Traffic flows: Client → Node 1 → Node 2 → ... → Destination</p>
+
+      {/* Current chain */}
+      {chainNodes.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          {chainNodes.map((node, i) => (
+            <div key={node.id} className="flex items-center gap-1">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-muted/40 px-2.5 py-1.5 text-xs">
+                <span>{countryFlag(node.countryCode)}</span>
+                <span className="font-medium">{node.name}</span>
+                <span className="text-[9px] text-muted-foreground">{node.protocol}</span>
+                <button
+                  onClick={() => setForm({ ...form, chainNodeIds: form.chainNodeIds.filter((id) => id !== node.id) })}
+                  className="text-muted-foreground hover:text-destructive ml-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+              {i < chainNodes.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add node to chain */}
+      <Select
+        value=""
+        onValueChange={(nodeId) => {
+          if (!form.chainNodeIds.includes(nodeId)) {
+            setForm({ ...form, chainNodeIds: [...form.chainNodeIds, nodeId] });
+          }
+        }}
+      >
+        <SelectTrigger className={inputCls}>
+          <SelectValue placeholder="Add node to chain..." />
+        </SelectTrigger>
+        <SelectContent>
+          {availableNodes
+            .filter((n) => !form.chainNodeIds.includes(n.id))
+            .map((n) => (
+              <SelectItem key={n.id} value={n.id}>
+                {countryFlag(n.countryCode)} {n.name} ({n.protocol})
+              </SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+
+      {form.chainNodeIds.length < 2 && (
+        <p className="text-[10px] text-yellow-400">Add at least 2 nodes to form a chain</p>
+      )}
+    </div>
+  );
+}
+
+function ProtocolFields({ form, setForm, allNodes }: { form: NodeForm; setForm: (f: NodeForm) => void; allNodes?: ProxyNode[] }) {
   const F = (props: { placeholder: string; field: keyof NodeForm; type?: string }) => (
-    <Input className={inputCls} placeholder={props.placeholder} type={props.type} value={form[props.field]} onChange={(e) => setForm({ ...form, [props.field]: e.target.value })} />
+    <Input className={inputCls} placeholder={props.placeholder} type={props.type} value={form[props.field] as string} onChange={(e) => setForm({ ...form, [props.field]: e.target.value })} />
   );
   const S = (props: { field: keyof NodeForm; options: string[]; placeholder?: string }) => (
-    <Select value={form[props.field]} onValueChange={(v) => setForm({ ...form, [props.field]: v })}>
+    <Select value={form[props.field] as string} onValueChange={(v) => setForm({ ...form, [props.field]: v })}>
       <SelectTrigger className={inputCls}><SelectValue placeholder={props.placeholder} /></SelectTrigger>
       <SelectContent>{props.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
     </Select>
@@ -234,6 +327,8 @@ function ProtocolFields({ form, setForm }: { form: NodeForm; setForm: (f: NodeFo
           <F placeholder="Max Padding" field="maxPaddingLen" type="number" />
         </div>
       </>);
+    case "Chain":
+      return <ChainFields form={form} setForm={setForm} allNodes={allNodes ?? []} />;
     default:
       return <p className="text-xs text-muted-foreground">Select a protocol</p>;
   }
@@ -280,6 +375,8 @@ function buildProtocolConfig(form: NodeForm): ProtocolConfig | undefined {
       return { type: "tuic", uuid: form.uuid, password: form.password, congestionControl: form.congestionControl as "bbr", udpRelayMode: form.udpRelayMode as "native", tls: buildTls(form) };
     case "AnyTLS":
       return { type: "anytls", password: form.password, sni: form.sni, idleTimeout: parseInt(form.idleTimeout) || 900, minPaddingLen: parseInt(form.minPaddingLen) || 0, maxPaddingLen: parseInt(form.maxPaddingLen) || 0 };
+    case "Chain":
+      return { type: "chain", chain: form.chainNodeIds };
     default:
       return undefined;
   }
@@ -330,11 +427,13 @@ const defaultNodeForm = {
   reality: "false",
   realityPublicKey: "",
   realityShortId: "",
+  // Chain
+  chainNodeIds: [] as string[],
 };
 
 type NodeForm = typeof defaultNodeForm;
 
-const protocols = ["VMess", "VLESS", "Trojan", "Shadowsocks", "Hysteria2", "TUIC", "AnyTLS"];
+const protocols = ["VMess", "VLESS", "Trojan", "Shadowsocks", "Hysteria2", "TUIC", "AnyTLS", "Chain"];
 const countries = [
   { code: "JP", name: "Japan" },
   { code: "US", name: "United States" },
@@ -345,13 +444,77 @@ const countries = [
   { code: "GB", name: "United Kingdom" },
 ];
 
+function nodeToForm(node: ProxyNode): NodeForm {
+  const f = { ...defaultNodeForm };
+  f.name = node.name;
+  f.server = node.server;
+  f.port = String(node.port);
+  f.protocol = node.protocol;
+  f.country = node.country;
+  f.countryCode = node.countryCode;
+
+  const c = node.protocolConfig;
+  if (!c) return f;
+
+  if (c.type === "vmess") {
+    f.uuid = c.uuid; f.alterId = String(c.alterId); f.security = c.security;
+    Object.assign(f, transportToForm(c.transport), tlsToForm(c.tls));
+  } else if (c.type === "vless") {
+    f.uuid = c.uuid; f.flow = c.flow || "none";
+    Object.assign(f, transportToForm(c.transport), tlsToForm(c.tls));
+  } else if (c.type === "trojan") {
+    f.password = c.password;
+    Object.assign(f, transportToForm(c.transport), tlsToForm(c.tls));
+  } else if (c.type === "shadowsocks") {
+    f.password = c.password; f.method = c.method;
+    f.plugin = c.plugin || "none"; f.pluginOpts = c.pluginOpts || "";
+  } else if (c.type === "hysteria2") {
+    f.password = c.password; f.upMbps = String(c.upMbps); f.downMbps = String(c.downMbps);
+    f.obfsType = c.obfsType || "none"; f.obfsPassword = c.obfsPassword || "";
+    Object.assign(f, tlsToForm(c.tls));
+  } else if (c.type === "tuic") {
+    f.uuid = c.uuid; f.password = c.password;
+    f.congestionControl = c.congestionControl; f.udpRelayMode = c.udpRelayMode;
+    Object.assign(f, tlsToForm(c.tls));
+  } else if (c.type === "anytls") {
+    f.password = c.password; f.sni = c.sni;
+    f.idleTimeout = String(c.idleTimeout); f.minPaddingLen = String(c.minPaddingLen); f.maxPaddingLen = String(c.maxPaddingLen);
+  } else if (c.type === "chain") {
+    f.chainNodeIds = [...c.chain];
+  }
+  return f;
+}
+
+function transportToForm(t: { type: string; wsPath?: string; wsHeaders?: Record<string, string>; grpcServiceName?: string; h2Host?: string[] }): Partial<NodeForm> {
+  return {
+    transport: t.type,
+    wsPath: t.wsPath || "",
+    wsHost: t.wsHeaders?.Host || "",
+    grpcServiceName: t.grpcServiceName || "",
+    h2Host: t.h2Host?.join(", ") || "",
+  };
+}
+
+function tlsToForm(t: { enabled: boolean; sni: string; alpn: string[]; insecure: boolean; reality: boolean; realityPublicKey: string; realityShortId: string }): Partial<NodeForm> {
+  return {
+    tlsEnabled: String(t.enabled),
+    sni: t.sni,
+    alpn: t.alpn.join(", "),
+    insecure: String(t.insecure),
+    reality: String(t.reality),
+    realityPublicKey: t.realityPublicKey,
+    realityShortId: t.realityShortId,
+  };
+}
+
 export function NodesPage() {
-  const { groups, selectedGroup, testing, fetchGroups, selectGroup, testAllLatency, setActiveNode, addNode, removeNode, addGroup, removeGroup, renameGroup } =
+  const { groups, selectedGroup, testing, testingNodes, fetchGroups, selectGroup, testLatency, testAllLatency, setActiveNode, disconnectNode, addNode, updateNode, removeNode, addGroup, removeGroup, renameGroup } =
     useNodesStore();
   const [search, setSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState("All");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [form, setForm] = useState(defaultNodeForm);
   const [newGroupName, setNewGroupName] = useState("");
   const [importCount, setImportCount] = useState<number | null>(null);
@@ -419,7 +582,7 @@ export function NodesPage() {
             )}
           </button>
           <button
-            onClick={() => { setForm(defaultNodeForm); setAddDialogOpen(true); }}
+            onClick={() => { setForm(defaultNodeForm); setEditingNodeId(null); setAddDialogOpen(true); }}
             className="h-8 w-8 rounded-lg border border-white/[0.06] bg-muted/30 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 hover:shadow-[0_0_15px_rgba(254,151,185,0.1)] transition-all"
           >
             <Plus className="h-4 w-4" />
@@ -532,9 +695,18 @@ export function NodesPage() {
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">{countryFlag(node.countryCode)}</span>
+                  {node.protocol === "Chain" ? (
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Link2 className="h-4 w-4" />
+                    </span>
+                  ) : (
+                    <span className="text-xl">{countryFlag(node.countryCode)}</span>
+                  )}
                   <div>
                     <p className="text-sm font-medium leading-tight">{node.name}</p>
+                    {node.protocol === "Chain" && node.protocolConfig?.type === "chain" && (
+                      <span className="text-[9px] text-muted-foreground">{(node.protocolConfig as { chain: string[] }).chain.length} hops</span>
+                    )}
                     {node.active && (
                       <span className="inline-flex items-center gap-1 text-[9px] font-bold text-primary uppercase tracking-wider mt-0.5">
                         <Check className="h-2.5 w-2.5" />
@@ -546,12 +718,22 @@ export function NodesPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wifi className={cn("h-3 w-3", latencyColor(node.latency))} />
-                  <span className={cn("text-xs font-mono font-semibold tabular-nums", latencyColor(node.latency))}>
-                    {node.latency !== null ? `${node.latency}ms` : "—"}
+                <button
+                  className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    testLatency(node.id);
+                  }}
+                >
+                  {testingNodes.has(node.id) ? (
+                    <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+                  ) : (
+                    <Wifi className={cn("h-3 w-3", latencyColor(node.latency))} />
+                  )}
+                  <span className={cn("text-xs font-mono font-semibold tabular-nums", testingNodes.has(node.id) ? "text-muted-foreground" : latencyColor(node.latency))}>
+                    {testingNodes.has(node.id) ? "..." : node.latency !== null ? (node.latency === -1 ? "timeout" : `${node.latency}ms`) : "—"}
                   </span>
-                </div>
+                </button>
                 <span className="text-[10px] text-muted-foreground">{node.protocol}</span>
               </div>
             </button>
@@ -563,10 +745,23 @@ export function NodesPage() {
           <div className="w-60 shrink-0">
             <QuickInfoPanel
               node={selectedNode}
+              allNodes={groups.flatMap((g) => g.nodes)}
               onClose={() => setSelectedNodeId(null)}
               onConnect={() => {
                 setActiveNode(selectedNode.id);
                 setSelectedNodeId(null);
+              }}
+              onDisconnect={() => {
+                disconnectNode();
+                setSelectedNodeId(null);
+              }}
+              onEdit={(id) => {
+                const n = allNodes.find((node) => node.id === id);
+                if (n) {
+                  setForm(nodeToForm(n));
+                  setEditingNodeId(n.id);
+                  setAddDialogOpen(true);
+                }
               }}
               onDelete={(id) => {
                 removeNode(id);
@@ -626,7 +821,7 @@ export function NodesPage() {
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="bg-card/90 backdrop-blur-2xl border-white/[0.06] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Node</DialogTitle>
+            <DialogTitle>{editingNodeId ? "Edit Node" : "Add Node"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* Common fields */}
@@ -634,24 +829,28 @@ export function NodesPage() {
               <label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5 block">Basic</label>
               <div className="space-y-3">
                 <Input placeholder="Node name" className="bg-muted/30 border-white/[0.06]" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                <div className="grid grid-cols-3 gap-2">
-                  <Input placeholder="Server address" className="bg-muted/30 border-white/[0.06] col-span-2" value={form.server} onChange={(e) => setForm({ ...form, server: e.target.value })} />
-                  <Input placeholder="Port" type="number" className="bg-muted/30 border-white/[0.06]" value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={cn("grid gap-2", form.protocol === "Chain" ? "grid-cols-1" : "grid-cols-2")}>
                   <Select value={form.protocol} onValueChange={(v) => setForm({ ...form, protocol: v })}>
                     <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {protocols.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={form.countryCode} onValueChange={(v) => { const c = countries.find((c) => c.code === v); setForm({ ...form, countryCode: v, country: c?.name ?? "" }); }}>
-                    <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Country" /></SelectTrigger>
-                    <SelectContent>
-                      {countries.map((c) => <SelectItem key={c.code} value={c.code}>{countryFlag(c.code)} {c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  {form.protocol !== "Chain" && (
+                    <Select value={form.countryCode} onValueChange={(v) => { const c = countries.find((c) => c.code === v); setForm({ ...form, countryCode: v, country: c?.name ?? "" }); }}>
+                      <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder="Country" /></SelectTrigger>
+                      <SelectContent>
+                        {countries.map((c) => <SelectItem key={c.code} value={c.code}>{countryFlag(c.code)} {c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
+                {form.protocol !== "Chain" && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input placeholder="Server address" className="bg-muted/30 border-white/[0.06] col-span-2" value={form.server} onChange={(e) => setForm({ ...form, server: e.target.value })} />
+                    <Input placeholder="Port" type="number" className="bg-muted/30 border-white/[0.06]" value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -659,29 +858,36 @@ export function NodesPage() {
             <div>
               <label className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5 block">{form.protocol} Config</label>
               <div className="space-y-3 rounded-lg border border-white/[0.04] bg-muted/10 p-3">
-                <ProtocolFields form={form} setForm={setForm} />
+                <ProtocolFields form={form} setForm={setForm} allNodes={groups.flatMap((g) => g.nodes)} />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="border-white/10" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" className="border-white/10" onClick={() => { setAddDialogOpen(false); setEditingNodeId(null); }}>Cancel</Button>
             <Button
               className="shadow-[0_0_15px_rgba(254,151,185,0.15)]"
-              disabled={!form.name || !form.server || !form.countryCode}
+              disabled={!form.name || (form.protocol !== "Chain" && !form.server) || (form.protocol === "Chain" && form.chainNodeIds.length < 2)}
               onClick={async () => {
-                await addNode(selectedGroup, {
+                const inferred = !form.countryCode ? inferCountry(form.name) : { country: form.country, countryCode: form.countryCode };
+                const input = {
                   name: form.name,
-                  server: form.server,
-                  port: parseInt(form.port) || 443,
+                  server: form.protocol === "Chain" ? "chain" : form.server,
+                  port: form.protocol === "Chain" ? 0 : parseInt(form.port) || 443,
                   protocol: form.protocol,
-                  country: form.country,
-                  countryCode: form.countryCode,
+                  country: inferred.country,
+                  countryCode: inferred.countryCode,
                   protocolConfig: buildProtocolConfig(form),
-                });
+                };
+                if (editingNodeId) {
+                  await updateNode(editingNodeId, input);
+                } else {
+                  await addNode(selectedGroup, input);
+                }
                 setAddDialogOpen(false);
+                setEditingNodeId(null);
               }}
             >
-              Add Node
+              {editingNodeId ? "Save" : "Add Node"}
             </Button>
           </DialogFooter>
         </DialogContent>

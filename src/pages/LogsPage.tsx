@@ -66,15 +66,15 @@ export function LogsPage() {
           <CardContent className="p-0">
             <div className="divide-y divide-white/[0.04]">
               {filtered.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-3 px-4 py-2 text-xs font-mono hover:bg-white/[0.02] transition-colors duration-150">
-                  <span className="shrink-0 text-muted-foreground w-20">
+                <div key={entry.id} className="flex items-center gap-3 px-4 py-2 text-xs font-mono hover:bg-white/[0.02] transition-colors duration-150">
+                  <span className="shrink-0 text-muted-foreground">
                     {new Date(entry.timestamp).toLocaleTimeString()}
                   </span>
                   <Badge className={cn("shrink-0 text-[9px] uppercase border-0", levelStyles[entry.level])}>
                     {entry.level}
                   </Badge>
-                  <span className="shrink-0 text-muted-foreground w-16">[{entry.source}]</span>
-                  <span className="break-all">{entry.message}</span>
+                  <span className="shrink-0 text-muted-foreground">[{entry.source}]</span>
+                  <span className="min-w-0 truncate">{entry.message}</span>
                 </div>
               ))}
             </div>

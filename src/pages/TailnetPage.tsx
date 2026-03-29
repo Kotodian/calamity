@@ -179,9 +179,15 @@ export function TailnetPage() {
 
       {/* Devices */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {devices.map((device, i) => (
-          <DeviceCard key={device.id} device={device} index={i} onSetExitNode={setExitNode} />
-        ))}
+        {[...devices]
+          .sort((a, b) => {
+            if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
+            if ((a.status === "online") !== (b.status === "online")) return a.status === "online" ? -1 : 1;
+            return 0;
+          })
+          .map((device, i) => (
+            <DeviceCard key={device.id} device={device} index={i} onSetExitNode={setExitNode} />
+          ))}
       </div>
 
       {/* Funnel */}
