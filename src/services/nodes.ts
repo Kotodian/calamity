@@ -1,10 +1,21 @@
 import type { NodeGroup, ProxyNode } from "./types";
 
+export type NewNodeInput = {
+  name: string;
+  server: string;
+  port: number;
+  protocol: string;
+  country: string;
+  countryCode: string;
+};
+
 export interface NodesService {
   getGroups(): Promise<NodeGroup[]>;
   testLatency(nodeId: string): Promise<number>;
   testAllLatency(groupId: string): Promise<void>;
   setActiveNode(nodeId: string): Promise<void>;
+  addNode(groupId: string, input: NewNodeInput): Promise<ProxyNode>;
+  removeNode(nodeId: string): Promise<void>;
 }
 
 const mockNodes: NodeGroup[] = [
@@ -62,6 +73,27 @@ export const nodesService: NodesService = {
     for (const group of mockNodes) {
       for (const node of group.nodes) {
         node.active = node.id === nodeId;
+      }
+    }
+  },
+  async addNode(groupId: string, input: NewNodeInput) {
+    const group = mockNodes.find((g) => g.id === groupId);
+    if (!group) throw new Error(`Group ${groupId} not found`);
+    const newNode: ProxyNode = {
+      id: `custom-${Date.now()}`,
+      ...input,
+      latency: null,
+      active: false,
+    };
+    group.nodes.push(newNode);
+    return { ...newNode };
+  },
+  async removeNode(nodeId: string) {
+    for (const group of mockNodes) {
+      const idx = group.nodes.findIndex((n) => n.id === nodeId);
+      if (idx !== -1) {
+        group.nodes.splice(idx, 1);
+        return;
       }
     }
   },

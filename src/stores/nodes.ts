@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { nodesService } from "../services/nodes";
+import { nodesService, type NewNodeInput } from "../services/nodes";
 import type { NodeGroup } from "../services/types";
 
 interface NodesStore {
@@ -11,6 +11,8 @@ interface NodesStore {
   testLatency: (nodeId: string) => Promise<void>;
   testAllLatency: () => Promise<void>;
   setActiveNode: (nodeId: string) => Promise<void>;
+  addNode: (groupId: string, input: NewNodeInput) => Promise<void>;
+  removeNode: (nodeId: string) => Promise<void>;
 }
 
 export const useNodesStore = create<NodesStore>((set, get) => ({
@@ -37,6 +39,14 @@ export const useNodesStore = create<NodesStore>((set, get) => ({
   },
   async setActiveNode(nodeId) {
     await nodesService.setActiveNode(nodeId);
+    await get().fetchGroups();
+  },
+  async addNode(groupId, input) {
+    await nodesService.addNode(groupId, input);
+    await get().fetchGroups();
+  },
+  async removeNode(nodeId) {
+    await nodesService.removeNode(nodeId);
     await get().fetchGroups();
   },
 }));

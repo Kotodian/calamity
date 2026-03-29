@@ -1,7 +1,21 @@
 import { useEffect, useState } from "react";
-import { Check, Wifi, Search, RefreshCw, X, Zap } from "lucide-react";
+import { Check, Wifi, Search, RefreshCw, X, Zap, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useNodesStore } from "@/stores/nodes";
 import type { ProxyNode } from "@/services/types";
 import { cn } from "@/lib/utils";
@@ -20,7 +34,7 @@ const flagEmoji: Record<string, string> = {
 
 const countryFilters = ["All", "HK", "JP", "US", "SG", "KR"];
 
-function QuickInfoPanel({ node, onClose, onConnect }: { node: ProxyNode; onClose: () => void; onConnect: () => void }) {
+function QuickInfoPanel({ node, onClose, onConnect, onDelete }: { node: ProxyNode; onClose: () => void; onConnect: () => void; onDelete: (id: string) => void }) {
   return (
     <div className="rounded-xl border border-white/[0.06] bg-card/90 backdrop-blur-2xl p-4 space-y-4 animate-slide-up shadow-[0_0_40px_rgba(0,0,0,0.4)]">
       <div className="flex items-center justify-between">
@@ -55,16 +69,46 @@ function QuickInfoPanel({ node, onClose, onConnect }: { node: ProxyNode; onClose
       >
         Disconnect
       </button>
+
+      <button
+        onClick={() => { onDelete(node.id); onClose(); }}
+        className="w-full flex items-center justify-center gap-1.5 text-xs text-destructive hover:text-destructive/80 transition-colors py-1"
+      >
+        <Trash2 className="h-3 w-3" />
+        Remove Node
+      </button>
     </div>
   );
 }
 
+const defaultNodeForm = {
+  name: "",
+  server: "",
+  port: "443",
+  protocol: "VMess",
+  country: "",
+  countryCode: "",
+};
+
+const protocols = ["VMess", "VLESS", "Trojan", "Shadowsocks", "Hysteria2", "TUIC"];
+const countries = [
+  { code: "JP", name: "Japan" },
+  { code: "US", name: "United States" },
+  { code: "SG", name: "Singapore" },
+  { code: "HK", name: "Hong Kong" },
+  { code: "KR", name: "South Korea" },
+  { code: "DE", name: "Germany" },
+  { code: "GB", name: "United Kingdom" },
+];
+
 export function NodesPage() {
-  const { groups, selectedGroup, testing, fetchGroups, testAllLatency, setActiveNode } =
+  const { groups, selectedGroup, testing, fetchGroups, testAllLatency, setActiveNode, addNode, removeNode } =
     useNodesStore();
   const [search, setSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState("All");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [form, setForm] = useState(defaultNodeForm);
 
   useEffect(() => {
     fetchGroups();
@@ -99,6 +143,12 @@ export function NodesPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <button
+            onClick={() => { setForm(defaultNodeForm); setAddDialogOpen(true); }}
+            className="h-8 w-8 rounded-lg border border-white/[0.06] bg-muted/30 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 hover:shadow-[0_0_15px_rgba(254,151,185,0.1)] transition-all"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -191,6 +241,10 @@ export function NodesPage() {
                 setActiveNode(selectedNode.id);
                 setSelectedNodeId(null);
               }}
+              onDelete={(id) => {
+                removeNode(id);
+                setSelectedNodeId(null);
+              }}
             />
           </div>
         )}
@@ -240,6 +294,88 @@ export function NodesPage() {
           </div>
         </div>
       )}
+
+      {/* Add Node Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="bg-card/90 backdrop-blur-2xl border-white/[0.06]">
+          <DialogHeader>
+            <DialogTitle>Add Node</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Node name (e.g. Tokyo 03)"
+              className="bg-muted/30 border-white/[0.06]"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+            <Input
+              placeholder="Server address"
+              className="bg-muted/30 border-white/[0.06]"
+              value={form.server}
+              onChange={(e) => setForm({ ...form, server: e.target.value })}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                placeholder="Port"
+                type="number"
+                className="bg-muted/30 border-white/[0.06]"
+                value={form.port}
+                onChange={(e) => setForm({ ...form, port: e.target.value })}
+              />
+              <Select value={form.protocol} onValueChange={(v) => setForm({ ...form, protocol: v })}>
+                <SelectTrigger className="bg-muted/30 border-white/[0.06]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {protocols.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Select
+              value={form.countryCode}
+              onValueChange={(v) => {
+                const c = countries.find((c) => c.code === v);
+                setForm({ ...form, countryCode: v, country: c?.name ?? "" });
+              }}
+            >
+              <SelectTrigger className="bg-muted/30 border-white/[0.06]">
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent>
+                {countries.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>
+                    {flagEmoji[c.code] ?? ""} {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="border-white/10" onClick={() => setAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="shadow-[0_0_15px_rgba(254,151,185,0.15)]"
+              disabled={!form.name || !form.server || !form.countryCode}
+              onClick={async () => {
+                await addNode(selectedGroup, {
+                  name: form.name,
+                  server: form.server,
+                  port: parseInt(form.port) || 443,
+                  protocol: form.protocol,
+                  country: form.country,
+                  countryCode: form.countryCode,
+                });
+                setAddDialogOpen(false);
+              }}
+            >
+              Add Node
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
