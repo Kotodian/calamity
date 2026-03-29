@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from "react";
-import { Power, ArrowUp, ArrowDown, Shield, Database } from "lucide-react";
+import { Power, ArrowUp, ArrowDown, Shield, Database, LogOut } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useConnectionStore } from "@/stores/connection";
 import { useNodesStore } from "@/stores/nodes";
+import { useTailnetStore } from "@/stores/tailnet";
 import {
   AreaChart,
   Area,
@@ -32,6 +34,7 @@ export function DashboardPage() {
     fetchState, toggleConnection, fetchSpeedHistory,
   } = useConnectionStore();
   const { groups, fetchGroups } = useNodesStore();
+  const { devices, fetchAccount, fetchDevices } = useTailnetStore();
   const [justConnected, setJustConnected] = useState(false);
   const prevStatusRef = useRef(status);
 
@@ -39,7 +42,9 @@ export function DashboardPage() {
     fetchState();
     fetchSpeedHistory();
     fetchGroups();
-  }, [fetchState, fetchSpeedHistory, fetchGroups]);
+    fetchAccount();
+    fetchDevices();
+  }, [fetchState, fetchSpeedHistory, fetchGroups, fetchAccount, fetchDevices]);
 
   useEffect(() => {
     if (prevStatusRef.current === "connecting" && status === "connected") {
@@ -53,6 +58,7 @@ export function DashboardPage() {
   const isConnected = status === "connected";
   const isConnecting = status === "connecting";
   const activeNodeObj = groups.flatMap((g) => g.nodes).find((n) => n.active);
+  const exitNode = devices.find((d) => d.isCurrentExitNode);
 
   return (
     <div className="p-6 min-h-full flex flex-col">
@@ -140,6 +146,17 @@ export function DashboardPage() {
             <span className="text-lg">{countryFlag(activeNodeObj.countryCode)}</span>
             <span className="text-sm font-medium">{activeNode}</span>
             <span className="text-xs text-muted-foreground">• {latency}ms</span>
+          </div>
+        )}
+
+        {/* Exit Node indicator */}
+        {exitNode && (
+          <div className="flex items-center gap-2 mt-2 animate-slide-up" style={{ animationDelay: "150ms" }}>
+            <Badge variant="outline" className="text-[10px] border-purple-500/30 bg-purple-500/10 text-purple-400">
+              <LogOut className="mr-1 h-2.5 w-2.5" />
+              Exit Node: {exitNode.name}
+            </Badge>
+            <span className="text-[10px] text-muted-foreground">{exitNode.ip}</span>
           </div>
         )}
       </div>

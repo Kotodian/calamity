@@ -1,9 +1,25 @@
 import type { TailnetDevice } from "./types";
 
+export interface TailnetAccount {
+  loginName: string;
+  tailnetName: string;
+  profilePicUrl?: string;
+  loggedIn: boolean;
+}
+
 export interface TailnetService {
+  getAccount(): Promise<TailnetAccount>;
+  login(): Promise<TailnetAccount>;
+  logout(): Promise<void>;
   getDevices(): Promise<TailnetDevice[]>;
   setExitNode(deviceId: string | null): Promise<void>;
 }
+
+let mockAccount: TailnetAccount = {
+  loginName: "",
+  tailnetName: "",
+  loggedIn: false,
+};
 
 const mockDevices: TailnetDevice[] = [
   { id: "d1", name: "MacBook Pro", hostname: "macbook-pro", ip: "100.64.0.1", os: "macOS", status: "online", lastSeen: new Date().toISOString(), isExitNode: false, isCurrentExitNode: false, isSelf: true },
@@ -14,6 +30,22 @@ const mockDevices: TailnetDevice[] = [
 ];
 
 export const tailnetService: TailnetService = {
+  async getAccount() {
+    return { ...mockAccount };
+  },
+  async login() {
+    // Mock: simulate Tailscale login
+    await new Promise((r) => setTimeout(r, 1000));
+    mockAccount = {
+      loginName: "user@example.com",
+      tailnetName: "example.ts.net",
+      loggedIn: true,
+    };
+    return { ...mockAccount };
+  },
+  async logout() {
+    mockAccount = { loginName: "", tailnetName: "", loggedIn: false };
+  },
   async getDevices() {
     return mockDevices.map((d) => ({ ...d }));
   },
