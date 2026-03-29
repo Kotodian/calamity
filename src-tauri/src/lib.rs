@@ -25,16 +25,21 @@ pub fn run() {
                     } => {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("tray") {
-                            if window.is_visible().unwrap_or(false) {
+                            let visible = window.is_visible().unwrap_or(false);
+                            if visible {
                                 let _ = window.hide();
                             } else {
-                                let width = 288_f64;
-                                let height = 420_f64;
-                                let x = position.x - width / 2.0;
-                                let y = position.y - height;
+                                // Use logical size for proper scaling on Retina
+                                let logical_w = 288.0_f64;
+                                let logical_h = 420.0_f64;
 
-                                let _ = window.set_position(tauri::LogicalPosition::new(x, y));
-                                let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                                let scale = window.scale_factor().unwrap_or(2.0);
+                                // tray position is in physical pixels, convert to logical
+                                let logical_x = position.x / scale - logical_w / 2.0;
+                                let logical_y = position.y / scale;
+
+                                let _ = window.set_size(tauri::LogicalSize::new(logical_w, logical_h));
+                                let _ = window.set_position(tauri::LogicalPosition::new(logical_x, logical_y));
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
