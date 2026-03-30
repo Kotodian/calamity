@@ -15,10 +15,12 @@ import type { Language } from "@/services/types";
 export function TrayActions() {
   const { t } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
+  const tunStatus = useSettingsStore((s) => s.tunStatus);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
   const status = useConnectionStore((s) => s.status);
   const toggleConnection = useConnectionStore((s) => s.toggleConnection);
   const isConnected = status === "connected";
+  const tunEnabled = tunStatus?.targetEnhancedMode ?? settings?.enhancedMode ?? false;
 
   return (
     <div className="space-y-1.5">
@@ -30,6 +32,8 @@ export function TrayActions() {
         <Switch
           className="scale-75"
           checked={settings?.systemProxy ?? false}
+          disabled={tunEnabled}
+          title={tunEnabled ? t("settings.tunProxyConflict") : undefined}
           onCheckedChange={(v) => updateSettings({ systemProxy: v })}
         />
       </div>

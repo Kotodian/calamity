@@ -25,7 +25,12 @@ pub fn run() {
             } else {
                 app.path()
                     .resource_dir()
-                    .map(|d| d.join("binaries").join("sing-box").to_string_lossy().to_string())
+                    .map(|d| {
+                        d.join("binaries")
+                            .join("sing-box")
+                            .to_string_lossy()
+                            .to_string()
+                    })
                     .unwrap_or_else(|_| "sing-box".to_string())
             };
 
@@ -40,7 +45,7 @@ pub fn run() {
                 // Apply system proxy if enabled
                 crate::commands::settings::apply_system_proxy_on_start(&settings);
                 match process.start(&settings).await {
-                    Ok(()) => {},
+                    Ok(()) => {}
                     Err(e) => eprintln!("[singbox] failed to start: {}", e),
                 }
             });
@@ -62,7 +67,8 @@ pub fn run() {
                         let should_update = match &sub.last_updated {
                             Some(last) => {
                                 if let Ok(last_dt) = chrono::DateTime::parse_from_rfc3339(last) {
-                                    let elapsed = (now - last_dt.with_timezone(&chrono::Utc)).num_seconds();
+                                    let elapsed =
+                                        (now - last_dt.with_timezone(&chrono::Utc)).num_seconds();
                                     elapsed >= sub.auto_update_interval as i64
                                 } else {
                                     true
@@ -76,7 +82,8 @@ pub fn run() {
                             let _ = crate::commands::subscriptions::update_subscription(
                                 app_handle_subs.clone(),
                                 sub.id.clone(),
-                            ).await;
+                            )
+                            .await;
                         }
                     }
 
@@ -113,8 +120,8 @@ pub fn run() {
                                 let logical_x = position.x / scale - logical_w / 2.0;
                                 let logical_y = position.y / scale;
 
-                                let _ = window
-                                    .set_size(tauri::LogicalSize::new(logical_w, logical_h));
+                                let _ =
+                                    window.set_size(tauri::LogicalSize::new(logical_w, logical_h));
                                 let _ = window.set_position(tauri::LogicalPosition::new(
                                     logical_x, logical_y,
                                 ));
@@ -157,6 +164,7 @@ pub fn run() {
             commands::connection::singbox_restart,
             commands::connection::singbox_status,
             commands::settings::get_settings,
+            commands::settings::get_tun_status,
             commands::settings::update_settings,
             commands::dns::get_dns_settings,
             commands::dns::update_dns_config,

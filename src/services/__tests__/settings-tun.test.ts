@@ -30,4 +30,18 @@ describe("settingsService TUN/enhanced mode", () => {
     const s = await settingsService.getSettings();
     expect(s.enhancedMode).toBe(false);
   });
+
+  it("forces system proxy off when enhanced mode is enabled", async () => {
+    await settingsService.updateSettings({ systemProxy: true, enhancedMode: true });
+    const s = await settingsService.getSettings();
+    expect(s.systemProxy).toBe(false);
+  });
+
+  it("reports fake-ip as the effective DNS mode when TUN is enabled", async () => {
+    await settingsService.updateSettings({ enhancedMode: true });
+    const status = await settingsService.getTunStatus();
+    expect(status.mode).toBe("tun");
+    expect(status.targetEnhancedMode).toBe(true);
+    expect(status.effectiveDnsMode).toBe("fake-ip");
+  });
 });

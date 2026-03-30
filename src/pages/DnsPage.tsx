@@ -54,8 +54,9 @@ export function DnsPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const settings = useSettingsStore((s) => s.settings);
+  const tunStatus = useSettingsStore((s) => s.tunStatus);
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
-  const tunEnabled = settings?.enhancedMode ?? false;
+  const tunEnabled = tunStatus?.targetEnhancedMode ?? settings?.enhancedMode ?? false;
 
   const nodeGroups = useNodesStore((s) => s.groups);
   const fetchNodes = useNodesStore((s) => s.fetchGroups);
@@ -75,6 +76,9 @@ export function DnsPage() {
   }, [fetchAll, fetchSettings, fetchNodes, fetchRouteRules]);
 
   if (!config) return null;
+
+  const effectiveDnsMode = tunStatus?.effectiveDnsMode ?? config.mode;
+  const fakeIpForcedByTun = tunStatus?.effectiveDnsMode === "fake-ip";
 
   const MATCH_TYPES = [
     { value: "domain", label: t("dns.matchTypes.domain") },
@@ -124,25 +128,37 @@ export function DnsPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <Select
-                value={config.mode}
-                onValueChange={(v) => updateConfig({ mode: v as DnsMode })}
+                value={effectiveDnsMode}
+                onValueChange={(v) => {
+                  if (!fakeIpForcedByTun) {
+                    updateConfig({ mode: v as DnsMode });
+                  }
+                }}
               >
                 <SelectTrigger className="w-48 bg-muted/30 border-white/[0.06]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
-                  <SelectItem value="fake-ip" disabled={!tunEnabled}>
-                    {tunEnabled ? t("dns.modeFakeIp") : t("dns.modeFakeIpRequiresTun")}
+                  <SelectItem value="fake-ip" disabled={!tunEnabled && !fakeIpForcedByTun}>
+                    {fakeIpForcedByTun
+                      ? t("dns.modeFakeIpForcedByTun")
+                      : tunEnabled
+                        ? t("dns.modeFakeIp")
+                        : t("dns.modeFakeIpRequiresTun")}
                   </SelectItem>
-                  <SelectItem value="redir-host">{t("dns.modeRedirHost")}</SelectItem>
-                  <SelectItem value="direct">{t("dns.modeDirect")}</SelectItem>
+                  <SelectItem value="redir-host" disabled={fakeIpForcedByTun}>{t("dns.modeRedirHost")}</SelectItem>
+                  <SelectItem value="direct" disabled={fakeIpForcedByTun}>{t("dns.modeDirect")}</SelectItem>
                 </SelectContent>
               </Select>
-              {config.mode === "fake-ip" && (
+              {fakeIpForcedByTun ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("dns.fakeIpForcedByTun", { value: config.fakeIpRange })}
+                </p>
+              ) : config.mode === "fake-ip" ? (
                 <p className="text-xs text-muted-foreground">
                   {t("dns.fakeIpRange", { value: config.fakeIpRange })}
                 </p>
-              )}
+              ) : null}
             </CardContent>
           </Card>
 

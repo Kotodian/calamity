@@ -5,25 +5,39 @@ use tauri_plugin_autostart::AutoLaunchManager;
 use crate::singbox::process::SingboxProcess;
 use crate::singbox::storage::{self, AppSettings};
 
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunRuntimeStatus {
+    pub running: bool,
+    pub mode: String,
+    pub target_enhanced_mode: bool,
+    pub requires_admin: bool,
+    pub last_error: Option<String>,
+    pub effective_dns_mode: Option<String>,
+}
+
 #[tauri::command]
 pub async fn get_settings() -> Result<AppSettings, String> {
     Ok(storage::load_settings())
 }
 
 #[tauri::command]
-pub async fn update_settings(app: AppHandle, updates: serde_json::Value) -> Result<AppSettings, String> {
+pub async fn get_tun_status(app: AppHandle) -> Result<TunRuntimeStatus, String> {
+    let process = app.state::<Arc<SingboxProcess>>().inner().clone();
+    let settings = storage::load_settings();
+    Ok(process.tun_status(&settings).await)
+}
+
+#[tauri::command]
+pub async fn update_settings(
+    app: AppHandle,
+    updates: serde_json::Value,
+) -> Result<AppSettings, String> {
     let mut settings = storage::load_settings();
     let old_key = restart_key(&settings);
     let old_system_proxy = settings.system_proxy;
 
-    // Merge updates into settings
-    let mut json = serde_json::to_value(&settings).map_err(|e| e.to_string())?;
-    if let (Some(base), Some(patch)) = (json.as_object_mut(), updates.as_object()) {
-        for (k, v) in patch {
-            base.insert(k.clone(), v.clone());
-        }
-    }
-    settings = serde_json::from_value(json).map_err(|e| e.to_string())?;
+    settings = merge_settings_updates(&settings, &updates)?;
 
     storage::save_settings(&settings)?;
 
@@ -52,8 +66,12 @@ pub async fn update_settings(app: AppHandle, updates: serde_json::Value) -> Resu
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     if old_key != new_key || !process.is_running().await {
         match process.restart(&settings).await {
-            Ok(()) => { let _ = app.emit("singbox-restarted", ()); }
-            Err(e) => { let _ = app.emit("singbox-error", &e); }
+            Ok(()) => {
+                let _ = app.emit("singbox-restarted", ());
+            }
+            Err(e) => {
+                let _ = app.emit("singbox-error", &e);
+            }
         }
     }
 
@@ -62,9 +80,38 @@ pub async fn update_settings(app: AppHandle, updates: serde_json::Value) -> Resu
 
 fn restart_key(s: &AppSettings) -> String {
     format!(
-        "{}:{}:{}:{}:{}",
-        s.mixed_port, s.http_port, s.socks_port, s.log_level, s.allow_lan
+        "{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+        s.mixed_port,
+        s.http_port,
+        s.socks_port,
+        s.log_level,
+        s.allow_lan,
+        s.enhanced_mode,
+        s.tun_config.stack,
+        s.tun_config.mtu,
+        s.tun_config.auto_route,
+        s.tun_config.strict_route,
+        s.tun_config.dns_hijack.join(","),
     )
+}
+
+fn merge_settings_updates(
+    current: &AppSettings,
+    updates: &serde_json::Value,
+) -> Result<AppSettings, String> {
+    let mut json = serde_json::to_value(current).map_err(|e| e.to_string())?;
+    if let (Some(base), Some(patch)) = (json.as_object_mut(), updates.as_object()) {
+        for (k, v) in patch {
+            base.insert(k.clone(), v.clone());
+        }
+    }
+
+    let mut settings: AppSettings = serde_json::from_value(json).map_err(|e| e.to_string())?;
+    if settings.enhanced_mode {
+        settings.system_proxy = false;
+    }
+
+    Ok(settings)
 }
 
 /// Get active network services (e.g. "Wi-Fi", "Ethernet").
@@ -94,9 +141,9 @@ fn get_active_network_services() -> Vec<String> {
         {
             let info_text = String::from_utf8_lossy(&info.stdout);
             // Has a real IP address (not empty or "none")
-            let has_ip = info_text.lines().any(|l| {
-                l.starts_with("IP address:") && !l.contains("none") && l.len() > 12
-            });
+            let has_ip = info_text
+                .lines()
+                .any(|l| l.starts_with("IP address:") && !l.contains("none") && l.len() > 12);
             if has_ip {
                 services.push(name.to_string());
             }
@@ -164,4 +211,54 @@ pub fn apply_system_proxy_on_start(settings: &AppSettings) {
 
 pub fn clear_system_proxy_on_exit() {
     clear_system_proxy();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{merge_settings_updates, restart_key};
+    use crate::singbox::storage::AppSettings;
+    use serde_json::json;
+
+    #[test]
+    fn restart_key_changes_when_enhanced_mode_changes() {
+        let mut settings = AppSettings::default();
+        let normal = restart_key(&settings);
+        settings.enhanced_mode = true;
+
+        assert_ne!(normal, restart_key(&settings));
+    }
+
+    #[test]
+    fn restart_key_changes_when_tun_config_changes() {
+        let mut settings = AppSettings::default();
+        let base = restart_key(&settings);
+        settings.tun_config.mtu = 1500;
+
+        assert_ne!(base, restart_key(&settings));
+    }
+
+    #[test]
+    fn restart_key_changes_when_dns_hijack_changes() {
+        let mut settings = AppSettings::default();
+        let base = restart_key(&settings);
+        settings.tun_config.dns_hijack = vec!["198.18.0.3:53".to_string()];
+
+        assert_ne!(base, restart_key(&settings));
+    }
+
+    #[test]
+    fn enabling_tun_forces_system_proxy_off() {
+        let current = AppSettings::default();
+        let merged = merge_settings_updates(
+            &current,
+            &json!({
+                "enhancedMode": true,
+                "systemProxy": true
+            }),
+        )
+        .expect("settings merge should succeed");
+
+        assert!(merged.enhanced_mode);
+        assert!(!merged.system_proxy);
+    }
 }

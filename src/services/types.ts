@@ -249,6 +249,17 @@ export interface AppSettings {
   logLevel: LogLevel;
 }
 
+export type TunMode = "normal" | "tun";
+
+export interface TunRuntimeStatus {
+  running: boolean;
+  mode: TunMode;
+  targetEnhancedMode: boolean;
+  requiresAdmin: boolean;
+  lastError: string | null;
+  effectiveDnsMode: DnsMode | null;
+}
+
 // Tray
 export interface SiteRule {
   domain: string;

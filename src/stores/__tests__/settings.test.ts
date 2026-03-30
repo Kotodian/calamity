@@ -3,7 +3,7 @@ import { useSettingsStore } from "../settings";
 
 describe("useSettingsStore", () => {
   beforeEach(() => {
-    useSettingsStore.setState({ settings: null });
+    useSettingsStore.setState({ settings: null, tunStatus: null });
   });
 
   it("fetchSettings loads settings", async () => {
@@ -17,6 +17,21 @@ describe("useSettingsStore", () => {
     await useSettingsStore.getState().fetchSettings();
     await useSettingsStore.getState().updateSettings({ autoStart: true });
     expect(useSettingsStore.getState().settings!.autoStart).toBe(true);
+  });
+
+  it("fetchSettings loads TUN runtime status", async () => {
+    await useSettingsStore.getState().fetchSettings();
+    const tunStatus = useSettingsStore.getState().tunStatus;
+    expect(tunStatus).not.toBeNull();
+    expect(tunStatus!.mode).toBeTruthy();
+  });
+
+  it("updateSettings keeps system proxy off when TUN is enabled", async () => {
+    await useSettingsStore.getState().fetchSettings();
+    await useSettingsStore.getState().updateSettings({ enhancedMode: true, systemProxy: true });
+    expect(useSettingsStore.getState().settings!.enhancedMode).toBe(true);
+    expect(useSettingsStore.getState().settings!.systemProxy).toBe(false);
+    expect(useSettingsStore.getState().tunStatus!.effectiveDnsMode).toBe("fake-ip");
   });
 
   it("setTheme applies class and updates settings", async () => {

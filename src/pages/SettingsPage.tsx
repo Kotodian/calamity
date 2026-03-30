@@ -16,13 +16,17 @@ import type { Language, LogLevel, Theme } from "@/services/types";
 
 export function SettingsPage() {
   const { t } = useTranslation();
-  const { settings, fetchSettings, updateSettings, setTheme } = useSettingsStore();
+  const { settings, tunStatus, fetchSettings, updateSettings, setTheme } = useSettingsStore();
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
   if (!settings) return null;
+
+  const tunEnabled = tunStatus?.targetEnhancedMode ?? settings.enhancedMode;
+  const tunRunning = tunStatus?.running ?? false;
+  const tunLastError = tunStatus?.lastError;
 
   return (
     <div className="p-6 space-y-6">
@@ -77,9 +81,15 @@ export function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">{t("settings.systemProxy")}</p>
-              <p className="text-xs text-muted-foreground">{t("settings.systemProxyDescription")}</p>
+              <p className="text-xs text-muted-foreground">
+                {tunEnabled ? t("settings.tunProxyConflict") : t("settings.systemProxyDescription")}
+              </p>
             </div>
-            <Switch checked={settings.systemProxy} onCheckedChange={(v) => updateSettings({ systemProxy: v })} />
+            <Switch
+              checked={settings.systemProxy}
+              disabled={tunEnabled}
+              onCheckedChange={(v) => updateSettings({ systemProxy: v })}
+            />
           </div>
           <Separator className="bg-white/[0.04]" />
           <div className="flex items-center justify-between">
@@ -89,9 +99,17 @@ export function SettingsPage() {
             </div>
             <Switch checked={settings.enhancedMode} onCheckedChange={(v) => updateSettings({ enhancedMode: v })} />
           </div>
-          {settings.enhancedMode && (
+          {tunEnabled && (
             <>
               <div className="rounded-lg border border-white/[0.04] bg-muted/10 p-3 space-y-3">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{t("settings.tunStatus")}</p>
+                  <p className="text-sm font-medium">{tunRunning ? t("settings.tunRunning") : t("settings.tunStopped")}</p>
+                  <p className="text-xs text-muted-foreground">{t("settings.tunRequiresAdmin")}</p>
+                  {tunLastError ? (
+                    <p className="text-xs text-destructive">{t("settings.tunLastError", { error: tunLastError })}</p>
+                  ) : null}
+                </div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{t("settings.tunConfiguration")}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

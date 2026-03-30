@@ -1,7 +1,8 @@
-import type { AppSettings, Theme } from "./types";
+import type { AppSettings, Theme, TunRuntimeStatus } from "./types";
 
 export interface SettingsService {
   getSettings(): Promise<AppSettings>;
+  getTunStatus(): Promise<TunRuntimeStatus>;
   updateSettings(settings: Partial<AppSettings>): Promise<void>;
   setTheme(theme: Theme): Promise<void>;
 }
@@ -29,12 +30,39 @@ let mockSettings: AppSettings = {
   logLevel: "info",
 };
 
+function buildMockTunStatus(): TunRuntimeStatus {
+  return {
+    running: mockSettings.enhancedMode,
+    mode: mockSettings.enhancedMode ? "tun" : "normal",
+    targetEnhancedMode: mockSettings.enhancedMode,
+    requiresAdmin: mockSettings.enhancedMode,
+    lastError: null,
+    effectiveDnsMode: mockSettings.enhancedMode ? "fake-ip" : null,
+  };
+}
+
 const mockSettingsService: SettingsService = {
   async getSettings() {
     return { ...mockSettings, tunConfig: { ...mockSettings.tunConfig, dnsHijack: [...mockSettings.tunConfig.dnsHijack] } };
   },
+  async getTunStatus() {
+    return { ...buildMockTunStatus() };
+  },
   async updateSettings(settings) {
-    mockSettings = { ...mockSettings, ...settings };
+    mockSettings = {
+      ...mockSettings,
+      ...settings,
+      tunConfig: settings.tunConfig
+        ? {
+            ...mockSettings.tunConfig,
+            ...settings.tunConfig,
+            dnsHijack: [...settings.tunConfig.dnsHijack],
+          }
+        : mockSettings.tunConfig,
+    };
+    if (mockSettings.enhancedMode) {
+      mockSettings.systemProxy = false;
+    }
   },
   async setTheme(theme) {
     mockSettings.theme = theme;
@@ -48,6 +76,10 @@ function createTauriSettingsService(): SettingsService {
     async getSettings() {
       const { invoke } = await import("@tauri-apps/api/core");
       return invoke<AppSettings>("get_settings");
+    },
+    async getTunStatus() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return invoke<TunRuntimeStatus>("get_tun_status");
     },
     async updateSettings(settings) {
       const { invoke } = await import("@tauri-apps/api/core");
