@@ -49,6 +49,10 @@ pub async fn singbox_status(app: AppHandle) -> Result<SingboxStatus, String> {
 }
 
 #[tauri::command]
-pub fn app_quit(app: AppHandle) {
+pub async fn app_quit(app: AppHandle) {
+    // Clean up before exiting — the RunEvent::Exit handler may not run reliably
+    crate::commands::settings::clear_system_proxy_on_exit();
+    let process = app.state::<Arc<SingboxProcess>>().inner().clone();
+    process.stop_sync();
     app.exit(0);
 }
