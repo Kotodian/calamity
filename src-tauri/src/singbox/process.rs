@@ -138,6 +138,12 @@ impl SingboxProcess {
         *guard = None;
 
         let runtime = self.runtime.lock().await.clone();
+        if runtime.mode == Some(RunMode::Tun) {
+            if let Some(config_path) = runtime.config_path.as_deref() {
+                self.stop_privileged_tun(config_path).await?;
+            }
+        }
+
         if runtime.mode == Some(RunMode::Tun) || self.api.health_check().await.unwrap_or(false) {
             let pattern = runtime
                 .config_path
@@ -260,6 +266,26 @@ impl SingboxProcess {
         Ok(())
     }
 
+    async fn stop_privileged_tun(&self, config_path: &str) -> Result<(), String> {
+        let script = build_privileged_cleanup_osascript(config_path);
+
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .await
+            .map_err(|e| format!("failed to request administrator privileges: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format_privileged_tun_error(
+                &String::from_utf8_lossy(&output.stdout),
+                &String::from_utf8_lossy(&output.stderr),
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn set_runtime(
         &self,
         mode: Option<RunMode>,
@@ -283,25 +309,44 @@ fn run_mode_for_settings(settings: &AppSettings) -> RunMode {
 
 fn build_privileged_osascript(singbox_path: &str, config_path: &str) -> String {
     let shell_command = build_tun_run_command(singbox_path, config_path);
+    build_privileged_shell_osascript(&shell_command)
+}
+
+fn build_privileged_cleanup_osascript(config_path: &str) -> String {
+    let shell_command = build_tun_cleanup_command(config_path);
+    build_privileged_shell_osascript(&shell_command)
+}
+
+fn build_privileged_shell_osascript(shell_command: &str) -> String {
     format!(
         "do shell script \"{}\" with administrator privileges",
-        escape_applescript_string(&shell_command)
+        escape_applescript_string(shell_command)
     )
 }
 
 fn build_tun_run_command(singbox_path: &str, config_path: &str) -> String {
     let log_path = build_tun_log_path(config_path);
+    let pid_path = build_tun_pid_path(config_path);
     let log_dir = std::path::Path::new(&log_path)
         .parent()
         .and_then(|path| path.to_str())
         .unwrap_or("/tmp");
 
     format!(
-        "mkdir -p {} && nohup {} run -c {} > {} 2>&1 &",
+        "mkdir -p {} && {} run -c {} > {} 2>&1 & echo $! > {}",
         shell_quote(log_dir),
         shell_quote(singbox_path),
         shell_quote(config_path),
         shell_quote(&log_path),
+        shell_quote(&pid_path),
+    )
+}
+
+fn build_tun_cleanup_command(config_path: &str) -> String {
+    let pid_path = build_tun_pid_path(config_path);
+    format!(
+        "if [ -f {pid_path} ]; then pid=$(cat {pid_path}); kill \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; rm -f {pid_path}; fi",
+        pid_path = shell_quote(&pid_path),
     )
 }
 
@@ -319,6 +364,14 @@ fn build_tun_log_path(config_path: &str) -> String {
         .parent()
         .unwrap_or_else(|| std::path::Path::new("/tmp"));
     directory.join("singbox-tun.log").to_string_lossy().to_string()
+}
+
+fn build_tun_pid_path(config_path: &str) -> String {
+    let config_path = std::path::Path::new(config_path);
+    let directory = config_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("/tmp"));
+    directory.join("singbox-tun.pid").to_string_lossy().to_string()
 }
 
 fn format_privileged_tun_error(stdout: &str, stderr: &str) -> String {
@@ -367,8 +420,9 @@ fn format_tun_start_timeout_message(config_path: &str, fallback: &str) -> String
 #[cfg(test)]
 mod tests {
     use super::{
-        build_privileged_osascript, build_tun_log_path, build_tun_run_command,
-        format_privileged_tun_error, run_mode_for_settings, RunMode,
+        build_privileged_osascript, build_tun_cleanup_command, build_tun_log_path,
+        build_tun_pid_path, build_tun_run_command, format_privileged_tun_error,
+        run_mode_for_settings, RunMode,
     };
     use crate::singbox::storage::AppSettings;
 
@@ -394,7 +448,7 @@ mod tests {
 
         assert_eq!(
             command,
-            "mkdir -p '/tmp' && nohup '/Applications/Calamity App/sing-box' run -c '/tmp/calamity config.json' > '/tmp/singbox-tun.log' 2>&1 &"
+            "mkdir -p '/tmp' && '/Applications/Calamity App/sing-box' run -c '/tmp/calamity config.json' > '/tmp/singbox-tun.log' 2>&1 & echo $! > '/tmp/singbox-tun.pid'"
         );
     }
 
@@ -404,7 +458,7 @@ mod tests {
 
         assert_eq!(
             script,
-            "do shell script \"mkdir -p '/tmp' && nohup '/usr/local/bin/sing-box' run -c '/tmp/config.json' > '/tmp/singbox-tun.log' 2>&1 &\" with administrator privileges"
+            "do shell script \"mkdir -p '/tmp' && '/usr/local/bin/sing-box' run -c '/tmp/config.json' > '/tmp/singbox-tun.log' 2>&1 & echo $! > '/tmp/singbox-tun.pid'\" with administrator privileges"
         );
     }
 
@@ -413,6 +467,26 @@ mod tests {
         assert_eq!(
             build_tun_log_path("/Users/test/Library/Application Support/com.calamity.app/singbox-config.json"),
             "/Users/test/Library/Application Support/com.calamity.app/singbox-tun.log"
+        );
+    }
+
+    #[test]
+    fn tun_pid_path_uses_config_directory() {
+        assert_eq!(
+            build_tun_pid_path(
+                "/Users/test/Library/Application Support/com.calamity.app/singbox-config.json"
+            ),
+            "/Users/test/Library/Application Support/com.calamity.app/singbox-tun.pid"
+        );
+    }
+
+    #[test]
+    fn tun_cleanup_command_uses_pid_file_and_waits_for_exit() {
+        let command = build_tun_cleanup_command("/tmp/config.json");
+
+        assert_eq!(
+            command,
+            "if [ -f '/tmp/singbox-tun.pid' ]; then pid=$(cat '/tmp/singbox-tun.pid'); kill \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; rm -f '/tmp/singbox-tun.pid'; fi"
         );
     }
 

@@ -64,17 +64,12 @@ pub fn generate_config(settings: &AppSettings) -> Value {
     outbound_list.push(json!({ "type": "direct", "tag": "direct-out" }));
     outbound_list.push(json!({ "type": "block", "tag": "block-out" }));
 
-    // Route final: active node or direct-out
-    let route_final = nodes_data
-        .active_node
-        .as_ref()
-        .filter(|id| all_node_tags.contains(id))
-        .cloned()
-        .unwrap_or_else(|| "direct-out".to_string());
-
     // Build route rules from stored rules
     let rules_data = rules_storage::load_rules();
-    let (stored_route_rules, rule_sets) = build_route_rules(&rules_data, &all_node_tags);
+    let route_final =
+        resolve_route_final(&rules_data, &all_node_tags, nodes_data.active_node.as_deref());
+    let (stored_route_rules, rule_sets) =
+        build_route_rules(&rules_data, &all_node_tags, nodes_data.active_node.as_deref());
     let mut route_rules = build_pre_match_route_rules(settings);
     route_rules.extend(stored_route_rules);
 
@@ -283,6 +278,7 @@ fn build_dns_rule(rule: &DnsRuleConfig) -> Option<Value> {
 fn build_route_rules(
     rules_data: &rules_storage::RulesData,
     all_node_tags: &[String],
+    active_node: Option<&str>,
 ) -> (Vec<Value>, Vec<Value>) {
     let mut route_rules: Vec<Value> = Vec::new();
     let mut rule_sets: Vec<Value> = Vec::new();
@@ -293,7 +289,8 @@ fn build_route_rules(
             continue;
         }
 
-        let outbound_tag = resolve_outbound(&rule.outbound, &rule.outbound_node, all_node_tags);
+        let outbound_tag =
+            resolve_outbound(&rule.outbound, &rule.outbound_node, all_node_tags, active_node);
 
         match rule.match_type.as_str() {
             "geosite" | "geoip" => {
@@ -301,6 +298,7 @@ fn build_route_rules(
 
                 route_rules.push(json!({
                     "rule_set": rule_set_tag,
+                    "action": "route",
                     "outbound": outbound_tag
                 }));
 
@@ -388,6 +386,7 @@ fn build_route_rules(
 
                 route_rules.push(json!({
                     key: value,
+                    "action": "route",
                     "outbound": outbound_tag
                 }));
             }
@@ -409,24 +408,60 @@ fn build_pre_match_route_rules(settings: &AppSettings) -> Vec<Value> {
     }
 }
 
+fn resolve_route_final(
+    rules_data: &rules_storage::RulesData,
+    all_node_tags: &[String],
+    active_node: Option<&str>,
+) -> String {
+    match rules_data.final_outbound.as_str() {
+        "direct" => "direct-out".to_string(),
+        "reject" => "block-out".to_string(),
+        "proxy" => rules_data
+            .final_outbound_node
+            .as_ref()
+            .filter(|node| all_node_tags.contains(node))
+            .cloned()
+            .or_else(|| {
+                active_node
+                    .filter(|node| all_node_tags.iter().any(|tag| tag == node))
+                    .map(ToOwned::to_owned)
+            })
+            .unwrap_or_else(|| "direct-out".to_string()),
+        other => all_node_tags
+            .iter()
+            .find(|tag| tag.as_str() == other)
+            .cloned()
+            .unwrap_or_else(|| "direct-out".to_string()),
+    }
+}
+
 fn resolve_outbound(
     outbound: &str,
     outbound_node: &Option<String>,
     all_node_tags: &[String],
+    active_node: Option<&str>,
 ) -> String {
     match outbound {
         "direct" => "direct-out".to_string(),
         "reject" => "block-out".to_string(),
         "proxy" => {
+            // 1. Use specified node if valid
             if let Some(node) = outbound_node {
                 if all_node_tags.contains(node) {
-                    node.clone()
-                } else {
-                    "direct-out".to_string()
+                    return node.clone();
                 }
-            } else {
-                "direct-out".to_string()
             }
+            // 2. Fallback to active node
+            if let Some(active) = active_node {
+                if all_node_tags.iter().any(|t| t == active) {
+                    return active.to_string();
+                }
+            }
+            // 3. Fallback to first available node
+            all_node_tags
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "direct-out".to_string())
         }
         _ => "direct-out".to_string(),
     }
@@ -490,6 +525,48 @@ mod tests {
                 && rule["action"] == "resolve"
                 && rule["strategy"] == "ipv4_only"
         }));
+    }
+
+    #[test]
+    fn route_rules_use_explicit_route_action() {
+        let rules_data = rules_storage::RulesData {
+            rules: vec![rules_storage::RouteRuleConfig {
+                id: "rule-1".to_string(),
+                name: "Direct Example".to_string(),
+                enabled: true,
+                match_type: "domain-suffix".to_string(),
+                match_value: "example.com".to_string(),
+                outbound: "direct".to_string(),
+                outbound_node: None,
+                rule_set_url: None,
+                rule_set_local_path: None,
+                download_detour: None,
+                order: 0,
+            }],
+            final_outbound: "proxy".to_string(),
+            final_outbound_node: None,
+            update_interval: 86400,
+        };
+
+        let (rules, _) = build_route_rules(&rules_data, &[], None);
+
+        assert_eq!(rules[0]["action"], "route");
+        assert_eq!(rules[0]["outbound"], "direct-out");
+    }
+
+    #[test]
+    fn configured_final_outbound_overrides_active_node() {
+        let all_node_tags = vec!["Proxy-A".to_string()];
+        let rules_data = rules_storage::RulesData {
+            rules: vec![],
+            final_outbound: "direct".to_string(),
+            final_outbound_node: None,
+            update_interval: 86400,
+        };
+
+        let final_outbound = resolve_route_final(&rules_data, &all_node_tags, Some("Proxy-A"));
+
+        assert_eq!(final_outbound, "direct-out");
     }
 
     #[test]
