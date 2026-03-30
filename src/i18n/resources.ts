@@ -102,6 +102,10 @@ export const resources = {
         added: "Added",
         adding: "Adding...",
         systemProxy: "System Proxy",
+        rules: "Rules",
+        group: "Group",
+        viewAll: "View all in dashboard",
+        noRules: "No enabled rules",
       },
       dashboard: {
         title: "Network Overview",
@@ -358,6 +362,10 @@ export const resources = {
         added: "已添加",
         adding: "添加中...",
         systemProxy: "系统代理",
+        rules: "规则",
+        group: "分组",
+        viewAll: "在面板中查看全部",
+        noRules: "没有启用的规则",
       },
       dashboard: {
         title: "网络概览",

@@ -34,19 +34,23 @@ export function TraySiteRule() {
   ];
 
   useEffect(() => {
-    (async () => {
+    const detect = async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         const url = await invoke<string | null>("get_browser_url");
-        if (url) {
-          setDomain(extractDomain(url));
-        }
+        setDomain(url ? extractDomain(url) : "");
       } catch {
         // Not in Tauri or detection failed
       } finally {
         setDetecting(false);
       }
-    })();
+    };
+    detect();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") detect();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const openDialog = () => {
@@ -76,6 +80,8 @@ export function TraySiteRule() {
       setAdding(false);
     }
   };
+
+  if (!detecting && !domain && !showDialog) return null;
 
   return (
     <div className="space-y-2">

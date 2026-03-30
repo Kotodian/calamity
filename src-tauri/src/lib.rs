@@ -107,7 +107,7 @@ pub fn run() {
                                 let _ = window.hide();
                             } else {
                                 let logical_w = 288.0_f64;
-                                let logical_h = 420.0_f64;
+                                let logical_h = 600.0_f64;
 
                                 let scale = window.scale_factor().unwrap_or(2.0);
                                 let logical_x = position.x / scale - logical_w / 2.0;

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { TrayStatus } from "./tray/TrayStatus";
 import { TrayModeSwitch } from "./tray/TrayModeSwitch";
+import { TrayRuleList } from "./tray/TrayRuleList";
 import { TraySiteRule } from "./tray/TraySiteRule";
 import { TrayActions } from "./tray/TrayActions";
 import { Separator } from "@/components/ui/separator";
@@ -8,6 +9,7 @@ import { useConnectionStore } from "@/stores/connection";
 import { useSettingsStore } from "@/stores/settings";
 
 export function TrayApp() {
+  const mode = useConnectionStore((s) => s.mode);
   const fetchState = useConnectionStore((s) => s.fetchState);
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
   const subscribeTraffic = useConnectionStore((s) => s.subscribeTraffic);
@@ -27,6 +29,12 @@ export function TrayApp() {
         <TrayStatus />
         <Separator className="bg-border/50" />
         <TrayModeSwitch />
+        {mode === "rule" && (
+          <>
+            <Separator className="bg-border/50" />
+            <TrayRuleList />
+          </>
+        )}
         <Separator className="bg-border/50" />
         <TraySiteRule />
         <Separator className="bg-border/50" />
