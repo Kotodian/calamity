@@ -1,7 +1,14 @@
 import type { RouteRule } from "./types";
 
+export interface FinalOutbound {
+  outbound: string;
+  outboundNode?: string;
+}
+
 export interface RulesService {
   getRules(): Promise<RouteRule[]>;
+  getFinalOutbound(): Promise<FinalOutbound>;
+  updateFinalOutbound(outbound: string, outboundNode?: string): Promise<void>;
   addRule(rule: Omit<RouteRule, "id" | "order">): Promise<RouteRule>;
   updateRule(id: string, updates: Partial<RouteRule>): Promise<void>;
   deleteRule(id: string): Promise<void>;
@@ -21,9 +28,17 @@ let mockRules: RouteRule[] = [
 
 let nextId = 7;
 
+let mockFinal: FinalOutbound = { outbound: "proxy" };
+
 const mockRulesService: RulesService = {
   async getRules() {
     return mockRules.map((r) => ({ ...r })).sort((a, b) => a.order - b.order);
+  },
+  async getFinalOutbound() {
+    return { ...mockFinal };
+  },
+  async updateFinalOutbound(outbound, outboundNode) {
+    mockFinal = { outbound, outboundNode };
   },
   async addRule(rule) {
     const newRule: RouteRule = { ...rule, id: `r${nextId++}`, order: mockRules.length };
@@ -54,6 +69,8 @@ const mockRulesService: RulesService = {
 
 interface RawRulesData {
   rules: RouteRule[];
+  finalOutbound: string;
+  finalOutboundNode?: string;
   updateInterval: number;
 }
 
@@ -69,6 +86,15 @@ function createTauriRulesService(): RulesService {
       const { invoke } = await import("@tauri-apps/api/core");
       const raw = await invoke<RawRulesData>("get_rules");
       return toRouteRules(raw);
+    },
+    async getFinalOutbound() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const raw = await invoke<RawRulesData>("get_rules");
+      return { outbound: raw.finalOutbound ?? "proxy", outboundNode: raw.finalOutboundNode };
+    },
+    async updateFinalOutbound(outbound, outboundNode) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("update_final_outbound", { outbound, outboundNode: outboundNode ?? null });
     },
     async addRule(rule) {
       const { invoke } = await import("@tauri-apps/api/core");

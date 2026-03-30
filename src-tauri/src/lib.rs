@@ -208,6 +208,7 @@ pub fn run() {
             commands::rules::delete_rule,
             commands::rules::reorder_rules,
             commands::rules::update_ruleset_interval,
+            commands::rules::update_final_outbound,
             commands::traffic::subscribe_traffic,
             commands::traffic::get_dashboard_info,
         ])

@@ -2,6 +2,18 @@ import { describe, it, expect } from "vitest";
 import { rulesService } from "../rules";
 
 describe("rulesService", () => {
+  it("getFinalOutbound returns final outbound config", async () => {
+    const final_ = await rulesService.getFinalOutbound();
+    expect(final_.outbound).toBeTruthy();
+  });
+
+  it("updateFinalOutbound changes final outbound", async () => {
+    await rulesService.updateFinalOutbound("direct");
+    const final_ = await rulesService.getFinalOutbound();
+    expect(final_.outbound).toBe("direct");
+    expect(final_.outboundNode).toBeUndefined();
+  });
+
   it("getRules returns sorted rules", async () => {
     const rules = await rulesService.getRules();
     expect(rules.length).toBeGreaterThan(0);

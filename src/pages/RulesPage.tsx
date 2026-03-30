@@ -127,7 +127,7 @@ const defaultForm: RuleFormData = {
 
 export function RulesPage() {
   const { t } = useTranslation();
-  const { rules, fetchRules, addRule, updateRule, deleteRule, reorderRules } = useRulesStore();
+  const { rules, fetchRules, addRule, updateRule, deleteRule, reorderRules, finalOutbound, fetchFinalOutbound, updateFinalOutbound } = useRulesStore();
   const { groups, fetchGroups } = useNodesStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -136,8 +136,9 @@ export function RulesPage() {
 
   useEffect(() => {
     fetchRules();
+    fetchFinalOutbound();
     fetchGroups();
-  }, [fetchRules, fetchGroups]);
+  }, [fetchRules, fetchFinalOutbound, fetchGroups]);
 
   const allNodes = groups.flatMap((g) => g.nodes);
 
@@ -219,6 +220,39 @@ export function RulesPage() {
           <Plus className="mr-2 h-4 w-4" /> {t("rules.addRule")}
         </Button>
       </div>
+
+      <Card className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl animate-slide-up">
+        <CardContent className="flex items-center gap-4 p-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{t("rules.finalOutbound")}</p>
+            <p className="text-xs text-muted-foreground">{t("rules.finalDescription")}</p>
+          </div>
+          <Select
+            value={finalOutbound.outbound === "proxy" && finalOutbound.outboundNode
+              ? `node:${finalOutbound.outboundNode}`
+              : finalOutbound.outbound}
+            onValueChange={(v) => {
+              if (v === "direct" || v === "reject") {
+                updateFinalOutbound(v);
+              } else if (v.startsWith("node:")) {
+                updateFinalOutbound("proxy", v.slice(5));
+              } else {
+                updateFinalOutbound("proxy");
+              }
+            }}
+          >
+            <SelectTrigger className="w-[180px] bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
+            <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
+              <SelectItem value="proxy">{t("common.outbound.proxy")}</SelectItem>
+              <SelectItem value="direct">{t("common.outbound.direct")}</SelectItem>
+              <SelectItem value="reject">{t("common.outbound.reject")}</SelectItem>
+              {allNodes.map((node) => (
+                <SelectItem key={node.id} value={`node:${node.name}`}>{node.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={rules.map((r) => r.id)} strategy={verticalListSortingStrategy}>

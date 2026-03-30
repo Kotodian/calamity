@@ -3,7 +3,7 @@ import { useRulesStore } from "../rules";
 
 describe("useRulesStore", () => {
   beforeEach(() => {
-    useRulesStore.setState({ rules: [] });
+    useRulesStore.setState({ rules: [], finalOutbound: { outbound: "proxy" } });
   });
 
   it("fetchRules loads rules from service", async () => {
@@ -40,5 +40,10 @@ describe("useRulesStore", () => {
     const reversed = [...ids].reverse();
     await useRulesStore.getState().reorderRules(reversed);
     expect(useRulesStore.getState().rules[0].id).toBe(reversed[0]);
+  });
+
+  it("updateFinalOutbound changes final outbound", async () => {
+    await useRulesStore.getState().updateFinalOutbound("reject");
+    expect(useRulesStore.getState().finalOutbound.outbound).toBe("reject");
   });
 });

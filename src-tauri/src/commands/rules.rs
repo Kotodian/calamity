@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::singbox::rules_storage::{self, RouteRuleConfig, RulesData};
 use crate::singbox::process::SingboxProcess;
+use crate::singbox::rules_storage::{self, RouteRuleConfig, RulesData};
 use crate::singbox::storage;
 
 #[tauri::command]
@@ -45,7 +45,10 @@ pub async fn delete_rule(app: AppHandle, id: String) -> Result<RulesData, String
 pub async fn reorder_rules(app: AppHandle, ordered_ids: Vec<String>) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
     data.rules.sort_by_key(|r| {
-        ordered_ids.iter().position(|id| id == &r.id).unwrap_or(usize::MAX)
+        ordered_ids
+            .iter()
+            .position(|id| id == &r.id)
+            .unwrap_or(usize::MAX)
     });
     reindex(&mut data);
     rules_storage::save_rules(&data)?;
@@ -54,10 +57,21 @@ pub async fn reorder_rules(app: AppHandle, ordered_ids: Vec<String>) -> Result<R
 }
 
 #[tauri::command]
-pub async fn update_ruleset_interval(
+pub async fn update_final_outbound(
     app: AppHandle,
-    interval: u64,
+    outbound: String,
+    outbound_node: Option<String>,
 ) -> Result<RulesData, String> {
+    let mut data = rules_storage::load_rules();
+    data.final_outbound = outbound;
+    data.final_outbound_node = outbound_node;
+    rules_storage::save_rules(&data)?;
+    reload_singbox(&app).await;
+    Ok(data)
+}
+
+#[tauri::command]
+pub async fn update_ruleset_interval(app: AppHandle, interval: u64) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
     data.update_interval = interval;
     rules_storage::save_rules(&data)?;

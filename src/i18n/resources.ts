@@ -241,6 +241,8 @@ export const resources = {
         remoteRuleSetUrl: "Remote URL (auto-generated if empty)",
         downloadVia: "Download via...",
         saving: "Saving...",
+        finalOutbound: "Final Outbound",
+        finalDescription: "Traffic not matching any rule goes to",
       },
       nodes: {
         title: "Nodes",
@@ -511,6 +513,8 @@ export const resources = {
         remoteRuleSetUrl: "远程 URL（留空则自动生成）",
         downloadVia: "下载出口...",
         saving: "保存中...",
+        finalOutbound: "最终出口",
+        finalDescription: "未匹配任何规则的流量走向",
       },
       nodes: {
         title: "节点",
