@@ -17,12 +17,18 @@ const MAX_VISIBLE_RULES = 10;
 function outboundDisplayValue(
   outbound: OutboundType,
   outboundNode: string | undefined,
-  groups: { id: string; name: string }[]
+  groups: { id: string; name: string; nodes: { id: string; name: string }[] }[]
 ): string {
   if (outbound === "direct") return "direct";
   if (outbound === "reject") return "reject";
-  // proxy outbound: match to a group, or fall back to first group
+  // proxy outbound: match to a specific node or group
   if (outboundNode) {
+    // Check if it's a specific node
+    for (const group of groups) {
+      const node = group.nodes.find((n) => n.name === outboundNode);
+      if (node) return `node:${node.id}`;
+    }
+    // Check if it's a group name
     const group = groups.find((g) => g.name === outboundNode);
     if (group) return `group:${group.id}`;
   }
@@ -52,6 +58,15 @@ export function TrayRuleList() {
       const group = groups.find((g) => g.id === groupId);
       if (group) {
         await updateRule(ruleId, { outbound: "proxy", outboundNode: group.name });
+      }
+    } else if (value.startsWith("node:")) {
+      const nodeId = value.slice(5);
+      for (const group of groups) {
+        const node = group.nodes.find((n) => n.id === nodeId);
+        if (node) {
+          await updateRule(ruleId, { outbound: "proxy", outboundNode: node.name });
+          break;
+        }
       }
     }
   };
@@ -91,11 +106,18 @@ export function TrayRuleList() {
                 <SelectTrigger className="h-6 w-[90px] shrink-0 bg-transparent text-[10px] border-white/[0.06] px-1.5">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px]">
                   {groups.map((g) => (
-                    <SelectItem key={g.id} value={`group:${g.id}`}>
-                      [{t("tray.group")}] {g.name}
-                    </SelectItem>
+                    <div key={g.id}>
+                      <SelectItem value={`group:${g.id}`}>
+                        [{t("tray.group")}] {g.name}
+                      </SelectItem>
+                      {g.nodes.map((n) => (
+                        <SelectItem key={n.id} value={`node:${n.id}`} className="pl-5 text-[10px]">
+                          {n.name}
+                        </SelectItem>
+                      ))}
+                    </div>
                   ))}
                   <SelectItem value="direct">{t("common.outbound.direct")}</SelectItem>
                   <SelectItem value="reject">{t("common.outbound.reject")}</SelectItem>

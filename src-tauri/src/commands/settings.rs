@@ -205,11 +205,21 @@ fn clear_system_proxy() {
 #[tauri::command]
 pub async fn install_tun_sudoers() -> Result<bool, String> {
     let settings = storage::load_settings();
-    let singbox_path = resolve_singbox_path(&settings.singbox_path);
+    let raw_path = &settings.singbox_path;
+    let resolved_path = resolve_singbox_path(raw_path);
+
+    // Include both the symlink and resolved paths so sudo matches either
+    let mut paths = vec![resolved_path.clone()];
+    if raw_path != &resolved_path {
+        paths.push(raw_path.clone());
+    }
+    paths.push("/bin/kill".to_string());
+    paths.push("/usr/bin/kill".to_string());
+
     let sudoers_line = format!(
-        "{user} ALL=(root) NOPASSWD: {singbox}, /bin/kill, /usr/bin/kill\n",
+        "{user} ALL=(root) NOPASSWD: {cmds}\n",
         user = whoami(),
-        singbox = singbox_path
+        cmds = paths.join(", ")
     );
     let sudoers_file = "/etc/sudoers.d/calamity-tun";
 
@@ -243,9 +253,9 @@ pub async fn install_tun_sudoers() -> Result<bool, String> {
 #[tauri::command]
 pub async fn check_tun_sudoers() -> Result<bool, String> {
     let settings = storage::load_settings();
-    let run_cmd = format!("{} --help", settings.singbox_path);
+    // Test with the exact path that will be used in sudo -n
     let output = tokio::process::Command::new("sudo")
-        .args(["-n", "sh", "-c", &run_cmd])
+        .args(["-n", &settings.singbox_path, "version"])
         .output()
         .await
         .map_err(|e| e.to_string())?;

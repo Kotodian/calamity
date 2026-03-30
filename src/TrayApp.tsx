@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { TrayStatus } from "./tray/TrayStatus";
 import { TrayModeSwitch } from "./tray/TrayModeSwitch";
+import { TrayEnhancedMode } from "./tray/TrayEnhancedMode";
 import { TrayRuleList } from "./tray/TrayRuleList";
 import { TraySiteRule } from "./tray/TraySiteRule";
 import { TrayActions } from "./tray/TrayActions";
@@ -29,6 +30,8 @@ export function TrayApp() {
         <TrayStatus />
         <Separator className="bg-border/50" />
         <TrayModeSwitch />
+        <Separator className="bg-border/50" />
+        <TrayEnhancedMode />
         {mode === "rule" && (
           <>
             <Separator className="bg-border/50" />

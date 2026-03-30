@@ -26,6 +26,7 @@ export const resources = {
           cancel: "Cancel",
           copyProxyAddress: "Copy Proxy Address",
           openDashboard: "Open Dashboard",
+          quit: "Quit Calamity",
         },
         status: {
           connected: "Connected",
@@ -117,6 +118,8 @@ export const resources = {
         group: "Group",
         viewAll: "View all in dashboard",
         noRules: "No enabled rules",
+        enhancedMode: "Enhanced Mode (TUN)",
+        node: "Node",
       },
       dashboard: {
         title: "Network Overview",
@@ -301,6 +304,7 @@ export const resources = {
           cancel: "取消",
           copyProxyAddress: "复制代理地址",
           openDashboard: "打开面板",
+          quit: "退出 Calamity",
         },
         status: {
           connected: "已连接",
@@ -392,6 +396,8 @@ export const resources = {
         group: "分组",
         viewAll: "在面板中查看全部",
         noRules: "没有启用的规则",
+        enhancedMode: "增强模式 (TUN)",
+        node: "节点",
       },
       dashboard: {
         title: "网络概览",

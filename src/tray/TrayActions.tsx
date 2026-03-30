@@ -1,4 +1,4 @@
-import { Shield, Copy, ExternalLink, Power } from "lucide-react";
+import { Shield, Copy, ExternalLink, Power, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -89,6 +89,16 @@ export function TrayActions() {
       >
         <Power className="h-3.5 w-3.5" />
         {isConnected ? t("common.actions.disconnect") : t("common.actions.connect")}
+      </button>
+      <button
+        onClick={async () => {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("app_quit");
+        }}
+        className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+      >
+        <LogOut className="h-3.5 w-3.5" />
+        {t("common.actions.quit")}
       </button>
     </div>
   );

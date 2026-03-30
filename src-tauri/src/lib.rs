@@ -213,6 +213,7 @@ pub fn run() {
             commands::rules::update_final_outbound,
             commands::traffic::subscribe_traffic,
             commands::traffic::get_dashboard_info,
+            commands::connection::app_quit,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
@@ -220,10 +221,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 // Clear system proxy on exit
                 crate::commands::settings::clear_system_proxy_on_exit();
+                // Use synchronous cleanup to avoid async deadlock during shutdown
                 let process = app.state::<Arc<SingboxProcess>>();
-                tauri::async_runtime::block_on(async {
-                    let _ = process.stop().await;
-                });
+                process.stop_sync();
             }
         });
 }

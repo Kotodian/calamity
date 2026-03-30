@@ -158,6 +158,49 @@ impl SingboxProcess {
         Ok(())
     }
 
+    /// Synchronous cleanup for use in exit handlers where async may deadlock.
+    pub fn stop_sync(&self) {
+        // Try to kill TUN process via PID file first (needs sudo before pkill)
+        let pid_path = super::storage::app_data_dir().join("singbox-tun.pid");
+        if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
+            if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                // Try passwordless sudo kill first
+                let sudo_ok = std::process::Command::new("sudo")
+                    .args(["-n", "kill", &pid.to_string()])
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false);
+
+                if !sudo_ok {
+                    // Fall back to regular kill (may work if process isn't root)
+                    let _ = std::process::Command::new("kill")
+                        .arg(&pid.to_string())
+                        .output();
+                }
+
+                // Wait briefly for process to exit
+                for _ in 0..10 {
+                    let alive = std::process::Command::new("kill")
+                        .args(["-0", &pid.to_string()])
+                        .output()
+                        .map(|o| o.status.success())
+                        .unwrap_or(false);
+                    if !alive {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+            }
+            let _ = std::fs::remove_file(&pid_path);
+        }
+
+        // Kill any remaining sing-box processes
+        let _ = std::process::Command::new("pkill")
+            .arg("-f")
+            .arg("sing-box run")
+            .output();
+    }
+
     /// Stop any running sing-box (managed or orphan), then start fresh
     pub async fn restart(&self, settings: &AppSettings) -> Result<(), String> {
         self.stop().await?;
@@ -275,8 +318,11 @@ impl SingboxProcess {
             }
         }
 
-        // Fallback to osascript with password prompt
-        let script = build_privileged_osascript(&self.singbox_path, config_path);
+        // Fallback to osascript: install sudoers + start sing-box in one admin prompt
+        let sudoers_cmd = build_sudoers_install_command(&self.singbox_path);
+        let run_cmd = build_tun_run_command(&self.singbox_path, config_path);
+        let combined = format!("{} ; {}", sudoers_cmd, run_cmd);
+        let script = build_privileged_shell_osascript(&combined);
 
         let output = Command::new("osascript")
             .arg("-e")
@@ -354,11 +400,6 @@ fn run_mode_for_settings(settings: &AppSettings) -> RunMode {
     }
 }
 
-fn build_privileged_osascript(singbox_path: &str, config_path: &str) -> String {
-    let shell_command = build_tun_run_command(singbox_path, config_path);
-    build_privileged_shell_osascript(&shell_command)
-}
-
 fn build_privileged_cleanup_osascript(config_path: &str) -> String {
     let shell_command = build_tun_cleanup_command(config_path);
     build_privileged_shell_osascript(&shell_command)
@@ -386,6 +427,37 @@ fn build_tun_run_command(singbox_path: &str, config_path: &str) -> String {
         shell_quote(config_path),
         shell_quote(&log_path),
         shell_quote(&pid_path),
+    )
+}
+
+fn build_sudoers_install_command(singbox_path: &str) -> String {
+    let user = std::env::var("USER")
+        .or_else(|_| std::env::var("LOGNAME"))
+        .unwrap_or_else(|_| "root".to_string());
+
+    let resolved = std::fs::canonicalize(singbox_path)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| singbox_path.to_string());
+
+    let mut paths = vec![resolved.clone()];
+    if singbox_path != resolved {
+        paths.push(singbox_path.to_string());
+    }
+    paths.push("/bin/kill".to_string());
+    paths.push("/usr/bin/kill".to_string());
+
+    let sudoers_content = format!(
+        "{} ALL=(root) NOPASSWD: {}",
+        user,
+        paths.join(", ")
+    );
+    let sudoers_file = "/etc/sudoers.d/calamity-tun";
+
+    format!(
+        "echo {} > {} && chmod 0440 {}",
+        shell_quote(&sudoers_content),
+        shell_quote(sudoers_file),
+        shell_quote(sudoers_file),
     )
 }
 
@@ -467,7 +539,7 @@ fn format_tun_start_timeout_message(config_path: &str, fallback: &str) -> String
 #[cfg(test)]
 mod tests {
     use super::{
-        build_privileged_osascript, build_tun_cleanup_command, build_tun_log_path,
+        build_privileged_shell_osascript, build_tun_cleanup_command, build_tun_log_path,
         build_tun_pid_path, build_tun_run_command, format_privileged_tun_error,
         run_mode_for_settings, RunMode,
     };
@@ -500,8 +572,9 @@ mod tests {
     }
 
     #[test]
-    fn privileged_tun_osascript_wraps_shell_command() {
-        let script = build_privileged_osascript("/usr/local/bin/sing-box", "/tmp/config.json");
+    fn privileged_shell_osascript_wraps_command() {
+        let cmd = build_tun_run_command("/usr/local/bin/sing-box", "/tmp/config.json");
+        let script = build_privileged_shell_osascript(&cmd);
 
         assert_eq!(
             script,

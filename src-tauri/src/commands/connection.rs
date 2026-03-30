@@ -47,3 +47,8 @@ pub async fn singbox_status(app: AppHandle) -> Result<SingboxStatus, String> {
     };
     Ok(SingboxStatus { running, version })
 }
+
+#[tauri::command]
+pub fn app_quit(app: AppHandle) {
+    app.exit(0);
+}
