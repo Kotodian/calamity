@@ -20,6 +20,7 @@ export default function App() {
   const { t } = useTranslation();
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
   const fetchConnectionState = useConnectionStore((s) => s.fetchState);
+  const subscribeConnectionStateChanges = useConnectionStore((s) => s.subscribeStateChanges);
 
   useEffect(() => {
     fetchSettings();
@@ -27,6 +28,7 @@ export default function App() {
 
     // Listen for sing-box errors
     let unlisten: (() => void) | null = null;
+    const unsubscribeStateChanges = subscribeConnectionStateChanges();
     (async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
@@ -35,8 +37,11 @@ export default function App() {
         });
       } catch {}
     })();
-    return () => { if (unlisten) unlisten(); };
-  }, [fetchSettings, fetchConnectionState, t]);
+    return () => {
+      if (unlisten) unlisten();
+      unsubscribeStateChanges();
+    };
+  }, [fetchSettings, fetchConnectionState, subscribeConnectionStateChanges, t]);
 
   return (
     <>

@@ -15,6 +15,7 @@ export interface ConnectionService {
   disconnect(): Promise<void>;
   setMode(mode: ProxyMode): Promise<void>;
   subscribeTraffic(onUpdate: (up: number, down: number) => void): () => void;
+  subscribeStateChanges(onChange: () => void | Promise<void>): () => void;
   getDashboardInfo(): Promise<DashboardInfo>;
 }
 
@@ -79,6 +80,36 @@ function createTauriConnectionService(): ConnectionService {
       };
     },
 
+    subscribeStateChanges(onChange) {
+      let unlistenConnectionState: (() => void) | null = null;
+      let unlistenRestarted: (() => void) | null = null;
+      let cancelled = false;
+
+      (async () => {
+        try {
+          const { listen } = await import("@tauri-apps/api/event");
+          unlistenConnectionState = await listen("connection-state-changed", async () => {
+            if (!cancelled) {
+              await onChange();
+            }
+          });
+          unlistenRestarted = await listen("singbox-restarted", async () => {
+            if (!cancelled) {
+              await onChange();
+            }
+          });
+        } catch (e) {
+          console.error("[connection] state sync subscribe failed:", e);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+        if (unlistenConnectionState) unlistenConnectionState();
+        if (unlistenRestarted) unlistenRestarted();
+      };
+    },
+
     async getDashboardInfo() {
       const { invoke } = await import("@tauri-apps/api/core");
       return invoke<DashboardInfo>("get_dashboard_info");
@@ -104,6 +135,7 @@ function createMockConnectionService(): ConnectionService {
     async disconnect() {},
     async setMode() {},
     subscribeTraffic() { return () => {}; },
+    subscribeStateChanges() { return () => {}; },
     async getDashboardInfo() {
       return { running: false, version: "mock", activeConnections: 0, uploadTotal: 0, downloadTotal: 0, memoryInuse: 0 };
     },

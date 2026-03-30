@@ -187,4 +187,5 @@ async fn restart_singbox(app: &AppHandle) {
             let _ = app.emit("singbox-error", &e);
         }
     }
+    crate::commands::connection::emit_connection_state_changed(app);
 }

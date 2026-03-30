@@ -14,15 +14,20 @@ export function TrayApp() {
   const fetchState = useConnectionStore((s) => s.fetchState);
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
   const subscribeTraffic = useConnectionStore((s) => s.subscribeTraffic);
+  const subscribeStateChanges = useConnectionStore((s) => s.subscribeStateChanges);
   const fetchDashboardInfo = useConnectionStore((s) => s.fetchDashboardInfo);
 
   useEffect(() => {
     fetchState();
     fetchSettings();
     fetchDashboardInfo();
-    const unsub = subscribeTraffic();
-    return unsub;
-  }, [fetchState, fetchSettings, subscribeTraffic, fetchDashboardInfo]);
+    const unsubTraffic = subscribeTraffic();
+    const unsubStateChanges = subscribeStateChanges();
+    return () => {
+      unsubTraffic();
+      unsubStateChanges();
+    };
+  }, [fetchState, fetchSettings, subscribeTraffic, subscribeStateChanges, fetchDashboardInfo]);
 
   return (
     <div className="p-2">

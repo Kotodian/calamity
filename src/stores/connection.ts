@@ -17,6 +17,7 @@ interface ConnectionStore extends ConnectionState {
   toggleConnection: () => Promise<void>;
   setMode: (mode: ProxyMode) => Promise<void>;
   subscribeTraffic: () => () => void;
+  subscribeStateChanges: () => () => void;
   fetchDashboardInfo: () => Promise<void>;
 }
 
@@ -119,6 +120,12 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
       unsub();
       clearInterval(interval);
     };
+  },
+
+  subscribeStateChanges() {
+    return connectionService.subscribeStateChanges(async () => {
+      await get().fetchState();
+    });
   },
 
   async fetchDashboardInfo() {

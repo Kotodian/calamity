@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::singbox::process::SingboxProcess;
 use crate::singbox::storage;
@@ -20,24 +20,34 @@ where
     stop().await
 }
 
+pub fn emit_connection_state_changed(app: &AppHandle) {
+    let _ = app.emit("connection-state-changed", ());
+}
+
 #[tauri::command]
 pub async fn singbox_start(app: AppHandle) -> Result<(), String> {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let settings = storage::load_settings();
-    process.start(&settings).await
+    process.start(&settings).await?;
+    emit_connection_state_changed(&app);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn singbox_stop(app: AppHandle) -> Result<(), String> {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
-    process.stop().await
+    process.stop().await?;
+    emit_connection_state_changed(&app);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn singbox_restart(app: AppHandle) -> Result<(), String> {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let settings = storage::load_settings();
-    process.restart(&settings).await
+    process.restart(&settings).await?;
+    emit_connection_state_changed(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -64,6 +74,7 @@ pub async fn app_quit(app: AppHandle) {
     if let Err(error) = cleanup_before_app_exit(|| async move { process.stop().await }).await {
         eprintln!("[singbox] failed to stop during app quit: {}", error);
     }
+    emit_connection_state_changed(&app);
     app.exit(0);
 }
 
