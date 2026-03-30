@@ -46,11 +46,8 @@ export function TraySiteRule() {
       }
     };
     detect();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") detect();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    const interval = setInterval(detect, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const openDialog = () => {

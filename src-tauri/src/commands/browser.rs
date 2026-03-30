@@ -10,25 +10,9 @@ pub async fn get_browser_url() -> Result<Option<String>, String> {
         ("Brave Browser", r#"tell application "Brave Browser" to get URL of active tab of first window"#),
     ];
 
-    // Get the frontmost app; if it's our own app, get the second one
-    let frontmost = Command::new("osascript")
-        .args(["-e", r#"tell application "System Events"
-            set procList to name of every application process whose frontmost is true
-            if (count of procList) > 0 then
-                set frontApp to item 1 of procList
-                if frontApp is "calamity" then
-                    -- Get the process with the second-highest unix id that is visible
-                    set visibleProcs to name of every application process whose visible is true
-                    repeat with p in visibleProcs
-                        if p as text is not "calamity" then
-                            return p as text
-                        end if
-                    end repeat
-                end if
-                return frontApp
-            end if
-            return ""
-        end tell"#])
+    // Use lsappinfo to get apps in front-to-back order, find the first browser
+    let app_order = Command::new("lsappinfo")
+        .arg("visibleProcessList")
         .output()
         .ok()
         .and_then(|o| {
@@ -37,12 +21,29 @@ pub async fn get_browser_url() -> Result<Option<String>, String> {
             } else {
                 None
             }
-        });
+        })
+        .unwrap_or_default();
 
-    // Try frontmost browser first
-    if let Some(ref front_app) = frontmost {
+    // Extract app names from lsappinfo output in order, skip calamity
+    let browser_names: Vec<&str> = scripts.iter().map(|(name, _)| *name).collect();
+    let mut ordered_browsers: Vec<&str> = Vec::new();
+    for part in app_order.split(':') {
+        let part = part.trim().trim_matches('"');
+        for &browser in &browser_names {
+            // lsappinfo uses underscores: "Google_Chrome", "Brave_Browser"
+            let normalized = browser.replace(' ', "_");
+            if part.contains(&normalized) || part.contains(browser) {
+                if !ordered_browsers.contains(&browser) {
+                    ordered_browsers.push(browser);
+                }
+            }
+        }
+    }
+
+    // Try browsers in front-to-back order
+    for &browser in &ordered_browsers {
         for (app_name, script) in &scripts {
-            if front_app.contains(app_name) || app_name.contains(front_app.as_str()) {
+            if *app_name == browser {
                 if let Some(url) = try_script(script) {
                     return Ok(Some(url));
                 }
