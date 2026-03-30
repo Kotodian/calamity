@@ -397,15 +397,20 @@ fn build_route_rules(
 }
 
 fn build_pre_match_route_rules(settings: &AppSettings) -> Vec<Value> {
+    let mut rules = vec![
+        // Sniff TLS/HTTP to extract domain from SNI/Host header
+        json!({
+            "action": "sniff"
+        }),
+    ];
     if settings.enhanced_mode {
-        vec![json!({
+        rules.push(json!({
             "inbound": ["tun-in"],
             "action": "resolve",
             "strategy": "ipv4_only"
-        })]
-    } else {
-        Vec::new()
+        }));
     }
+    rules
 }
 
 fn resolve_route_final(
