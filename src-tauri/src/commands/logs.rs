@@ -20,7 +20,10 @@ fn parse_log_source(payload: &str) -> (String, String) {
 
     // Strip "[session_id duration] " prefix
     let rest = if payload.starts_with('[') {
-        payload.find("] ").map(|i| &payload[i + 2..]).unwrap_or(payload)
+        payload
+            .find("] ")
+            .map(|i| &payload[i + 2..])
+            .unwrap_or(payload)
     } else {
         payload
     };
@@ -57,7 +60,10 @@ fn now_timestamp() -> String {
 
 #[tauri::command]
 pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), String> {
-    let process = app.state::<std::sync::Arc<SingboxProcess>>().inner().clone();
+    let process = app
+        .state::<std::sync::Arc<SingboxProcess>>()
+        .inner()
+        .clone();
 
     eprintln!("[logs] start_log_stream called, level={}", level);
 
@@ -65,12 +71,15 @@ pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), Strin
     match process.api().version().await {
         Ok(ver) => {
             eprintln!("[logs] sing-box version: {}", ver.version);
-            let _ = app.emit("singbox-log", &LogEvent {
-                level: "info".to_string(),
-                message: format!("connected to {}", ver.version),
-                timestamp: now_timestamp(),
-                source: "calamity".to_string(),
-            });
+            let _ = app.emit(
+                "singbox-log",
+                &LogEvent {
+                    level: "info".to_string(),
+                    message: format!("connected to {}", ver.version),
+                    timestamp: now_timestamp(),
+                    source: "calamity".to_string(),
+                },
+            );
         }
         Err(e) => eprintln!("[logs] failed to get version: {}", e),
     }
@@ -117,8 +126,8 @@ pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), Strin
                         }
                     }
                 }
-                Ok(None) => break,   // Stream ended
-                Err(_) => break,     // Connection error
+                Ok(None) => break, // Stream ended
+                Err(_) => break,   // Connection error
             }
         }
     });

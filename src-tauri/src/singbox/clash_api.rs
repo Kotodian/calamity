@@ -51,10 +51,7 @@ impl ClashApi {
     pub async fn test_delay(&self, proxy_name: &str, timeout: u64) -> Result<u64, String> {
         let url = format!(
             "{}/proxies/{}/delay?url={}&timeout={}",
-            BASE_URL,
-            proxy_name,
-            "http://cp.cloudflare.com/generate_204",
-            timeout
+            BASE_URL, proxy_name, "http://cp.cloudflare.com/generate_204", timeout
         );
         let resp = self
             .client
@@ -71,10 +68,7 @@ impl ClashApi {
             .ok_or_else(|| "no delay in response".to_string())
     }
 
-    pub async fn logs_stream(
-        &self,
-        level: &str,
-    ) -> Result<reqwest::Response, String> {
+    pub async fn logs_stream(&self, level: &str) -> Result<reqwest::Response, String> {
         self.client
             .get(format!("{}/logs?level={}", BASE_URL, level))
             .send()

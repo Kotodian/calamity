@@ -127,7 +127,8 @@ mod tests {
             "logLevel": "debug"
         }"#;
 
-        let settings: AppSettings = serde_json::from_str(json).expect("old settings should still deserialize");
+        let settings: AppSettings =
+            serde_json::from_str(json).expect("old settings should still deserialize");
 
         assert_eq!(settings.language, "system");
         assert_eq!(settings.theme, "light");

@@ -89,10 +89,7 @@ fn build_hysteria2(node: &ProxyNode, c: &serde_json::Map<String, Value>) -> Opti
     if down > 0 {
         out["down_mbps"] = json!(down);
     }
-    let obfs_type = c
-        .get("obfsType")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let obfs_type = c.get("obfsType").and_then(|v| v.as_str()).unwrap_or("");
     if !obfs_type.is_empty() {
         out["obfs"] = json!({
             "type": obfs_type,

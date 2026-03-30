@@ -10,24 +10,33 @@ use crate::singbox::subscriptions_storage::{self, SubscriptionConfig, Subscripti
 
 /// Deduplicate node names against existing nodes in other groups.
 /// If a name conflicts, append " (2)", " (3)", etc.
-fn deduplicate_nodes(nodes: Vec<ProxyNode>, existing: &NodesData, exclude_group_id: &str) -> Vec<ProxyNode> {
-    let existing_names: HashSet<String> = existing.groups.iter()
+fn deduplicate_nodes(
+    nodes: Vec<ProxyNode>,
+    existing: &NodesData,
+    exclude_group_id: &str,
+) -> Vec<ProxyNode> {
+    let existing_names: HashSet<String> = existing
+        .groups
+        .iter()
         .filter(|g| g.id != exclude_group_id)
         .flat_map(|g| g.nodes.iter().map(|n| n.name.clone()))
         .collect();
 
     let mut used_names: HashSet<String> = existing_names;
-    nodes.into_iter().map(|mut node| {
-        let original = node.name.clone();
-        let mut counter = 2;
-        while used_names.contains(&node.name) {
-            node.name = format!("{} ({})", original, counter);
-            node.id = node.name.clone();
-            counter += 1;
-        }
-        used_names.insert(node.name.clone());
-        node
-    }).collect()
+    nodes
+        .into_iter()
+        .map(|mut node| {
+            let original = node.name.clone();
+            let mut counter = 2;
+            while used_names.contains(&node.name) {
+                node.name = format!("{} ({})", original, counter);
+                node.id = node.name.clone();
+                counter += 1;
+            }
+            used_names.insert(node.name.clone());
+            node
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -91,10 +100,7 @@ pub async fn add_subscription(
 }
 
 #[tauri::command]
-pub async fn update_subscription(
-    app: AppHandle,
-    id: String,
-) -> Result<SubscriptionConfig, String> {
+pub async fn update_subscription(app: AppHandle, id: String) -> Result<SubscriptionConfig, String> {
     let mut subs_data = subscriptions_storage::load_subscriptions();
     let mut nodes_data = nodes_storage::load_nodes();
 
@@ -224,10 +230,7 @@ pub async fn edit_subscription(
 }
 
 #[tauri::command]
-pub async fn toggle_subscription(
-    id: String,
-    enabled: bool,
-) -> Result<SubscriptionConfig, String> {
+pub async fn toggle_subscription(id: String, enabled: bool) -> Result<SubscriptionConfig, String> {
     let mut subs_data = subscriptions_storage::load_subscriptions();
     let sub = subs_data
         .subscriptions

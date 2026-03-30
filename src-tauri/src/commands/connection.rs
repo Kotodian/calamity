@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use serde::Serialize;
+use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
 use crate::singbox::process::SingboxProcess;
@@ -36,7 +36,12 @@ pub async fn singbox_status(app: AppHandle) -> Result<SingboxStatus, String> {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let running = process.is_running().await;
     let version = if running {
-        process.api().version().await.map(|v| v.version).unwrap_or_else(|_| "unknown".to_string())
+        process
+            .api()
+            .version()
+            .await
+            .map(|v| v.version)
+            .unwrap_or_else(|_| "unknown".to_string())
     } else {
         "not running".to_string()
     };

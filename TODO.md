@@ -1,10 +1,23 @@
 # Calamity TODO
 
-## TUN Mode
-- [ ] 实现 TUN 入站（sing-box inbound type: tun）
-- [ ] 设置页 TUN 开关（已有 UI，需要连接后端）
-- [ ] TUN 配置写入 sing-box config（stack、mtu、auto_route、strict_route、dns_hijack）
-- [ ] macOS 权限处理（需要 root 或 Network Extension）
+## 基本功能
+- [x] 托盘在规则模式下显示所有的规则
+- [x] 实现 TUN 入站（sing-box inbound type: tun）
+- [x] 设置页 TUN 开关（已有 UI，需要连接后端）
+- [x] TUN 配置写入 sing-box config（stack、mtu、auto_route、strict_route、dns_hijack）
+- [x] macOS 权限处理（需要 root 或 Network Extension）
+
+## 优化
+- [ ] 配置热重载
+- [x] 仪表盘支持伸缩
+
+## CI/CD
+- [x] 打包
+- [ ] 定义版本
+
+## 文档
+- [ ] README
+- [ ] github pages，操作手册
 
 ## CLI
 - [ ] 命令行工具 `calamity` 用于无 GUI 管理

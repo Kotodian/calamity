@@ -18,7 +18,10 @@ pub async fn add_node(
 ) -> Result<NodesData, String> {
     let mut data = nodes_storage::load_nodes();
     // Validate name uniqueness across all groups
-    let name_exists = data.groups.iter().any(|g| g.nodes.iter().any(|n| n.name == node.name));
+    let name_exists = data
+        .groups
+        .iter()
+        .any(|g| g.nodes.iter().any(|n| n.name == node.name));
     if name_exists {
         return Err(format!("node name '{}' already exists", node.name));
     }
@@ -42,7 +45,10 @@ pub async fn update_node(
     let mut data = nodes_storage::load_nodes();
     // If name changed, validate uniqueness
     if old_name != node.name {
-        let name_exists = data.groups.iter().any(|g| g.nodes.iter().any(|n| n.name == node.name));
+        let name_exists = data
+            .groups
+            .iter()
+            .any(|g| g.nodes.iter().any(|n| n.name == node.name));
         if name_exists {
             return Err(format!("node name '{}' already exists", node.name));
         }
@@ -78,7 +84,11 @@ pub async fn remove_node(app: AppHandle, node_name: String) -> Result<NodesData,
 }
 
 #[tauri::command]
-pub async fn add_group(app: AppHandle, name: String, group_type: Option<String>) -> Result<NodesData, String> {
+pub async fn add_group(
+    app: AppHandle,
+    name: String,
+    group_type: Option<String>,
+) -> Result<NodesData, String> {
     let mut data = nodes_storage::load_nodes();
     let id = format!(
         "group-{}",

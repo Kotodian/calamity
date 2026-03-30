@@ -1,11 +1,11 @@
 pub mod browser;
-pub mod logs;
 pub mod connection;
 pub mod connections;
-pub mod settings;
 pub mod dns;
+pub mod logs;
 pub mod nodes;
 pub mod rules;
+pub mod settings;
 pub mod subscriptions;
 pub mod tailscale;
 pub mod traffic;

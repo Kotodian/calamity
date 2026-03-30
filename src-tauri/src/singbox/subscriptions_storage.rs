@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::storage::{read_json, write_json};
+use serde::{Deserialize, Serialize};
 
 const SUBSCRIPTIONS_FILE: &str = "subscriptions.json";
 

@@ -21,7 +21,10 @@ pub fn find_tailscale() -> Result<String, String> {
         return Ok(macos_path.to_string());
     }
 
-    Err("Tailscale not found. Please install Tailscale from https://tailscale.com/download".to_string())
+    Err(
+        "Tailscale not found. Please install Tailscale from https://tailscale.com/download"
+            .to_string(),
+    )
 }
 
 fn run_tailscale(args: &[&str]) -> Result<String, String> {
@@ -123,16 +126,22 @@ pub struct FunnelEntry {
 fn dns_name_to_display(dns_name: &str, suffix: &str) -> String {
     // "huawei-matebook-x.tail47feb.ts.net." → "huawei-matebook-x"
     let trimmed = dns_name.trim_end_matches('.');
-    let without_suffix = trimmed.strip_suffix(&format!(".{}", suffix)).unwrap_or(trimmed);
+    let without_suffix = trimmed
+        .strip_suffix(&format!(".{}", suffix))
+        .unwrap_or(trimmed);
     without_suffix.to_string()
 }
 
 fn map_node(node: &TsNode, suffix: &str, is_self: bool) -> TailscaleDevice {
     let online = node.online.unwrap_or(false);
-    let ip = node.tailscale_ips.as_ref()
+    let ip = node
+        .tailscale_ips
+        .as_ref()
         .and_then(|ips| ips.first().cloned())
         .unwrap_or_default();
-    let last_seen = node.last_seen.clone()
+    let last_seen = node
+        .last_seen
+        .clone()
         .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
 
     TailscaleDevice {
@@ -235,7 +244,9 @@ pub fn get_serve_status() -> Result<Vec<FunnelEntry>, String> {
                 for (_path, handler) in handlers {
                     if let Some(proxy) = handler.get("Proxy").and_then(|v| v.as_str()) {
                         // Extract port from proxy URL like "http://127.0.0.1:3000"
-                        let port = proxy.rsplit(':').next()
+                        let port = proxy
+                            .rsplit(':')
+                            .next()
                             .and_then(|p| p.parse::<u16>().ok())
                             .unwrap_or(0);
 
@@ -244,7 +255,8 @@ pub fn get_serve_status() -> Result<Vec<FunnelEntry>, String> {
                             .and_then(|v| v.as_bool())
                             .unwrap_or(false);
 
-                        let public_url = format!("https://{}", public_addr.trim_end_matches(":443"));
+                        let public_url =
+                            format!("https://{}", public_addr.trim_end_matches(":443"));
 
                         entries.push(FunnelEntry {
                             id: format!("web-{}", port),

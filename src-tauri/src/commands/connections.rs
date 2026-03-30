@@ -17,12 +17,15 @@ pub async fn subscribe_connections(app: AppHandle) -> Result<(), String> {
                 }
                 Err(_) => {
                     // sing-box not running, emit empty
-                    let _ = app.emit("connections-update", serde_json::json!({
-                        "connections": [],
-                        "uploadTotal": 0,
-                        "downloadTotal": 0,
-                        "memory": 0
-                    }));
+                    let _ = app.emit(
+                        "connections-update",
+                        serde_json::json!({
+                            "connections": [],
+                            "uploadTotal": 0,
+                            "downloadTotal": 0,
+                            "memory": 0
+                        }),
+                    );
                 }
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

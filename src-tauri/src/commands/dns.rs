@@ -59,10 +59,7 @@ pub async fn update_dns_server(
 }
 
 #[tauri::command]
-pub async fn delete_dns_server(
-    app: AppHandle,
-    id: String,
-) -> Result<DnsSettings, String> {
+pub async fn delete_dns_server(app: AppHandle, id: String) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
     settings.servers.retain(|s| s.id != id);
     settings.rules.retain(|r| r.server != id);
@@ -72,10 +69,7 @@ pub async fn delete_dns_server(
 }
 
 #[tauri::command]
-pub async fn add_dns_rule(
-    app: AppHandle,
-    rule: DnsRuleConfig,
-) -> Result<DnsSettings, String> {
+pub async fn add_dns_rule(app: AppHandle, rule: DnsRuleConfig) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
     settings.rules.push(rule);
     dns_storage::save_dns_settings(&settings)?;
@@ -84,10 +78,7 @@ pub async fn add_dns_rule(
 }
 
 #[tauri::command]
-pub async fn delete_dns_rule(
-    app: AppHandle,
-    id: String,
-) -> Result<DnsSettings, String> {
+pub async fn delete_dns_rule(app: AppHandle, id: String) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
     settings.rules.retain(|r| r.id != id);
     dns_storage::save_dns_settings(&settings)?;

@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use serde::Serialize;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::singbox::process::SingboxProcess;
@@ -79,19 +79,26 @@ pub async fn get_dashboard_info(app: AppHandle) -> Result<DashboardInfo, String>
         });
     }
 
-    let version = process.api().version().await
+    let version = process
+        .api()
+        .version()
+        .await
         .map(|v| v.version)
         .unwrap_or_else(|_| "unknown".to_string());
 
     let (active_connections, upload_total, download_total, memory_inuse) =
         match process.api().get_connections().await {
             Ok(val) => {
-                let conns = val.get("connections")
+                let conns = val
+                    .get("connections")
                     .and_then(|c| c.as_array())
                     .map(|a| a.len())
                     .unwrap_or(0);
                 let up = val.get("uploadTotal").and_then(|v| v.as_u64()).unwrap_or(0);
-                let down = val.get("downloadTotal").and_then(|v| v.as_u64()).unwrap_or(0);
+                let down = val
+                    .get("downloadTotal")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 let mem = val.get("memory").and_then(|v| v.as_u64()).unwrap_or(0);
                 (conns, up, down, mem)
             }

@@ -45,13 +45,30 @@ fn parse_userinfo(header_value: &str) -> SubscriptionUserInfo {
         }
     }
 
-    SubscriptionUserInfo { upload, download, total, expire }
+    SubscriptionUserInfo {
+        upload,
+        download,
+        total,
+        expire,
+    }
 }
 
-fn parse_standard_uri(uri: &str) -> Option<(String, String, u16, std::collections::HashMap<String, String>, String)> {
+fn parse_standard_uri(
+    uri: &str,
+) -> Option<(
+    String,
+    String,
+    u16,
+    std::collections::HashMap<String, String>,
+    String,
+)> {
     let hash_idx = uri.find('#');
     let fragment = hash_idx
-        .map(|i| urlencoding::decode(&uri[i + 1..]).unwrap_or_default().to_string())
+        .map(|i| {
+            urlencoding::decode(&uri[i + 1..])
+                .unwrap_or_default()
+                .to_string()
+        })
         .unwrap_or_default();
     let without_fragment = hash_idx.map(|i| &uri[..i]).unwrap_or(uri);
 
@@ -107,13 +124,37 @@ fn make_transport_config(params: &std::collections::HashMap<String, String>) -> 
 fn infer_country(name: &str) -> (String, String) {
     let patterns: &[(&[&str], &str, &str)] = &[
         (&["HK", "Hong Kong", "香港"], "Hong Kong", "HK"),
-        (&["JP", "Japan", "日本", "东京", "Tokyo", "Osaka", "大阪"], "Japan", "JP"),
-        (&["US", "USA", "United States", "美国", "Los Angeles", "San Jose", "Seattle"], "United States", "US"),
+        (
+            &["JP", "Japan", "日本", "东京", "Tokyo", "Osaka", "大阪"],
+            "Japan",
+            "JP",
+        ),
+        (
+            &[
+                "US",
+                "USA",
+                "United States",
+                "美国",
+                "Los Angeles",
+                "San Jose",
+                "Seattle",
+            ],
+            "United States",
+            "US",
+        ),
         (&["SG", "Singapore", "新加坡"], "Singapore", "SG"),
-        (&["KR", "Korea", "韩国", "首尔", "Seoul"], "South Korea", "KR"),
+        (
+            &["KR", "Korea", "韩国", "首尔", "Seoul"],
+            "South Korea",
+            "KR",
+        ),
         (&["TW", "Taiwan", "台湾"], "Taiwan", "TW"),
         (&["DE", "Germany", "德国"], "Germany", "DE"),
-        (&["GB", "UK", "United Kingdom", "英国", "London"], "United Kingdom", "GB"),
+        (
+            &["GB", "UK", "United Kingdom", "英国", "London"],
+            "United Kingdom",
+            "GB",
+        ),
         (&["FR", "France", "法国"], "France", "FR"),
         (&["AU", "Australia", "澳大利亚"], "Australia", "AU"),
         (&["CA", "Canada", "加拿大"], "Canada", "CA"),
@@ -181,7 +222,11 @@ fn parse_vmess(uri: &str) -> Option<ProxyNode> {
 
 fn parse_vless(uri: &str) -> Option<ProxyNode> {
     let (uuid, host, port, params, fragment) = parse_standard_uri(uri)?;
-    let name = if fragment.is_empty() { "VLESS Node".to_string() } else { fragment };
+    let name = if fragment.is_empty() {
+        "VLESS Node".to_string()
+    } else {
+        fragment
+    };
     let (country, country_code) = infer_country(&name);
 
     let config = serde_json::json!({
@@ -206,9 +251,15 @@ fn parse_vless(uri: &str) -> Option<ProxyNode> {
 
 fn parse_trojan(uri: &str) -> Option<ProxyNode> {
     let (password, host, port, params, fragment) = parse_standard_uri(uri)?;
-    let name = if fragment.is_empty() { "Trojan Node".to_string() } else { fragment };
+    let name = if fragment.is_empty() {
+        "Trojan Node".to_string()
+    } else {
+        fragment
+    };
     let (country, country_code) = infer_country(&name);
-    let password = urlencoding::decode(&password).unwrap_or_default().to_string();
+    let password = urlencoding::decode(&password)
+        .unwrap_or_default()
+        .to_string();
 
     let config = serde_json::json!({
         "type": "trojan",
@@ -240,7 +291,11 @@ fn parse_trojan(uri: &str) -> Option<ProxyNode> {
 fn parse_ss(uri: &str) -> Option<ProxyNode> {
     let hash_idx = uri.find('#');
     let fragment = hash_idx
-        .map(|i| urlencoding::decode(&uri[i + 1..]).unwrap_or_default().to_string())
+        .map(|i| {
+            urlencoding::decode(&uri[i + 1..])
+                .unwrap_or_default()
+                .to_string()
+        })
         .unwrap_or_default();
     let without_fragment = hash_idx.map(|i| &uri[..i]).unwrap_or(uri);
     let content = &without_fragment[5..]; // remove "ss://"
@@ -257,7 +312,11 @@ fn parse_ss(uri: &str) -> Option<ProxyNode> {
             .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(user_part))
             .ok()
             .and_then(|b| String::from_utf8(b).ok())
-            .unwrap_or_else(|| urlencoding::decode(user_part).unwrap_or_default().to_string());
+            .unwrap_or_else(|| {
+                urlencoding::decode(user_part)
+                    .unwrap_or_default()
+                    .to_string()
+            });
 
         let colon_idx = decoded.find(':')?;
         method = decoded[..colon_idx].to_string();
@@ -287,7 +346,11 @@ fn parse_ss(uri: &str) -> Option<ProxyNode> {
         port = host_part[last_colon + 1..].parse().unwrap_or(443);
     }
 
-    let name = if fragment.is_empty() { "SS Node".to_string() } else { fragment };
+    let name = if fragment.is_empty() {
+        "SS Node".to_string()
+    } else {
+        fragment
+    };
     let (country, country_code) = infer_country(&name);
 
     let config = serde_json::json!({
@@ -310,9 +373,15 @@ fn parse_ss(uri: &str) -> Option<ProxyNode> {
 
 fn parse_hy2(uri: &str) -> Option<ProxyNode> {
     let (password, host, port, params, fragment) = parse_standard_uri(uri)?;
-    let name = if fragment.is_empty() { "Hysteria2 Node".to_string() } else { fragment };
+    let name = if fragment.is_empty() {
+        "Hysteria2 Node".to_string()
+    } else {
+        fragment
+    };
     let (country, country_code) = infer_country(&name);
-    let password = urlencoding::decode(&password).unwrap_or_default().to_string();
+    let password = urlencoding::decode(&password)
+        .unwrap_or_default()
+        .to_string();
 
     let config = serde_json::json!({
         "type": "hysteria2",
@@ -349,7 +418,11 @@ fn parse_tuic(uri: &str) -> Option<ProxyNode> {
     let mut parts = userinfo.splitn(2, ':');
     let uuid = parts.next().unwrap_or("").to_string();
     let password = parts.next().unwrap_or("").to_string();
-    let name = if fragment.is_empty() { "TUIC Node".to_string() } else { fragment };
+    let name = if fragment.is_empty() {
+        "TUIC Node".to_string()
+    } else {
+        fragment
+    };
     let (country, country_code) = infer_country(&name);
 
     let config = serde_json::json!({
@@ -436,16 +509,11 @@ pub async fn fetch_subscription(url: &str) -> Result<FetchResult, String> {
     // Try base64 decode first, fall back to raw text
     let decoded = base64::engine::general_purpose::STANDARD
         .decode(body.trim())
-        .or_else(|_| {
-            base64::engine::general_purpose::STANDARD_NO_PAD.decode(body.trim())
-        })
+        .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(body.trim()))
         .and_then(|b| String::from_utf8(b).map_err(|_| base64::DecodeError::InvalidByte(0, 0)))
         .unwrap_or_else(|_| body.clone());
 
-    let nodes: Vec<ProxyNode> = decoded
-        .lines()
-        .filter_map(parse_v2ray_uri)
-        .collect();
+    let nodes: Vec<ProxyNode> = decoded.lines().filter_map(parse_v2ray_uri).collect();
 
     Ok(FetchResult { nodes, user_info })
 }

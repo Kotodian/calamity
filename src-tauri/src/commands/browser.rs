@@ -3,11 +3,26 @@ use std::process::Command;
 #[tauri::command]
 pub async fn get_browser_url() -> Result<Option<String>, String> {
     let scripts = [
-        ("Google Chrome", r#"tell application "Google Chrome" to get URL of active tab of first window"#),
-        ("Safari", r#"tell application "Safari" to get URL of current tab of first window"#),
-        ("Arc", r#"tell application "Arc" to get URL of active tab of first window"#),
-        ("Microsoft Edge", r#"tell application "Microsoft Edge" to get URL of active tab of first window"#),
-        ("Brave Browser", r#"tell application "Brave Browser" to get URL of active tab of first window"#),
+        (
+            "Google Chrome",
+            r#"tell application "Google Chrome" to get URL of active tab of first window"#,
+        ),
+        (
+            "Safari",
+            r#"tell application "Safari" to get URL of current tab of first window"#,
+        ),
+        (
+            "Arc",
+            r#"tell application "Arc" to get URL of active tab of first window"#,
+        ),
+        (
+            "Microsoft Edge",
+            r#"tell application "Microsoft Edge" to get URL of active tab of first window"#,
+        ),
+        (
+            "Brave Browser",
+            r#"tell application "Brave Browser" to get URL of active tab of first window"#,
+        ),
     ];
 
     // Use lsappinfo to get apps in front-to-back order, find the first browser
