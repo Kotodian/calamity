@@ -44,6 +44,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     const state = await connectionService.getState();
     set({
       status: state.status,
+      mode: state.mode,
       activeNode: state.activeNode,
     });
   },
@@ -77,8 +78,13 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   },
 
   async setMode(mode) {
-    await connectionService.setMode(mode);
     set({ mode });
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("update_settings", { updates: { proxyMode: mode } });
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("proxy-mode-changed", mode);
+    } catch { /* ignore in non-Tauri env */ }
   },
 
   subscribeTraffic() {
@@ -123,9 +129,14 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   },
 
   subscribeStateChanges() {
-    return connectionService.subscribeStateChanges(async () => {
-      await get().fetchState();
-    });
+    return connectionService.subscribeStateChanges(
+      async () => {
+        await get().fetchState();
+      },
+      (mode) => {
+        set({ mode: mode as ProxyMode });
+      }
+    );
   },
 
   async fetchDashboardInfo() {

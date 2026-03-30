@@ -10,7 +10,7 @@ function formatSpeed(bytes: number): string {
 
 export function TrayStatus() {
   const { t } = useTranslation();
-  const { status, activeNode, uploadSpeed, downloadSpeed, latency } = useConnectionStore();
+  const { status, mode, activeNode, uploadSpeed, downloadSpeed, latency } = useConnectionStore();
   const isConnected = status === "connected";
 
   return (
@@ -24,7 +24,7 @@ export function TrayStatus() {
           <Badge variant="outline" className="text-[10px]">{latency}ms</Badge>
         )}
       </div>
-      {isConnected && activeNode && (
+      {isConnected && mode === "global" && activeNode && (
         <p className="text-xs text-muted-foreground">{activeNode}</p>
       )}
       {isConnected && (

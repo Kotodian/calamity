@@ -70,6 +70,12 @@ pub struct AppSettings {
     pub socks_port: u16,
     pub mixed_port: u16,
     pub log_level: String,
+    #[serde(default = "default_proxy_mode")]
+    pub proxy_mode: String,
+}
+
+fn default_proxy_mode() -> String {
+    "rule".to_string()
 }
 
 impl Default for AppSettings {
@@ -87,6 +93,7 @@ impl Default for AppSettings {
             socks_port: 7891,
             mixed_port: 7893,
             log_level: "info".to_string(),
+            proxy_mode: default_proxy_mode(),
         }
     }
 }

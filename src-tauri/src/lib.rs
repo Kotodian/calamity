@@ -42,18 +42,7 @@ pub fn run() {
             let process = Arc::new(SingboxProcess::new(singbox_path));
             app.manage(process.clone());
 
-            // Start sing-box on launch (will reuse existing instance if already running)
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let process = app_handle.state::<Arc<SingboxProcess>>();
-                let settings = crate::singbox::storage::load_settings();
-                // Apply system proxy if enabled
-                crate::commands::settings::apply_system_proxy_on_start(&settings);
-                match process.start(&settings).await {
-                    Ok(()) => {}
-                    Err(e) => eprintln!("[singbox] failed to start: {}", e),
-                }
-            });
+            // Don't auto-start sing-box; user clicks connect to start
 
             // Auto-update subscriptions
             let app_handle_subs = app.handle().clone();

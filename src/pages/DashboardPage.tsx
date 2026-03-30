@@ -40,7 +40,7 @@ function formatUptime(startedAt: number | null): string {
 export function DashboardPage() {
   const { t } = useTranslation();
   const {
-    status, activeNode, uploadSpeed, downloadSpeed,
+    status, mode, activeNode, uploadSpeed, downloadSpeed,
     totalUpload, totalDownload, latency, speedHistory,
     activeConnections, memoryInuse, version, startedAt,
     fetchState, subscribeTraffic, fetchDashboardInfo, toggleConnection,
@@ -174,8 +174,8 @@ export function DashboardPage() {
           )}
         </div>
 
-        {/* Active Node */}
-        {isConnected && (
+        {/* Active Node — only show in global mode */}
+        {isConnected && mode === "global" && (
           <div className="flex items-center gap-2 mt-1 animate-slide-up" style={{ animationDelay: "100ms" }}>
             {exitNode ? (
               <>

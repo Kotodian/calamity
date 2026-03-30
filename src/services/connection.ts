@@ -15,7 +15,7 @@ export interface ConnectionService {
   disconnect(): Promise<void>;
   setMode(mode: ProxyMode): Promise<void>;
   subscribeTraffic(onUpdate: (up: number, down: number) => void): () => void;
-  subscribeStateChanges(onChange: () => void | Promise<void>): () => void;
+  subscribeStateChanges(onChange: () => void | Promise<void>, onModeChange?: (mode: string) => void): () => void;
   getDashboardInfo(): Promise<DashboardInfo>;
 }
 
@@ -23,13 +23,16 @@ function createTauriConnectionService(): ConnectionService {
   return {
     async getState() {
       const { invoke } = await import("@tauri-apps/api/core");
-      const status = await invoke<{ running: boolean; version: string }>("singbox_status");
-      const nodesData = await invoke<{ activeNode: string | null }>("get_nodes");
+      const [status, nodesData, settings] = await Promise.all([
+        invoke<{ running: boolean; version: string }>("singbox_status"),
+        invoke<{ activeNode: string | null }>("get_nodes"),
+        invoke<{ proxyMode?: string }>("get_settings"),
+      ]);
       const isConnected = status.running && !!nodesData.activeNode;
 
       return {
         status: isConnected ? "connected" : "disconnected",
-        mode: "rule" as ProxyMode,
+        mode: (settings.proxyMode || "rule") as ProxyMode,
         activeNode: nodesData.activeNode,
         uploadSpeed: 0,
         downloadSpeed: 0,
@@ -49,8 +52,8 @@ function createTauriConnectionService(): ConnectionService {
       await invoke("disconnect_node");
     },
 
-    async setMode(_mode: ProxyMode) {
-      // Mode switching not yet implemented in backend
+    async setMode() {
+      // Mode is persisted via update_settings in the store
     },
 
     subscribeTraffic(onUpdate) {
@@ -80,9 +83,10 @@ function createTauriConnectionService(): ConnectionService {
       };
     },
 
-    subscribeStateChanges(onChange) {
+    subscribeStateChanges(onChange, onModeChange) {
       let unlistenConnectionState: (() => void) | null = null;
       let unlistenRestarted: (() => void) | null = null;
+      let unlistenMode: (() => void) | null = null;
       let cancelled = false;
 
       (async () => {
@@ -98,6 +102,11 @@ function createTauriConnectionService(): ConnectionService {
               await onChange();
             }
           });
+          unlistenMode = await listen<string>("proxy-mode-changed", (event) => {
+            if (!cancelled && onModeChange) {
+              onModeChange(event.payload);
+            }
+          });
         } catch (e) {
           console.error("[connection] state sync subscribe failed:", e);
         }
@@ -107,6 +116,7 @@ function createTauriConnectionService(): ConnectionService {
         cancelled = true;
         if (unlistenConnectionState) unlistenConnectionState();
         if (unlistenRestarted) unlistenRestarted();
+        if (unlistenMode) unlistenMode();
       };
     },
 
