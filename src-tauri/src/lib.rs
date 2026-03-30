@@ -23,15 +23,20 @@ pub fn run() {
             let singbox_path = if cfg!(debug_assertions) {
                 "sing-box".to_string()
             } else {
-                app.path()
-                    .resource_dir()
-                    .map(|d| {
-                        d.join("binaries")
-                            .join("sing-box")
-                            .to_string_lossy()
-                            .to_string()
-                    })
-                    .unwrap_or_else(|_| "sing-box".to_string())
+                // Tauri sidecar binaries are placed in Contents/MacOS/
+                let exe_dir = std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+                if let Some(dir) = exe_dir {
+                    let sidecar = dir.join("sing-box");
+                    if sidecar.exists() {
+                        sidecar.to_string_lossy().to_string()
+                    } else {
+                        "sing-box".to_string()
+                    }
+                } else {
+                    "sing-box".to_string()
+                }
             };
 
             let process = Arc::new(SingboxProcess::new(singbox_path));
