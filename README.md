@@ -1,5 +1,9 @@
 # Calamity
 
+[中文文档](./README.zh-CN.md)
+
+GitHub Pages: `https://kotodian.github.io/calamity/`
+
 Calamity is a macOS desktop proxy client built with Tauri, React, and sing-box. It combines a full dashboard with a compact tray interface for daily proxy operations, rule management, DNS control, and node switching.
 
 ## Highlights

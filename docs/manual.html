@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calamity 操作手册</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f1ea;
+        --surface: rgba(255, 255, 255, 0.9);
+        --text: #1c1d1f;
+        --muted: #5d5f66;
+        --accent: #af5d28;
+        --accent-soft: rgba(175, 93, 40, 0.1);
+        --border: rgba(28, 29, 31, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "SF Pro Display", "PingFang SC", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top right, rgba(175, 93, 40, 0.16), transparent 26%),
+          radial-gradient(circle at top left, rgba(18, 116, 85, 0.12), transparent 24%),
+          linear-gradient(180deg, #fbfaf7 0%, var(--bg) 100%);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        width: min(1040px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0 64px;
+      }
+
+      .hero,
+      .section {
+        border: 1px solid var(--border);
+        border-radius: 26px;
+        background: var(--surface);
+        box-shadow: 0 20px 54px rgba(28, 29, 31, 0.08);
+      }
+
+      .hero {
+        padding: 36px;
+      }
+
+      .crumb {
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 14px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .tag {
+        display: inline-flex;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(34px, 7vw, 58px);
+        line-height: 1.04;
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.75;
+      }
+
+      .toc {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .toc a {
+        padding: 14px 16px;
+        border-radius: 18px;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .toc a:hover {
+        border-color: rgba(175, 93, 40, 0.32);
+      }
+
+      .section {
+        margin-top: 24px;
+        padding: 28px 30px;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 28px;
+      }
+
+      h3 {
+        margin: 22px 0 10px;
+        font-size: 20px;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .callout {
+        margin-top: 16px;
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: rgba(18, 116, 85, 0.08);
+        border: 1px solid rgba(18, 116, 85, 0.14);
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: rgba(28, 29, 31, 0.06);
+        font-family: "SFMono-Regular", "Cascadia Code", monospace;
+        font-size: 0.95em;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="crumb">
+          <a href="./index.html">Calamity Docs</a>
+          <span>/</span>
+          <span>操作手册</span>
+        </div>
+        <span class="tag">操作手册</span>
+        <h1>Calamity 中文使用说明</h1>
+        <p>
+          这份手册面向日常使用者，覆盖托盘操作、主界面功能、节点和规则管理、DNS、TUN
+          模式以及常见建议。内容按“先能用，再进阶”的顺序组织。
+        </p>
+        <nav class="toc">
+          <a href="#startup">启动与界面</a>
+          <a href="#tray">托盘操作</a>
+          <a href="#nodes">节点与连接</a>
+          <a href="#rules">规则</a>
+          <a href="#dns">DNS</a>
+          <a href="#tun">TUN 模式</a>
+          <a href="#subs">订阅</a>
+          <a href="#logs">日志与排障</a>
+        </nav>
+      </section>
+
+      <section class="section" id="startup">
+        <h2>启动与界面</h2>
+        <p>
+          Calamity 由主窗口和托盘窗口组成。主窗口用于完整配置；托盘窗口用于快速开关、
+          查看状态和执行常用操作。
+        </p>
+        <ol>
+          <li>启动应用后，主窗口会自动加载当前设置并尝试启动 sing-box。</li>
+          <li>点击菜单栏图标可以展开托盘窗口。</li>
+          <li>关闭主窗口默认只是隐藏，不会退出应用。</li>
+          <li>使用托盘中的退出按钮，才会执行完整清理并退出。</li>
+        </ol>
+      </section>
+
+      <section class="section" id="tray">
+        <h2>托盘操作</h2>
+        <h3>状态区</h3>
+        <p>托盘顶部会显示连接状态、当前节点、延迟和实时上下行速度。</p>
+
+        <h3>常用动作</h3>
+        <ul>
+          <li>切换系统代理开关</li>
+          <li>复制代理地址</li>
+          <li>切换语言</li>
+          <li>打开主面板</li>
+          <li>连接或断开代理</li>
+          <li>退出应用</li>
+        </ul>
+
+        <div class="callout">
+          <p>
+            当 TUN 模式开启时，系统代理会保持关闭状态；托盘中对应开关会被禁用，避免两套接管方式同时启用。
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="nodes">
+        <h2>节点与连接</h2>
+        <p>
+          节点页面用于管理代理节点和分组。当前活跃节点会影响实际连接状态，也会同步显示在托盘和侧边栏中。
+        </p>
+        <ul>
+          <li>节点可以按组组织，支持普通分组和 `urltest` 分组。</li>
+          <li>切换活跃节点后，应用会重启 sing-box 并同步最新连接状态。</li>
+          <li>如果当前没有活跃节点，即使 sing-box 正在运行，界面也会显示为未连接。</li>
+        </ul>
+      </section>
+
+      <section class="section" id="rules">
+        <h2>规则</h2>
+        <p>
+          规则页面用于定义域名、后缀、关键词等匹配条件，以及这些流量的出口策略。未命中的流量会落到 Final 出口。
+        </p>
+        <ul>
+          <li>支持自定义顺序，越靠前的规则越先匹配。</li>
+          <li>支持为规则选择具体节点、`direct` 或 `reject`。</li>
+          <li>支持设置 Final 出口，用于处理未命中的流量。</li>
+          <li>托盘中的站点规则是规则系统的快捷入口，不是另一套独立规则。</li>
+        </ul>
+      </section>
+
+      <section class="section" id="dns">
+        <h2>DNS</h2>
+        <p>
+          DNS 页面用于管理上游 DNS 服务器、匹配规则和最终服务器。它会直接影响解析路径和 Fake-IP 行为。
+        </p>
+        <ul>
+          <li>可以配置 UDP、DoH、DoT 等常见解析方式。</li>
+          <li>可以为特定域名、后缀或关键词指定服务器。</li>
+          <li>当 TUN 模式开启时，运行时会强制使用 Fake-IP。</li>
+        </ul>
+      </section>
+
+      <section class="section" id="tun">
+        <h2>TUN 模式</h2>
+        <p>
+          TUN 模式用于接管系统层流量。当前实现主要面向 macOS，并且需要管理员权限才能启动。
+        </p>
+        <ol>
+          <li>在设置页开启 TUN 模式。</li>
+          <li>按提示完成管理员授权。</li>
+          <li>应用会以带权限的方式启动 sing-box，并接管 TUN 流量。</li>
+          <li>退出应用时会尝试完整停止该进程，释放 TUN 接口。</li>
+        </ol>
+
+        <div class="callout">
+          <p>
+            如果你只想用浏览器或指定程序走代理，优先使用系统代理；如果希望更完整地接管系统流量，再启用 TUN。
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="subs">
+        <h2>订阅</h2>
+        <p>
+          订阅页面用于添加、更新和启停订阅源。更新后节点列表会被刷新，相关状态也会同步到前端。
+        </p>
+        <ul>
+          <li>支持手动更新单个订阅或全部订阅。</li>
+          <li>支持自动更新间隔。</li>
+          <li>订阅修改后建议确认活跃节点是否仍然存在。</li>
+        </ul>
+      </section>
+
+      <section class="section" id="logs">
+        <h2>日志与排障</h2>
+        <p>日志页面用于查看 sing-box 和应用侧错误。排障时建议按以下顺序检查：</p>
+        <ol>
+          <li>确认 sing-box 是否已成功启动。</li>
+          <li>确认当前是否有活跃节点。</li>
+          <li>确认规则 Final 出口和节点出口是否符合预期。</li>
+          <li>确认 DNS 模式是否与当前场景匹配。</li>
+          <li>使用 TUN 时，确认管理员授权和退出清理是否正常。</li>
+        </ol>
+      </section>
+    </main>
+  </body>
+</html>
