@@ -27,6 +27,7 @@ export const resources = {
           copyProxyAddress: "Copy Proxy Address",
           openDashboard: "Open Dashboard",
           quit: "Quit Calamity",
+          quitting: "Quitting...",
         },
         status: {
           connected: "Connected",
@@ -305,6 +306,7 @@ export const resources = {
           copyProxyAddress: "复制代理地址",
           openDashboard: "打开面板",
           quit: "退出 Calamity",
+          quitting: "退出中...",
         },
         status: {
           connected: "已连接",

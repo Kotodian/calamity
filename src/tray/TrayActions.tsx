@@ -1,4 +1,5 @@
-import { Shield, Copy, ExternalLink, Power, LogOut } from "lucide-react";
+import { useState } from "react";
+import { Shield, Copy, ExternalLink, Power, LogOut, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -21,6 +22,7 @@ export function TrayActions() {
   const toggleConnection = useConnectionStore((s) => s.toggleConnection);
   const isConnected = status === "connected";
   const tunEnabled = tunStatus?.targetEnhancedMode ?? settings?.enhancedMode ?? false;
+  const [quitting, setQuitting] = useState(false);
 
   return (
     <div className="space-y-1.5">
@@ -91,14 +93,23 @@ export function TrayActions() {
         {isConnected ? t("common.actions.disconnect") : t("common.actions.connect")}
       </button>
       <button
+        disabled={quitting}
         onClick={async () => {
+          if (quitting) return;
+          setQuitting(true);
           const { invoke } = await import("@tauri-apps/api/core");
+          // Close all active connections first
+          try { await invoke("close_all_connections"); } catch { /* ignore */ }
           await invoke("app_quit");
         }}
-        className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
       >
-        <LogOut className="h-3.5 w-3.5" />
-        {t("common.actions.quit")}
+        {quitting ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <LogOut className="h-3.5 w-3.5" />
+        )}
+        {quitting ? t("common.actions.quitting") : t("common.actions.quit")}
       </button>
     </div>
   );
