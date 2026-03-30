@@ -77,6 +77,9 @@ export const resources = {
         httpPort: "HTTP Port",
         socksPort: "SOCKS Port",
         mixedPort: "Mixed Port",
+        tunSudoersInstall: "Enable password-free TUN",
+        tunSudoersInstalling: "Installing...",
+        tunSudoersInstalled: "Password-free TUN enabled",
         corePath: "Core Path",
         logLevel: "Log Level",
         logLevels: {
@@ -349,6 +352,9 @@ export const resources = {
         httpPort: "HTTP 端口",
         socksPort: "SOCKS 端口",
         mixedPort: "混合端口",
+        tunSudoersInstall: "启用免密 TUN",
+        tunSudoersInstalling: "安装中...",
+        tunSudoersInstalled: "已启用免密 TUN",
         corePath: "核心路径",
         logLevel: "日志级别",
         logLevels: {

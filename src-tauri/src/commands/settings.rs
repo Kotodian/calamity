@@ -202,6 +202,73 @@ fn clear_system_proxy() {
     }
 }
 
+#[tauri::command]
+pub async fn install_tun_sudoers() -> Result<bool, String> {
+    let settings = storage::load_settings();
+    let singbox_path = resolve_singbox_path(&settings.singbox_path);
+    let sudoers_line = format!(
+        "{user} ALL=(root) NOPASSWD: {singbox}, /bin/kill, /usr/bin/kill\n",
+        user = whoami(),
+        singbox = singbox_path
+    );
+    let sudoers_file = "/etc/sudoers.d/calamity-tun";
+
+    // Write sudoers file via osascript (needs one-time admin auth)
+    let script = format!(
+        "do shell script \"echo '{}' > {} && chmod 0440 {}\" with administrator privileges",
+        escape_applescript_string(&sudoers_line),
+        sudoers_file,
+        sudoers_file,
+    );
+
+    let output = tokio::process::Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .await
+        .map_err(|e| format!("failed to install sudoers: {}", e))?;
+
+    if output.status.success() {
+        Ok(true)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("User canceled") || stderr.contains("(-128)") {
+            Ok(false)
+        } else {
+            Err(format!("failed to install sudoers: {}", stderr.trim()))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn check_tun_sudoers() -> Result<bool, String> {
+    let settings = storage::load_settings();
+    let run_cmd = format!("{} --help", settings.singbox_path);
+    let output = tokio::process::Command::new("sudo")
+        .args(["-n", "sh", "-c", &run_cmd])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(output.status.success())
+}
+
+fn whoami() -> String {
+    std::env::var("USER")
+        .or_else(|_| std::env::var("LOGNAME"))
+        .unwrap_or_else(|_| "root".to_string())
+}
+
+fn resolve_singbox_path(path: &str) -> String {
+    // Resolve symlinks to get the real binary path for sudoers
+    std::fs::canonicalize(path)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| path.to_string())
+}
+
+fn escape_applescript_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 /// Set system proxy on startup if enabled, clear on exit.
 pub fn apply_system_proxy_on_start(settings: &AppSettings) {
     if settings.system_proxy {

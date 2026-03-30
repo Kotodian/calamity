@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Shield, Check } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -27,6 +29,30 @@ export function SettingsPage() {
   const tunEnabled = tunStatus?.targetEnhancedMode ?? settings.enhancedMode;
   const tunRunning = tunStatus?.running ?? false;
   const tunLastError = tunStatus?.lastError;
+  const [sudoersInstalled, setSudoersInstalled] = useState<boolean | null>(null);
+  const [installing, setInstalling] = useState(false);
+
+  useEffect(() => {
+    if (tunEnabled) {
+      (async () => {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const ok = await invoke<boolean>("check_tun_sudoers");
+          setSudoersInstalled(ok);
+        } catch { setSudoersInstalled(false); }
+      })();
+    }
+  }, [tunEnabled]);
+
+  const handleInstallSudoers = async () => {
+    setInstalling(true);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const ok = await invoke<boolean>("install_tun_sudoers");
+      setSudoersInstalled(ok);
+    } catch { /* ignore */ }
+    setInstalling(false);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -109,6 +135,24 @@ export function SettingsPage() {
                   {tunLastError ? (
                     <p className="text-xs text-destructive">{t("settings.tunLastError", { error: tunLastError })}</p>
                   ) : null}
+                  <div className="flex items-center gap-2 pt-1">
+                    {sudoersInstalled ? (
+                      <span className="flex items-center gap-1 text-xs text-green-500">
+                        <Check className="h-3 w-3" /> {t("settings.tunSudoersInstalled")}
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-white/[0.06]"
+                        disabled={installing}
+                        onClick={handleInstallSudoers}
+                      >
+                        <Shield className="h-3 w-3 mr-1" />
+                        {installing ? t("settings.tunSudoersInstalling") : t("settings.tunSudoersInstall")}
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{t("settings.tunConfiguration")}</p>
                 <div className="grid grid-cols-2 gap-3">

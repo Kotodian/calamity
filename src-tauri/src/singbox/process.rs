@@ -247,6 +247,26 @@ impl SingboxProcess {
     }
 
     async fn spawn_privileged_tun(&self, config_path: &str) -> Result<(), String> {
+        // Try sudo first (works if sudoers entry is installed)
+        let log_path = build_tun_log_path(config_path);
+        let pid_path = build_tun_pid_path(config_path);
+        let log_file = std::fs::File::create(&log_path).ok();
+        let sudo_result = Command::new("sudo")
+            .args(["-n", &self.singbox_path, "run", "-c", config_path])
+            .stdout(log_file.map_or(std::process::Stdio::null(), |f| f.into()))
+            .stderr(std::process::Stdio::null())
+            .spawn();
+
+        if let Ok(mut child) = sudo_result {
+            if let Some(pid) = child.id() {
+                let _ = std::fs::write(&pid_path, pid.to_string());
+                // Detach: don't wait, let it run in background
+                tokio::spawn(async move { let _ = child.wait().await; });
+                return Ok(());
+            }
+        }
+
+        // Fallback to osascript with password prompt
         let script = build_privileged_osascript(&self.singbox_path, config_path);
 
         let output = Command::new("osascript")
@@ -267,6 +287,24 @@ impl SingboxProcess {
     }
 
     async fn stop_privileged_tun(&self, config_path: &str) -> Result<(), String> {
+        // Try sudo kill using PID file
+        let pid_path = build_tun_pid_path(config_path);
+        if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
+            if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                let kill_result = Command::new("sudo")
+                    .args(["-n", "kill", &pid.to_string()])
+                    .output()
+                    .await;
+                if let Ok(output) = kill_result {
+                    if output.status.success() {
+                        let _ = std::fs::remove_file(&pid_path);
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        // Fallback to osascript
         let script = build_privileged_cleanup_osascript(config_path);
 
         let output = Command::new("osascript")

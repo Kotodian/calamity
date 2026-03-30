@@ -165,6 +165,8 @@ pub fn run() {
             commands::connection::singbox_status,
             commands::settings::get_settings,
             commands::settings::get_tun_status,
+            commands::settings::install_tun_sudoers,
+            commands::settings::check_tun_sudoers,
             commands::settings::update_settings,
             commands::dns::get_dns_settings,
             commands::dns::update_dns_config,
