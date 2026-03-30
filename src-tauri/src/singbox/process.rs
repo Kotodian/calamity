@@ -148,9 +148,12 @@ impl SingboxProcess {
             let pattern = runtime
                 .config_path
                 .unwrap_or_else(|| "sing-box run".to_string());
+            // TUN processes run as root, need sudo to kill
+            let _ = std::process::Command::new("sudo")
+                .args(["-n", "pkill", "-f", &pattern])
+                .output();
             let _ = std::process::Command::new("pkill")
-                .arg("-f")
-                .arg(pattern)
+                .args(["-f", &pattern])
                 .output();
         }
 
@@ -160,28 +163,21 @@ impl SingboxProcess {
 
     /// Synchronous cleanup for use in exit handlers where async may deadlock.
     pub fn stop_sync(&self) {
-        // Try to kill TUN process via PID file first (needs sudo before pkill)
+        eprintln!("[singbox] stop_sync: starting cleanup");
+
+        // Try to kill TUN process via PID file
         let pid_path = super::storage::app_data_dir().join("singbox-tun.pid");
         if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                // Try passwordless sudo kill first
-                let sudo_ok = std::process::Command::new("sudo")
+                eprintln!("[singbox] stop_sync: killing TUN pid {}", pid);
+                // sudo kill — TUN process runs as root
+                let _ = std::process::Command::new("sudo")
                     .args(["-n", "kill", &pid.to_string()])
-                    .output()
-                    .map(|o| o.status.success())
-                    .unwrap_or(false);
-
-                if !sudo_ok {
-                    // Fall back to regular kill (may work if process isn't root)
-                    let _ = std::process::Command::new("kill")
-                        .arg(&pid.to_string())
-                        .output();
-                }
-
-                // Wait briefly for process to exit
-                for _ in 0..10 {
-                    let alive = std::process::Command::new("kill")
-                        .args(["-0", &pid.to_string()])
+                    .output();
+                // Wait for exit
+                for _ in 0..20 {
+                    let alive = std::process::Command::new("sudo")
+                        .args(["-n", "kill", "-0", &pid.to_string()])
                         .output()
                         .map(|o| o.status.success())
                         .unwrap_or(false);
@@ -194,11 +190,16 @@ impl SingboxProcess {
             let _ = std::fs::remove_file(&pid_path);
         }
 
-        // Kill any remaining sing-box processes
-        let _ = std::process::Command::new("pkill")
-            .arg("-f")
-            .arg("sing-box run")
+        // Kill any remaining sing-box processes (needs sudo for root processes)
+        let _ = std::process::Command::new("sudo")
+            .args(["-n", "pkill", "-f", "sing-box run"])
             .output();
+        // Also try unprivileged pkill for non-TUN managed child
+        let _ = std::process::Command::new("pkill")
+            .args(["-f", "sing-box run"])
+            .output();
+
+        eprintln!("[singbox] stop_sync: cleanup done");
     }
 
     /// Stop any running sing-box (managed or orphan), then start fresh
