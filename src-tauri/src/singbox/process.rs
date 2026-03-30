@@ -336,8 +336,12 @@ impl SingboxProcess {
             match child.try_wait().map_err(|e| e.to_string())? {
                 None => {
                     // Still running — sudo succeeded
-                    if let Some(pid) = child.id() {
-                        let _ = std::fs::write(&pid_path, pid.to_string());
+                    // child.id() returns the sudo PID, not the sing-box PID.
+                    // We need the actual sing-box PID for SIGHUP reload.
+                    if let Some(sudo_pid) = child.id() {
+                        let singbox_pid = find_child_pid(sudo_pid)
+                            .unwrap_or(sudo_pid);
+                        let _ = std::fs::write(&pid_path, singbox_pid.to_string());
                     }
                     tokio::spawn(async move { let _ = child.wait().await; });
                     return Ok(());
@@ -474,6 +478,32 @@ fn build_tun_run_command(singbox_path: &str, config_path: &str) -> String {
         shell_quote(&log_path),
         shell_quote(&pid_path),
     )
+}
+
+/// Find the actual sing-box child PID spawned by sudo.
+/// `sudo -n sing-box run` creates: sudo(parent_pid) -> sing-box(child_pid).
+/// We need the child PID so SIGHUP reaches sing-box, not sudo.
+fn find_child_pid(parent_pid: u32) -> Option<u32> {
+    // pgrep -P returns child PIDs of the given parent
+    let output = std::process::Command::new("pgrep")
+        .args(["-P", &parent_pid.to_string()])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // There may be an intermediate sudo process; walk down until we find sing-box
+    for line in stdout.lines() {
+        if let Ok(child) = line.trim().parse::<u32>() {
+            // Check if this child has its own children (intermediate sudo)
+            if let Some(grandchild) = find_child_pid(child) {
+                return Some(grandchild);
+            }
+            return Some(child);
+        }
+    }
+    None
 }
 
 fn resolve_to_full_path(path: &str) -> String {
