@@ -476,17 +476,34 @@ fn build_tun_run_command(singbox_path: &str, config_path: &str) -> String {
     )
 }
 
+fn resolve_to_full_path(path: &str) -> String {
+    if let Ok(resolved) = std::fs::canonicalize(path) {
+        return resolved.to_string_lossy().to_string();
+    }
+    if let Ok(output) = std::process::Command::new("which").arg(path).output() {
+        if output.status.success() {
+            let which_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !which_path.is_empty() {
+                return std::fs::canonicalize(&which_path)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or(which_path);
+            }
+        }
+    }
+    path.to_string()
+}
+
 fn build_sudoers_install_command(singbox_path: &str) -> String {
     let user = std::env::var("USER")
         .or_else(|_| std::env::var("LOGNAME"))
         .unwrap_or_else(|_| "root".to_string());
 
-    let resolved = std::fs::canonicalize(singbox_path)
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| singbox_path.to_string());
+    let resolved = resolve_to_full_path(singbox_path);
 
     let mut paths = vec![resolved.clone()];
-    if singbox_path != resolved {
+    // Only add the original path if it differs AND is a fully-qualified path
+    // (sudoers requires absolute paths; bare names like "sing-box" make the file invalid)
+    if singbox_path != resolved && singbox_path.starts_with('/') {
         paths.push(singbox_path.to_string());
     }
     paths.push("/bin/kill".to_string());

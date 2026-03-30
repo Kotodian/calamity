@@ -224,8 +224,9 @@ pub async fn install_tun_sudoers() -> Result<bool, String> {
     let resolved_path = resolve_singbox_path(raw_path);
 
     // Include both the symlink and resolved paths so sudo matches either
+    // Only add fully-qualified paths (sudoers rejects bare command names)
     let mut paths = vec![resolved_path.clone()];
-    if raw_path != &resolved_path {
+    if raw_path != &resolved_path && raw_path.starts_with('/') {
         paths.push(raw_path.clone());
     }
     paths.push("/bin/kill".to_string());
@@ -284,10 +285,23 @@ fn whoami() -> String {
 }
 
 fn resolve_singbox_path(path: &str) -> String {
-    // Resolve symlinks to get the real binary path for sudoers
-    std::fs::canonicalize(path)
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| path.to_string())
+    // Try direct canonicalize first (works for absolute/relative paths)
+    if let Ok(resolved) = std::fs::canonicalize(path) {
+        return resolved.to_string_lossy().to_string();
+    }
+    // For bare command names like "sing-box", use `which` to find full path
+    if let Ok(output) = std::process::Command::new("which").arg(path).output() {
+        if output.status.success() {
+            let which_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !which_path.is_empty() {
+                // Resolve symlinks on the which result
+                return std::fs::canonicalize(&which_path)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or(which_path);
+            }
+        }
+    }
+    path.to_string()
 }
 
 fn escape_applescript_string(value: &str) -> String {
