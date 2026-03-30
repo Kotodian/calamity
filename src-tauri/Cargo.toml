@@ -27,3 +27,4 @@ base64 = "0.22"
 chrono = "0.4"
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
+tauri-plugin-dialog = "2"

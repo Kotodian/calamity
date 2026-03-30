@@ -18,6 +18,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Determine sing-box binary path
             let singbox_path = if cfg!(debug_assertions) {
@@ -229,6 +230,8 @@ pub fn run() {
             commands::rules::update_final_outbound,
             commands::traffic::subscribe_traffic,
             commands::traffic::get_dashboard_info,
+            commands::config_io::export_config,
+            commands::config_io::import_config,
             commands::connection::app_quit,
         ])
         .build(tauri::generate_context!())

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Check } from "lucide-react";
+import { Shield, Check, Download, Upload } from "lucide-react";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import {
   Select,
   SelectContent,
@@ -62,6 +63,79 @@ export function SettingsPage() {
       setSudoersInstalled(ok);
     } catch { /* ignore */ }
     setInstalling(false);
+  };
+
+  const [ioState, setIoState] = useState<{
+    phase: "idle" | "exporting" | "importing" | "done" | "error";
+    progress: number;
+    message: string;
+  }>({ phase: "idle", progress: 0, message: "" });
+
+  const animateProgress = (
+    onComplete: () => Promise<{ message: string }>,
+    phase: "exporting" | "importing",
+  ) => {
+    setIoState({ phase, progress: 0, message: "" });
+
+    // Animate progress 0→85 quickly, then slow down waiting for real completion
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += progress < 60 ? 8 : progress < 85 ? 2 : 0.3;
+      progress = Math.min(progress, 92);
+      setIoState((s) => ({ ...s, progress }));
+    }, 50);
+
+    onComplete()
+      .then(({ message }) => {
+        clearInterval(interval);
+        // Snap to 100 with a brief pause
+        setIoState({ phase: "done", progress: 100, message });
+        setTimeout(() => setIoState({ phase: "idle", progress: 0, message: "" }), 2500);
+      })
+      .catch((e) => {
+        clearInterval(interval);
+        setIoState({ phase: "error", progress: 100, message: String(e) });
+        setTimeout(() => setIoState({ phase: "idle", progress: 0, message: "" }), 4000);
+      });
+  };
+
+  const handleExport = async () => {
+    const filePath = await save({
+      defaultPath: `calamity-backup-${new Date().toISOString().slice(0, 10)}.calamity`,
+      filters: [{ name: t("settings.configBackup"), extensions: ["calamity"] }],
+    });
+    if (!filePath) return;
+
+    animateProgress(async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("export_config", { path: filePath });
+      return { message: t("settings.exportConfig") + " OK" };
+    }, "exporting");
+  };
+
+  const handleImport = async () => {
+    const filePath = await open({
+      filters: [
+        { name: t("settings.configBackup"), extensions: ["calamity", "json"] },
+      ],
+      multiple: false,
+    });
+    if (!filePath) return;
+
+    animateProgress(async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const result = await invoke<{
+        success: boolean;
+        format: string;
+        nodesImported: number;
+        nodesSkipped: number;
+        rulesImported: number;
+        dnsServersImported: number;
+        message: string;
+      }>("import_config", { path: filePath as string });
+      await fetchSettings();
+      return { message: result.message };
+    }, "importing");
   };
 
   return (
@@ -260,6 +334,74 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="animate-slide-up rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl shadow-[0_0_20px_rgba(254,151,185,0.08)] transition-all duration-200 hover:border-white/10 hover:bg-card/80" style={{ animationDelay: "400ms" }}>
+        <CardHeader><CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t("settings.configBackup")}</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{t("settings.exportConfig")}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.exportConfigDescription")}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-white/[0.06]"
+              disabled={ioState.phase !== "idle"}
+              onClick={handleExport}
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              {t("settings.exportConfig")}
+            </Button>
+          </div>
+          <Separator className="bg-white/[0.04]" />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{t("settings.importConfig")}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.importConfigDescription")}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-white/[0.06]"
+              disabled={ioState.phase !== "idle"}
+              onClick={handleImport}
+            >
+              <Upload className="h-3.5 w-3.5 mr-1.5" />
+              {t("settings.importConfig")}
+            </Button>
+          </div>
+
+          {ioState.phase !== "idle" && (
+            <div className="space-y-2 animate-in fade-in duration-200">
+              {/* Progress bar */}
+              <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ease-out ${
+                    ioState.phase === "error"
+                      ? "bg-destructive"
+                      : ioState.phase === "done"
+                        ? "bg-green-500"
+                        : "bg-gradient-to-r from-pink-500 via-purple-400 to-pink-500 bg-[length:200%_100%] animate-[shimmer_1.5s_linear_infinite]"
+                  }`}
+                  style={{ width: `${ioState.progress}%` }}
+                />
+              </div>
+              {/* Status text */}
+              <div className="flex items-center gap-2">
+                {ioState.phase === "done" && <Check className="h-3 w-3 text-green-500 shrink-0" />}
+                <p className={`text-xs ${
+                  ioState.phase === "error" ? "text-destructive" :
+                  ioState.phase === "done" ? "text-green-500" :
+                  "text-muted-foreground"
+                }`}>
+                  {ioState.message || (ioState.phase === "exporting" ? t("settings.exportConfig") + "..." : t("settings.importConfig") + "...")}
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
