@@ -258,11 +258,20 @@ impl SingboxProcess {
             .spawn();
 
         if let Ok(mut child) = sudo_result {
-            if let Some(pid) = child.id() {
-                let _ = std::fs::write(&pid_path, pid.to_string());
-                // Detach: don't wait, let it run in background
-                tokio::spawn(async move { let _ = child.wait().await; });
-                return Ok(());
+            // Wait briefly to check if sudo auth succeeded
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            match child.try_wait().map_err(|e| e.to_string())? {
+                None => {
+                    // Still running — sudo succeeded
+                    if let Some(pid) = child.id() {
+                        let _ = std::fs::write(&pid_path, pid.to_string());
+                    }
+                    tokio::spawn(async move { let _ = child.wait().await; });
+                    return Ok(());
+                }
+                Some(_) => {
+                    // Exited immediately — sudo auth failed, fall through
+                }
             }
         }
 
