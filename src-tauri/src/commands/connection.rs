@@ -11,6 +11,15 @@ pub struct SingboxStatus {
     pub version: String,
 }
 
+async fn cleanup_before_app_exit<F, Fut>(stop: F) -> Result<(), String>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
+    crate::commands::settings::clear_system_proxy_on_exit();
+    stop().await
+}
+
 #[tauri::command]
 pub async fn singbox_start(app: AppHandle) -> Result<(), String> {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
@@ -50,9 +59,33 @@ pub async fn singbox_status(app: AppHandle) -> Result<SingboxStatus, String> {
 
 #[tauri::command]
 pub async fn app_quit(app: AppHandle) {
-    // Clean up before exiting — the RunEvent::Exit handler may not run reliably
-    crate::commands::settings::clear_system_proxy_on_exit();
+    // Clean up before exiting — the RunEvent::Exit handler is only a fallback.
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
-    process.stop_sync();
+    if let Err(error) = cleanup_before_app_exit(|| async move { process.stop().await }).await {
+        eprintln!("[singbox] failed to stop during app quit: {}", error);
+    }
     app.exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cleanup_before_app_exit;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    #[test]
+    fn app_quit_cleanup_awaits_async_stop() {
+        let called = Arc::new(AtomicBool::new(false));
+        let called_for_stop = called.clone();
+
+        let result = tauri::async_runtime::block_on(cleanup_before_app_exit(|| async move {
+            called_for_stop.store(true, Ordering::SeqCst);
+            Ok(())
+        }));
+
+        assert!(result.is_ok());
+        assert!(called.load(Ordering::SeqCst));
+    }
 }

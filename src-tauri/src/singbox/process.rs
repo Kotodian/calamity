@@ -150,10 +150,10 @@ impl SingboxProcess {
                 .unwrap_or_else(|| "sing-box run".to_string());
             // TUN processes run as root, need sudo to kill
             let _ = std::process::Command::new("sudo")
-                .args(["-n", "pkill", "-f", &pattern])
+                .args(["-n", "pkill", "-9", "-f", &pattern])
                 .output();
             let _ = std::process::Command::new("pkill")
-                .args(["-f", &pattern])
+                .args(["-9", "-f", &pattern])
                 .output();
         }
 
@@ -170,33 +170,18 @@ impl SingboxProcess {
         if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
                 eprintln!("[singbox] stop_sync: killing TUN pid {}", pid);
-                // sudo kill — TUN process runs as root
-                let _ = std::process::Command::new("sudo")
-                    .args(["-n", "kill", &pid.to_string()])
-                    .output();
-                // Wait for exit
-                for _ in 0..20 {
-                    let alive = std::process::Command::new("sudo")
-                        .args(["-n", "kill", "-0", &pid.to_string()])
-                        .output()
-                        .map(|o| o.status.success())
-                        .unwrap_or(false);
-                    if !alive {
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                }
+                let _ = terminate_pid_with_sudo_sync(pid);
             }
             let _ = std::fs::remove_file(&pid_path);
         }
 
         // Kill any remaining sing-box processes (needs sudo for root processes)
         let _ = std::process::Command::new("sudo")
-            .args(["-n", "pkill", "-f", "sing-box run"])
+            .args(["-n", "pkill", "-9", "-f", "sing-box run"])
             .output();
         // Also try unprivileged pkill for non-TUN managed child
         let _ = std::process::Command::new("pkill")
-            .args(["-f", "sing-box run"])
+            .args(["-9", "-f", "sing-box run"])
             .output();
 
         eprintln!("[singbox] stop_sync: cleanup done");
@@ -347,15 +332,9 @@ impl SingboxProcess {
         let pid_path = build_tun_pid_path(config_path);
         if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                let kill_result = Command::new("sudo")
-                    .args(["-n", "kill", &pid.to_string()])
-                    .output()
-                    .await;
-                if let Ok(output) = kill_result {
-                    if output.status.success() {
-                        let _ = std::fs::remove_file(&pid_path);
-                        return Ok(());
-                    }
+                if terminate_pid_with_sudo(pid).await {
+                    let _ = std::fs::remove_file(&pid_path);
+                    return Ok(());
                 }
             }
         }
@@ -465,9 +444,114 @@ fn build_sudoers_install_command(singbox_path: &str) -> String {
 fn build_tun_cleanup_command(config_path: &str) -> String {
     let pid_path = build_tun_pid_path(config_path);
     format!(
-        "if [ -f {pid_path} ]; then pid=$(cat {pid_path}); kill \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; rm -f {pid_path}; fi",
+        "if [ -f {pid_path} ]; then pid=$(cat {pid_path}); kill -TERM \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; if kill -0 \"$pid\" 2>/dev/null; then kill -KILL \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; fi; rm -f {pid_path}; fi",
         pid_path = shell_quote(&pid_path),
     )
+}
+
+async fn terminate_pid_with_sudo(pid: u32) -> bool {
+    let pid_str = pid.to_string();
+
+    let term_status = Command::new("sudo")
+        .args(["-n", "kill", "-TERM", &pid_str])
+        .output()
+        .await
+        .ok()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if !term_status && !is_pid_alive_with_sudo(&pid_str).await {
+        return true;
+    }
+
+    if wait_for_pid_exit_with_sudo(&pid_str).await {
+        return true;
+    }
+
+    let kill_status = Command::new("sudo")
+        .args(["-n", "kill", "-KILL", &pid_str])
+        .output()
+        .await
+        .ok()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if !kill_status && !is_pid_alive_with_sudo(&pid_str).await {
+        return true;
+    }
+
+    wait_for_pid_exit_with_sudo(&pid_str).await
+}
+
+async fn wait_for_pid_exit_with_sudo(pid: &str) -> bool {
+    for _ in 0..10 {
+        if !is_pid_alive_with_sudo(pid).await {
+            return true;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+    }
+    !is_pid_alive_with_sudo(pid).await
+}
+
+async fn is_pid_alive_with_sudo(pid: &str) -> bool {
+    Command::new("sudo")
+        .args(["-n", "kill", "-0", pid])
+        .output()
+        .await
+        .ok()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn terminate_pid_with_sudo_sync(pid: u32) -> bool {
+    let pid_str = pid.to_string();
+
+    let term_status = std::process::Command::new("sudo")
+        .args(["-n", "kill", "-TERM", &pid_str])
+        .output()
+        .ok()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if !term_status && !is_pid_alive_with_sudo_sync(&pid_str) {
+        return true;
+    }
+
+    if wait_for_pid_exit_with_sudo_sync(&pid_str) {
+        return true;
+    }
+
+    let kill_status = std::process::Command::new("sudo")
+        .args(["-n", "kill", "-KILL", &pid_str])
+        .output()
+        .ok()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if !kill_status && !is_pid_alive_with_sudo_sync(&pid_str) {
+        return true;
+    }
+
+    wait_for_pid_exit_with_sudo_sync(&pid_str)
+}
+
+fn wait_for_pid_exit_with_sudo_sync(pid: &str) -> bool {
+    for _ in 0..10 {
+        if !is_pid_alive_with_sudo_sync(pid) {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    !is_pid_alive_with_sudo_sync(pid)
+}
+
+fn is_pid_alive_with_sudo_sync(pid: &str) -> bool {
+    std::process::Command::new("sudo")
+        .args(["-n", "kill", "-0", pid])
+        .output()
+        .ok()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 fn shell_quote(value: &str) -> String {
@@ -607,7 +691,7 @@ mod tests {
 
         assert_eq!(
             command,
-            "if [ -f '/tmp/singbox-tun.pid' ]; then pid=$(cat '/tmp/singbox-tun.pid'); kill \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; rm -f '/tmp/singbox-tun.pid'; fi"
+            "if [ -f '/tmp/singbox-tun.pid' ]; then pid=$(cat '/tmp/singbox-tun.pid'); kill -TERM \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; if kill -0 \"$pid\" 2>/dev/null; then kill -KILL \"$pid\" 2>/dev/null || true; for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 \"$pid\" 2>/dev/null || break; sleep 0.2; done; fi; rm -f '/tmp/singbox-tun.pid'; fi"
         );
     }
 
