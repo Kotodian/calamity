@@ -74,7 +74,9 @@ pub fn generate_config(settings: &AppSettings) -> Value {
 
     // Build route rules from stored rules
     let rules_data = rules_storage::load_rules();
-    let (route_rules, rule_sets) = build_route_rules(&rules_data, &all_node_tags);
+    let (stored_route_rules, rule_sets) = build_route_rules(&rules_data, &all_node_tags);
+    let mut route_rules = build_pre_match_route_rules(settings);
+    route_rules.extend(stored_route_rules);
 
     let mut route_section = json!({
         "auto_detect_interface": true,
@@ -143,60 +145,56 @@ fn build_inbounds(settings: &AppSettings, listen: &str) -> Vec<Value> {
 }
 
 fn build_tun_inbound(settings: &AppSettings) -> Value {
-    let mut inbound = json!({
+    json!({
         "type": "tun",
         "tag": "tun-in",
-        "interface_name": "calamity-tun",
+        "interface_name": "",
         "address": ["172.19.0.1/30"],
-        "inet4_address": ["172.19.0.1/30"],
         "mtu": settings.tun_config.mtu,
         "auto_route": settings.tun_config.auto_route,
         "strict_route": settings.tun_config.strict_route,
         "stack": settings.tun_config.stack,
-        "domain_strategy": "ipv4_only",
         "platform": {
             "http_proxy": {
                 "enabled": false
             }
         }
-    });
-
-    if !settings.tun_config.dns_hijack.is_empty() {
-        inbound["dns_hijack"] = json!(settings.tun_config.dns_hijack);
-    }
-
-    inbound
+    })
 }
 
 fn build_dns_section(dns: &DnsSettings, force_fake_ip: bool) -> Value {
-    let servers: Vec<Value> = dns
+    let mut servers: Vec<Value> = dns
         .servers
         .iter()
         .filter(|s| s.enabled)
         .map(|s| build_dns_server(s))
         .collect();
 
-    let rules: Vec<Value> = dns
+    let mut rules: Vec<Value> = dns
         .rules
         .iter()
         .filter(|r| r.enabled)
         .filter_map(|r| build_dns_rule(r))
         .collect();
 
-    let mut section = json!({
+    if force_fake_ip || dns.mode == "fake-ip" {
+        // sing-box 1.12+: fakeip is a DNS server type, not a top-level field
+        servers.push(json!({
+            "type": "fakeip",
+            "tag": "dns-fakeip",
+            "inet4_range": dns.fake_ip_range
+        }));
+        rules.push(json!({
+            "query_type": ["A", "AAAA"],
+            "server": "dns-fakeip"
+        }));
+    }
+
+    json!({
         "final": dns.final_server,
         "servers": servers,
         "rules": rules
-    });
-
-    if force_fake_ip || dns.mode == "fake-ip" {
-        section["fakeip"] = json!({
-            "enabled": true,
-            "inet4_range": dns.fake_ip_range
-        });
-    }
-
-    section
+    })
 }
 
 fn build_dns_server(server: &DnsServerConfig) -> Value {
@@ -399,6 +397,18 @@ fn build_route_rules(
     (route_rules, rule_sets)
 }
 
+fn build_pre_match_route_rules(settings: &AppSettings) -> Vec<Value> {
+    if settings.enhanced_mode {
+        vec![json!({
+            "inbound": ["tun-in"],
+            "action": "resolve",
+            "strategy": "ipv4_only"
+        })]
+    } else {
+        Vec::new()
+    }
+}
+
 fn resolve_outbound(
     outbound: &str,
     outbound_node: &Option<String>,
@@ -453,14 +463,33 @@ mod tests {
             .expect("tun inbound should be present when enhanced mode is enabled");
 
         assert_eq!(tun["tag"], "tun-in");
+        assert_eq!(tun["interface_name"], "");
         assert_eq!(tun["stack"], "mixed");
         assert_eq!(tun["mtu"], 1500);
         assert_eq!(tun["auto_route"], true);
         assert_eq!(tun["strict_route"], true);
-        assert_eq!(tun["inet4_address"][0], "172.19.0.1/30");
-        assert_eq!(tun["domain_strategy"], "ipv4_only");
+        assert_eq!(tun["address"][0], "172.19.0.1/30");
+        assert!(tun.get("domain_strategy").is_none());
         assert_eq!(tun["platform"]["http_proxy"]["enabled"], false);
-        assert_eq!(tun["dns_hijack"][0], "198.18.0.2:53");
+        // dns_hijack removed in sing-box 1.12+
+        assert!(tun.get("dns_hijack").is_none());
+    }
+
+    #[test]
+    fn enhanced_mode_adds_ipv4_resolve_route_action() {
+        let mut settings = AppSettings::default();
+        settings.enhanced_mode = true;
+
+        let config = generate_config(&settings);
+        let rules = config["route"]["rules"]
+            .as_array()
+            .expect("route rules should be present");
+
+        assert!(rules.iter().any(|rule| {
+            rule["inbound"] == json!(["tun-in"])
+                && rule["action"] == "resolve"
+                && rule["strategy"] == "ipv4_only"
+        }));
     }
 
     #[test]
@@ -469,9 +498,21 @@ mod tests {
         dns.mode = "direct".to_string();
 
         let section = build_dns_section(&dns, true);
+        let servers = section["servers"]
+            .as_array()
+            .expect("dns servers should be present");
+        let rules = section["rules"]
+            .as_array()
+            .expect("dns rules should be present");
 
-        assert_eq!(section["fakeip"]["enabled"], true);
-        assert_eq!(section["fakeip"]["inet4_range"], "198.18.0.0/15");
+        assert!(servers.iter().any(|server| {
+            server["type"] == "fakeip"
+                && server["tag"] == "dns-fakeip"
+                && server["inet4_range"] == "198.18.0.0/15"
+        }));
+        assert!(rules
+            .iter()
+            .any(|rule| rule["server"] == "dns-fakeip" && rule["query_type"] == json!(["A", "AAAA"])));
     }
 
     #[test]

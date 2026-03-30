@@ -81,7 +81,15 @@ impl SingboxProcess {
         let spawned_child = match run_mode {
             RunMode::Normal => Some(self.spawn_managed(config_path)?),
             RunMode::Tun => {
-                self.spawn_privileged_tun(config_path).await?;
+                if let Err(error) = self.spawn_privileged_tun(config_path).await {
+                    self.set_runtime(
+                        Some(run_mode),
+                        Some(config_path.to_string()),
+                        Some(error.clone()),
+                    )
+                    .await;
+                    return Err(error);
+                }
                 None
             }
         };
@@ -107,6 +115,11 @@ impl SingboxProcess {
             "sing-box started in {} mode but Clash API not responding after 5s",
             run_mode.as_str()
         );
+        let message = if run_mode == RunMode::Tun {
+            format_tun_start_timeout_message(config_path, &message)
+        } else {
+            message
+        };
         self.set_runtime(
             Some(run_mode),
             Some(config_path.to_string()),
@@ -230,20 +243,18 @@ impl SingboxProcess {
     async fn spawn_privileged_tun(&self, config_path: &str) -> Result<(), String> {
         let script = build_privileged_osascript(&self.singbox_path, config_path);
 
-        let status = Command::new("osascript")
+        let output = Command::new("osascript")
             .arg("-e")
             .arg(script)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::inherit())
-            .status()
+            .output()
             .await
             .map_err(|e| format!("failed to request administrator privileges: {}", e))?;
 
-        if !status.success() {
-            return Err(
-                "administrator privileges were denied or sing-box failed to start in TUN mode"
-                    .to_string(),
-            );
+        if !output.status.success() {
+            return Err(format_privileged_tun_error(
+                &String::from_utf8_lossy(&output.stdout),
+                &String::from_utf8_lossy(&output.stderr),
+            ));
         }
 
         Ok(())
@@ -279,10 +290,18 @@ fn build_privileged_osascript(singbox_path: &str, config_path: &str) -> String {
 }
 
 fn build_tun_run_command(singbox_path: &str, config_path: &str) -> String {
+    let log_path = build_tun_log_path(config_path);
+    let log_dir = std::path::Path::new(&log_path)
+        .parent()
+        .and_then(|path| path.to_str())
+        .unwrap_or("/tmp");
+
     format!(
-        "{} run -c {}",
+        "mkdir -p {} && nohup {} run -c {} > {} 2>&1 &",
+        shell_quote(log_dir),
         shell_quote(singbox_path),
         shell_quote(config_path),
+        shell_quote(&log_path),
     )
 }
 
@@ -294,10 +313,62 @@ fn escape_applescript_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+fn build_tun_log_path(config_path: &str) -> String {
+    let config_path = std::path::Path::new(config_path);
+    let directory = config_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("/tmp"));
+    directory.join("singbox-tun.log").to_string_lossy().to_string()
+}
+
+fn format_privileged_tun_error(stdout: &str, stderr: &str) -> String {
+    let details = [stderr.trim(), stdout.trim()]
+        .into_iter()
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    if details.contains("User canceled") || details.contains("(-128)") {
+        return "administrator privileges were denied for TUN mode".to_string();
+    }
+
+    if details.is_empty() {
+        "sing-box failed to start in TUN mode".to_string()
+    } else {
+        details
+    }
+}
+
+fn format_tun_start_timeout_message(config_path: &str, fallback: &str) -> String {
+    let log_path = build_tun_log_path(config_path);
+    let log_tail = std::fs::read_to_string(&log_path)
+        .ok()
+        .and_then(|content| {
+            let tail = content
+                .lines()
+                .rev()
+                .take(20)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("\n")
+                .trim()
+                .to_string();
+            (!tail.is_empty()).then_some(tail)
+        });
+
+    match log_tail {
+        Some(log_tail) => format!("{fallback}\n{log_tail}"),
+        None => fallback.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        build_privileged_osascript, build_tun_run_command, run_mode_for_settings, RunMode,
+        build_privileged_osascript, build_tun_log_path, build_tun_run_command,
+        format_privileged_tun_error, run_mode_for_settings, RunMode,
     };
     use crate::singbox::storage::AppSettings;
 
@@ -323,7 +394,7 @@ mod tests {
 
         assert_eq!(
             command,
-            "'/Applications/Calamity App/sing-box' run -c '/tmp/calamity config.json'"
+            "mkdir -p '/tmp' && nohup '/Applications/Calamity App/sing-box' run -c '/tmp/calamity config.json' > '/tmp/singbox-tun.log' 2>&1 &"
         );
     }
 
@@ -333,7 +404,32 @@ mod tests {
 
         assert_eq!(
             script,
-            "do shell script \"'/usr/local/bin/sing-box' run -c '/tmp/config.json'\" with administrator privileges"
+            "do shell script \"mkdir -p '/tmp' && nohup '/usr/local/bin/sing-box' run -c '/tmp/config.json' > '/tmp/singbox-tun.log' 2>&1 &\" with administrator privileges"
         );
+    }
+
+    #[test]
+    fn tun_log_path_uses_config_directory() {
+        assert_eq!(
+            build_tun_log_path("/Users/test/Library/Application Support/com.calamity.app/singbox-config.json"),
+            "/Users/test/Library/Application Support/com.calamity.app/singbox-tun.log"
+        );
+    }
+
+    #[test]
+    fn privileged_tun_failure_preserves_singbox_error_output() {
+        let error = format_privileged_tun_error(
+            "",
+            "0:150: execution error: FATAL[0000] create service: initialize inbound[3]: legacy inbound fields are deprecated (-2700)",
+        );
+
+        assert!(error.contains("legacy inbound fields are deprecated"));
+    }
+
+    #[test]
+    fn privileged_tun_failure_maps_user_cancellation_to_admin_denied() {
+        let error = format_privileged_tun_error("", "128: execution error: User canceled. (-128)");
+
+        assert_eq!(error, "administrator privileges were denied for TUN mode");
     }
 }
