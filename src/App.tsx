@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 export default function App() {
   const { t } = useTranslation();
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const subscribeSettingsChanges = useSettingsStore((s) => s.subscribeSettingsChanges);
   const fetchConnectionState = useConnectionStore((s) => s.fetchState);
   const subscribeConnectionStateChanges = useConnectionStore((s) => s.subscribeStateChanges);
 
@@ -26,9 +27,10 @@ export default function App() {
     fetchSettings();
     fetchConnectionState();
 
-    // Listen for sing-box errors
+    // Listen for sing-box errors and settings changes
     let unlisten: (() => void) | null = null;
     const unsubscribeStateChanges = subscribeConnectionStateChanges();
+    const unsubscribeSettings = subscribeSettingsChanges();
     (async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
@@ -40,8 +42,9 @@ export default function App() {
     return () => {
       if (unlisten) unlisten();
       unsubscribeStateChanges();
+      unsubscribeSettings();
     };
-  }, [fetchSettings, fetchConnectionState, subscribeConnectionStateChanges, t]);
+  }, [fetchSettings, subscribeSettingsChanges, fetchConnectionState, subscribeConnectionStateChanges, t]);
 
   return (
     <>

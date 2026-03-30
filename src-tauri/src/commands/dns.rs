@@ -89,14 +89,15 @@ pub async fn delete_dns_rule(app: AppHandle, id: String) -> Result<DnsSettings, 
 async fn restart_singbox(app: &AppHandle) {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let app_settings = storage::load_settings();
-    match process.restart(&app_settings).await {
+    match process.reload(&app_settings).await {
         Ok(()) => {
-            eprintln!("[dns] sing-box restarted successfully");
+            eprintln!("[dns] sing-box reloaded successfully");
             let _ = app.emit("singbox-restarted", ());
         }
         Err(e) => {
-            eprintln!("[dns] sing-box restart failed: {}", e);
+            eprintln!("[dns] sing-box reload failed: {}", e);
             let _ = app.emit("singbox-error", &e);
         }
     }
+    crate::commands::connection::emit_connection_state_changed(app).await;
 }

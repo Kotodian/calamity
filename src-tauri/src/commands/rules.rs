@@ -88,14 +88,15 @@ fn reindex(data: &mut RulesData) {
 async fn reload_singbox(app: &AppHandle) {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let settings = storage::load_settings();
-    match process.restart(&settings).await {
+    match process.reload(&settings).await {
         Ok(()) => {
-            eprintln!("[rules] sing-box restarted successfully");
+            eprintln!("[rules] sing-box reloaded successfully");
             let _ = app.emit("singbox-restarted", ());
         }
         Err(e) => {
-            eprintln!("[rules] sing-box restart failed: {}", e);
+            eprintln!("[rules] sing-box reload failed: {}", e);
             let _ = app.emit("singbox-error", &e);
         }
     }
+    crate::commands::connection::emit_connection_state_changed(app).await;
 }

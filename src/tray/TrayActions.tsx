@@ -21,6 +21,7 @@ export function TrayActions() {
   const status = useConnectionStore((s) => s.status);
   const toggleConnection = useConnectionStore((s) => s.toggleConnection);
   const isConnected = status === "connected";
+  const isDisconnecting = status === "disconnecting";
   const tunEnabled = tunStatus?.targetEnhancedMode ?? settings?.enhancedMode ?? false;
   const [quitting, setQuitting] = useState(false);
 
@@ -83,14 +84,21 @@ export function TrayActions() {
       </button>
       <button
         onClick={toggleConnection}
+        disabled={isDisconnecting}
         className={`flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-xs transition-colors ${
-          isConnected
-            ? "text-destructive hover:bg-destructive/10"
-            : "text-green-600 hover:bg-green-500/10"
+          isDisconnecting
+            ? "text-red-400 opacity-50 cursor-not-allowed"
+            : isConnected
+              ? "text-destructive hover:bg-destructive/10"
+              : "text-green-600 hover:bg-green-500/10"
         }`}
       >
-        <Power className="h-3.5 w-3.5" />
-        {isConnected ? t("common.actions.disconnect") : t("common.actions.connect")}
+        {isDisconnecting ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Power className="h-3.5 w-3.5" />
+        )}
+        {isDisconnecting ? t("common.status.disconnecting") : isConnected ? t("common.actions.disconnect") : t("common.actions.connect")}
       </button>
       <button
         disabled={quitting}

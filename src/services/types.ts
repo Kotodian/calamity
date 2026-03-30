@@ -1,5 +1,5 @@
 // Connection
-export type ConnectionStatus = "connected" | "disconnected" | "connecting";
+export type ConnectionStatus = "connected" | "disconnected" | "connecting" | "disconnecting";
 export type ProxyMode = "rule" | "global" | "direct";
 
 export interface ConnectionState {
@@ -11,6 +11,12 @@ export interface ConnectionState {
   totalUpload: number;
   totalDownload: number;
   latency: number;
+}
+
+export interface ConnectionSnapshot {
+  status: Exclude<ConnectionStatus, "connecting">;
+  mode: ProxyMode;
+  activeNode: string | null;
 }
 
 export interface SpeedRecord {

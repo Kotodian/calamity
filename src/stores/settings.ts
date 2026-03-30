@@ -9,6 +9,7 @@ interface SettingsStore {
   fetchSettings: () => Promise<void>;
   fetchTunStatus: () => Promise<void>;
   updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
+  subscribeSettingsChanges: () => () => void;
   setTheme: (theme: Theme) => void;
 }
 
@@ -60,6 +61,26 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
     await settingsService.updateSettings(updates);
     await get().fetchSettings();
+  },
+  subscribeSettingsChanges() {
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen("settings-changed", async () => {
+          if (!cancelled) {
+            await get().fetchSettings();
+          }
+        });
+      } catch { /* ignore in non-Tauri env */ }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
   },
   setTheme(theme) {
     applyTheme(theme);

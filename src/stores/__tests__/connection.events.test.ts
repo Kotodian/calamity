@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConnectionState } from "@/services/types";
+import type { ConnectionSnapshot, ConnectionState } from "@/services/types";
 
 const mockedState = vi.hoisted(() => ({
   currentState: {
@@ -12,11 +12,11 @@ const mockedState = vi.hoisted(() => ({
     totalDownload: 0,
     latency: 0,
   } as ConnectionState,
-  stateChangeHandler: null as (() => void | Promise<void>) | null,
-  subscribeStateChanges: vi.fn((onChange: () => void | Promise<void>) => {
-    mockedState.stateChangeHandler = onChange;
+  snapshotHandler: null as ((snapshot: ConnectionSnapshot) => void | Promise<void>) | null,
+  subscribeStateChanges: vi.fn((onChange: (snapshot: ConnectionSnapshot) => void | Promise<void>) => {
+    mockedState.snapshotHandler = onChange;
     return () => {
-      mockedState.stateChangeHandler = null;
+      mockedState.snapshotHandler = null;
     };
   }),
 }));
@@ -43,8 +43,12 @@ vi.mock("../../services/connection", () => ({
 import { useConnectionStore } from "../connection";
 
 async function emitStateChange() {
-  if (mockedState.stateChangeHandler) {
-    await mockedState.stateChangeHandler();
+  if (mockedState.snapshotHandler) {
+    await mockedState.snapshotHandler({
+      status: mockedState.currentState.status === "connected" ? "connected" : "disconnected",
+      mode: mockedState.currentState.mode,
+      activeNode: mockedState.currentState.activeNode,
+    });
   }
 }
 
@@ -60,7 +64,7 @@ describe("useConnectionStore event sync", () => {
       totalDownload: 0,
       latency: 0,
     };
-    mockedState.stateChangeHandler = null;
+    mockedState.snapshotHandler = null;
     mockedState.subscribeStateChanges.mockClear();
     useConnectionStore.setState({
       status: "disconnected",
@@ -79,7 +83,7 @@ describe("useConnectionStore event sync", () => {
     });
   });
 
-  it("refreshes connection state when a backend sync event arrives", async () => {
+  it("updates connection state directly from a backend snapshot event", async () => {
     const unsubscribe = useConnectionStore.getState().subscribeStateChanges();
 
     expect(mockedState.subscribeStateChanges).toHaveBeenCalledTimes(1);

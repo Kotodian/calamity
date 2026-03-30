@@ -61,19 +61,30 @@ pub async fn update_settings(
         }
     }
 
-    // Always ensure sing-box is running with latest config
+    // Reload or restart sing-box depending on what changed
     let new_key = restart_key(&settings);
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
-    if old_key != new_key || !process.is_running().await {
+    let is_running = process.is_running().await;
+
+    if !is_running {
+        // Not running — don't auto-start, user clicks connect
+    } else if old_key != new_key {
+        // Critical settings changed (ports, TUN mode, etc.) — must restart
         match process.restart(&settings).await {
-            Ok(()) => {
-                let _ = app.emit("singbox-restarted", ());
-            }
-            Err(e) => {
-                let _ = app.emit("singbox-error", &e);
-            }
+            Ok(()) => { let _ = app.emit("singbox-restarted", ()); }
+            Err(e) => { let _ = app.emit("singbox-error", &e); }
+        }
+    } else {
+        // Non-critical change — hot-reload via SIGHUP
+        match process.reload(&settings).await {
+            Ok(()) => { let _ = app.emit("singbox-restarted", ()); }
+            Err(e) => { let _ = app.emit("singbox-error", &e); }
         }
     }
+
+    // Broadcast settings change to all windows
+    let _ = app.emit("settings-changed", ());
+    crate::commands::connection::emit_connection_state_changed(&app).await;
 
     Ok(settings)
 }
@@ -150,6 +161,10 @@ fn get_active_network_services() -> Vec<String> {
         }
     }
     services
+}
+
+pub fn set_system_proxy_ports(http_port: u16, socks_port: u16) {
+    set_system_proxy(http_port, socks_port);
 }
 
 fn set_system_proxy(http_port: u16, socks_port: u16) {

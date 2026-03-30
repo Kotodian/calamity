@@ -48,6 +48,7 @@ export function DashboardPage() {
   const { groups, fetchGroups } = useNodesStore();
   const { devices, fetchAccount, fetchDevices } = useTailnetStore();
   const [justConnected, setJustConnected] = useState(false);
+  const [justDisconnected, setJustDisconnected] = useState(false);
   const [uptimeStr, setUptimeStr] = useState("0s");
   const prevStatusRef = useRef(status);
 
@@ -90,16 +91,30 @@ export function DashboardPage() {
   }, [startedAt]);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
     if (prevStatusRef.current === "connecting" && status === "connected") {
       setJustConnected(true);
-      const timer = setTimeout(() => setJustConnected(false), 1500);
-      return () => clearTimeout(timer);
+      setJustDisconnected(false);
+      timer = setTimeout(() => setJustConnected(false), 1500);
+    } else if (
+      (prevStatusRef.current === "connected" || prevStatusRef.current === "disconnecting") &&
+      status === "disconnected"
+    ) {
+      setJustDisconnected(true);
+      setJustConnected(false);
+      timer = setTimeout(() => setJustDisconnected(false), 1200);
     }
+
     prevStatusRef.current = status;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [status]);
 
   const isConnected = status === "connected";
   const isConnecting = status === "connecting";
+  const isDisconnecting = status === "disconnecting";
   const activeNodeObj = groups.flatMap((g) => g.nodes).find((n) => n.active);
   const exitNode = devices.find((d) => d.isCurrentExitNode);
 
@@ -122,32 +137,51 @@ export function DashboardPage() {
           <div className={cn(
             "absolute inset-[-20px] rounded-full border transition-all duration-1000",
             isConnected ? "border-primary/20" : "border-white/[0.04]",
-            isConnecting && "animate-spin border-yellow-500/30"
+            isConnecting && "animate-spin border-yellow-500/30",
+            isDisconnecting && "animate-spin border-red-500/25",
+            justDisconnected && "animate-power-ring-disconnect border-primary/30"
           )} style={{ animationDuration: "3s" }} />
           <div className={cn(
             "absolute inset-[-10px] rounded-full border transition-all duration-700",
             isConnected ? "border-primary/30" : "border-white/[0.06]",
-            isConnecting && "animate-spin border-yellow-500/20"
+            isConnecting && "animate-spin border-yellow-500/20",
+            isDisconnecting && "animate-spin border-red-500/15",
+            justDisconnected && "animate-power-ring-disconnect-delayed border-primary/40"
           )} style={{ animationDuration: "2s", animationDirection: "reverse" }} />
           {justConnected && (
             <div className="absolute inset-[-30px] rounded-full bg-primary/20 animate-glow-expand" />
           )}
+          {justDisconnected && (
+            <>
+              <div className="absolute inset-[-24px] rounded-full border border-primary/35 animate-power-shockwave" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-b from-background/10 via-background/35 to-background/70 animate-power-core-cooldown" />
+            </>
+          )}
           <button
+            data-testid="dashboard-power-button"
             onClick={toggleConnection}
+            disabled={isDisconnecting}
             className={cn(
               "relative z-10 h-28 w-28 rounded-full flex items-center justify-center transition-all duration-500",
               isConnected && "bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-[0_0_40px_rgba(254,151,185,0.2)] animate-power-ring",
               isConnecting && "bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 text-yellow-400 animate-power-connecting",
-              !isConnected && !isConnecting && "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:scale-105 active:scale-95",
+              isDisconnecting && "bg-gradient-to-br from-red-500/15 to-red-500/5 text-red-400 animate-power-connecting cursor-not-allowed",
+              justDisconnected && "animate-power-disconnecting bg-gradient-to-br from-slate-400/10 to-background/10 text-muted-foreground shadow-[0_0_28px_rgba(148,163,184,0.12)]",
+              !isConnected && !isConnecting && !isDisconnecting && "bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:scale-105 active:scale-95",
             )}
           >
             <Power className={cn(
               "h-10 w-10 transition-all duration-700",
-              isConnecting && "rotate-180 scale-90"
+              isConnecting && "rotate-180 scale-90",
+              isDisconnecting && "rotate-180 scale-90",
+              justDisconnected && "animate-power-icon-disconnecting"
             )} />
-            {isConnecting && (
+            {(isConnecting || isDisconnecting) && (
               <div className="absolute inset-0 rounded-full overflow-hidden">
-                <div className="absolute inset-x-0 h-1/3 bg-gradient-to-b from-yellow-400/25 to-transparent animate-scan-line" />
+                <div className={cn(
+                  "absolute inset-x-0 h-1/3 bg-gradient-to-b to-transparent animate-scan-line",
+                  isConnecting ? "from-yellow-400/25" : "from-red-400/25"
+                )} />
               </div>
             )}
           </button>
@@ -169,8 +203,15 @@ export function DashboardPage() {
               {t("common.status.connecting")}
             </p>
           )}
-          {!isConnected && !isConnecting && (
-            <p className="text-sm text-muted-foreground">{t("dashboard.tapToConnect")}</p>
+          {isDisconnecting && (
+            <p className="text-sm font-medium text-red-400 animate-pulse tracking-wider uppercase">
+              {t("common.status.disconnecting")}
+            </p>
+          )}
+          {!isConnected && !isConnecting && !isDisconnecting && (
+            <p className={cn("text-sm text-muted-foreground", justDisconnected && "animate-power-status-disconnecting")}>
+              {t("dashboard.tapToConnect")}
+            </p>
           )}
         </div>
 

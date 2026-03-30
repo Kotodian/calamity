@@ -60,7 +60,10 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   },
 
   async disconnect() {
-    await connectionService.disconnect();
+    set({ status: "disconnecting" });
+    try {
+      await connectionService.disconnect();
+    } catch { /* ignore */ }
     set({
       status: "disconnected",
       activeNode: null,
@@ -70,7 +73,9 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   },
 
   async toggleConnection() {
-    if (get().status === "connected") {
+    const s = get().status;
+    if (s === "connecting" || s === "disconnecting") return;
+    if (s === "connected") {
       await get().disconnect();
     } else {
       await get().connect();
@@ -82,8 +87,6 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     try {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("update_settings", { updates: { proxyMode: mode } });
-      const { emit } = await import("@tauri-apps/api/event");
-      await emit("proxy-mode-changed", mode);
     } catch { /* ignore in non-Tauri env */ }
   },
 
@@ -129,14 +132,13 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   },
 
   subscribeStateChanges() {
-    return connectionService.subscribeStateChanges(
-      async () => {
-        await get().fetchState();
-      },
-      (mode) => {
-        set({ mode: mode as ProxyMode });
-      }
-    );
+    return connectionService.subscribeStateChanges((snapshot) => {
+      set({
+        status: snapshot.status,
+        mode: snapshot.mode,
+        activeNode: snapshot.activeNode,
+      });
+    });
   },
 
   async fetchDashboardInfo() {

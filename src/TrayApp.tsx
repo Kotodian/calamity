@@ -13,6 +13,7 @@ export function TrayApp() {
   const mode = useConnectionStore((s) => s.mode);
   const fetchState = useConnectionStore((s) => s.fetchState);
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const subscribeSettingsChanges = useSettingsStore((s) => s.subscribeSettingsChanges);
   const subscribeTraffic = useConnectionStore((s) => s.subscribeTraffic);
   const subscribeStateChanges = useConnectionStore((s) => s.subscribeStateChanges);
   const fetchDashboardInfo = useConnectionStore((s) => s.fetchDashboardInfo);
@@ -23,11 +24,13 @@ export function TrayApp() {
     fetchDashboardInfo();
     const unsubTraffic = subscribeTraffic();
     const unsubStateChanges = subscribeStateChanges();
+    const unsubSettings = subscribeSettingsChanges();
     return () => {
       unsubTraffic();
       unsubStateChanges();
+      unsubSettings();
     };
-  }, [fetchState, fetchSettings, subscribeTraffic, subscribeStateChanges, fetchDashboardInfo]);
+  }, [fetchState, fetchSettings, subscribeTraffic, subscribeStateChanges, subscribeSettingsChanges, fetchDashboardInfo]);
 
   return (
     <div className="p-2">

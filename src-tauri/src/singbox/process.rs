@@ -130,14 +130,17 @@ impl SingboxProcess {
     }
 
     pub async fn stop(&self) -> Result<(), String> {
+        let pre_stop_api_healthy = self.api.health_check().await.unwrap_or(false);
+        let runtime = self.runtime.lock().await.clone();
         let mut guard = self.child.lock().await;
+        let had_managed_child = guard.is_some();
         if let Some(ref mut child) = *guard {
             child.kill().await.map_err(|e| e.to_string())?;
             child.wait().await.map_err(|e| e.to_string())?;
         }
         *guard = None;
+        drop(guard);
 
-        let runtime = self.runtime.lock().await.clone();
         if runtime.mode == Some(RunMode::Tun) {
             if let Some(config_path) = runtime.config_path.as_deref() {
                 self.stop_privileged_tun(config_path).await?;
@@ -147,6 +150,7 @@ impl SingboxProcess {
         if runtime.mode == Some(RunMode::Tun) || self.api.health_check().await.unwrap_or(false) {
             let pattern = runtime
                 .config_path
+                .clone()
                 .unwrap_or_else(|| "sing-box run".to_string());
             // TUN processes run as root, need sudo to kill
             let _ = std::process::Command::new("sudo")
@@ -155,6 +159,22 @@ impl SingboxProcess {
             let _ = std::process::Command::new("pkill")
                 .args(["-9", "-f", &pattern])
                 .output();
+        }
+
+        let should_confirm_shutdown =
+            had_managed_child || runtime.mode.is_some() || pre_stop_api_healthy;
+        if should_confirm_shutdown
+            && !wait_for_condition(
+                || async { !self.api.health_check().await.unwrap_or(false) },
+                20,
+                tokio::time::Duration::from_millis(100),
+            )
+            .await
+        {
+            let message = "sing-box stop timed out: Clash API still responding after 2s".to_string();
+            self.set_runtime(runtime.mode, runtime.config_path.clone(), Some(message.clone()))
+                .await;
+            return Err(message);
         }
 
         self.set_runtime(None, None, None).await;
@@ -195,41 +215,65 @@ impl SingboxProcess {
     }
 
     /// Hot-reload config by writing new config and sending SIGHUP to sing-box process.
-    /// Falls back to full restart if SIGHUP fails or no managed child exists.
+    /// Works for both managed (normal) and privileged (TUN) processes.
     pub async fn reload(&self, settings: &AppSettings) -> Result<(), String> {
-        if settings.enhanced_mode {
-            return self.restart(settings).await;
+        // If sing-box isn't running, nothing to reload
+        if !self.is_running().await {
+            return Ok(());
         }
 
         config::write_config(settings)?;
 
+        // Try managed child first
         let guard = self.child.lock().await;
         if let Some(ref child) = *guard {
             if let Some(pid) = child.id() {
-                #[cfg(unix)]
-                {
-                    let ret = unsafe { libc::kill(pid as i32, libc::SIGHUP) };
-                    if ret == 0 {
-                        eprintln!("[singbox] sent SIGHUP to pid {}", pid);
-                        drop(guard);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                        return Ok(());
-                    }
-                    eprintln!(
-                        "[singbox] SIGHUP failed (ret={}), falling back to restart",
-                        ret
-                    );
-                }
-                #[cfg(not(unix))]
-                {
-                    eprintln!(
-                        "[singbox] SIGHUP not supported on this platform, falling back to restart"
-                    );
-                }
+                drop(guard);
+                return self.send_sighup(pid as i32, false);
             }
         }
         drop(guard);
-        self.restart(settings).await
+
+        // Try TUN process via PID file
+        let runtime = self.runtime.lock().await.clone();
+        if runtime.mode == Some(RunMode::Tun) {
+            if let Some(config_path) = runtime.config_path.as_deref() {
+                let pid_path = build_tun_pid_path(config_path);
+                if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
+                    if let Ok(pid) = pid_str.trim().parse::<i32>() {
+                        return self.send_sighup(pid, true);
+                    }
+                }
+            }
+        }
+
+        eprintln!("[singbox] no process found to reload");
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    fn send_sighup(&self, pid: i32, use_sudo: bool) -> Result<(), String> {
+        let ret = if use_sudo {
+            std::process::Command::new("sudo")
+                .args(["-n", "kill", "-HUP", &pid.to_string()])
+                .output()
+                .map(|o| if o.status.success() { 0 } else { -1 })
+                .unwrap_or(-1)
+        } else {
+            unsafe { libc::kill(pid, libc::SIGHUP) }
+        };
+
+        if ret != 0 {
+            return Err(format!("SIGHUP failed for pid {}", pid));
+        }
+
+        eprintln!("[singbox] sent SIGHUP to pid {}{}", pid, if use_sudo { " (sudo)" } else { "" });
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn send_sighup(&self, _pid: i32, _use_sudo: bool) -> Result<(), String> {
+        Err("SIGHUP not supported on this platform".to_string())
     }
 
     pub async fn is_running(&self) -> bool {
@@ -378,6 +422,28 @@ fn run_mode_for_settings(settings: &AppSettings) -> RunMode {
     } else {
         RunMode::Normal
     }
+}
+
+async fn wait_for_condition<F, Fut>(
+    mut predicate: F,
+    attempts: usize,
+    interval: tokio::time::Duration,
+) -> bool
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for attempt in 0..attempts {
+        if predicate().await {
+            return true;
+        }
+
+        if attempt + 1 < attempts {
+            tokio::time::sleep(interval).await;
+        }
+    }
+
+    false
 }
 
 fn build_privileged_cleanup_osascript(config_path: &str) -> String {
@@ -710,5 +776,34 @@ mod tests {
         let error = format_privileged_tun_error("", "128: execution error: User canceled. (-128)");
 
         assert_eq!(error, "administrator privileges were denied for TUN mode");
+    }
+
+    #[test]
+    fn wait_for_condition_succeeds_when_predicate_eventually_matches() {
+        let attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let attempts_for_check = attempts.clone();
+
+        let matched = tauri::async_runtime::block_on(super::wait_for_condition(
+            move || {
+                let attempts_for_check = attempts_for_check.clone();
+                async move { attempts_for_check.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= 2 }
+            },
+            5,
+            std::time::Duration::from_millis(0),
+        ));
+
+        assert!(matched);
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn wait_for_condition_returns_false_after_timeout() {
+        let matched = tauri::async_runtime::block_on(super::wait_for_condition(
+            || async { false },
+            3,
+            std::time::Duration::from_millis(0),
+        ));
+
+        assert!(!matched);
     }
 }

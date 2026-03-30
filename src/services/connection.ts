@@ -1,4 +1,4 @@
-import type { ConnectionState, ProxyMode } from "./types";
+import type { ConnectionSnapshot, ConnectionState, ProxyMode } from "./types";
 
 export interface DashboardInfo {
   running: boolean;
@@ -15,8 +15,20 @@ export interface ConnectionService {
   disconnect(): Promise<void>;
   setMode(mode: ProxyMode): Promise<void>;
   subscribeTraffic(onUpdate: (up: number, down: number) => void): () => void;
-  subscribeStateChanges(onChange: () => void | Promise<void>, onModeChange?: (mode: string) => void): () => void;
+  subscribeStateChanges(onChange: (snapshot: ConnectionSnapshot) => void | Promise<void>): () => void;
   getDashboardInfo(): Promise<DashboardInfo>;
+}
+
+export function buildConnectionSnapshot(input: {
+  running: boolean;
+  activeNode: string | null;
+  proxyMode?: string | null;
+}): ConnectionSnapshot {
+  return {
+    status: input.running ? "connected" : "disconnected",
+    mode: (input.proxyMode || "rule") as ProxyMode,
+    activeNode: input.activeNode,
+  };
 }
 
 function createTauriConnectionService(): ConnectionService {
@@ -28,12 +40,16 @@ function createTauriConnectionService(): ConnectionService {
         invoke<{ activeNode: string | null }>("get_nodes"),
         invoke<{ proxyMode?: string }>("get_settings"),
       ]);
-      const isConnected = status.running && !!nodesData.activeNode;
+      const snapshot = buildConnectionSnapshot({
+        running: status.running,
+        activeNode: nodesData.activeNode,
+        proxyMode: settings.proxyMode,
+      });
 
       return {
-        status: isConnected ? "connected" : "disconnected",
-        mode: (settings.proxyMode || "rule") as ProxyMode,
-        activeNode: nodesData.activeNode,
+        status: snapshot.status,
+        mode: snapshot.mode,
+        activeNode: snapshot.activeNode,
         uploadSpeed: 0,
         downloadSpeed: 0,
         totalUpload: 0,
@@ -49,7 +65,7 @@ function createTauriConnectionService(): ConnectionService {
 
     async disconnect() {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("disconnect_node");
+      await invoke("singbox_stop");
     },
 
     async setMode() {
@@ -83,28 +99,16 @@ function createTauriConnectionService(): ConnectionService {
       };
     },
 
-    subscribeStateChanges(onChange, onModeChange) {
+    subscribeStateChanges(onChange) {
       let unlistenConnectionState: (() => void) | null = null;
-      let unlistenRestarted: (() => void) | null = null;
-      let unlistenMode: (() => void) | null = null;
       let cancelled = false;
 
       (async () => {
         try {
           const { listen } = await import("@tauri-apps/api/event");
-          unlistenConnectionState = await listen("connection-state-changed", async () => {
+          unlistenConnectionState = await listen<ConnectionSnapshot>("connection-state-changed", async (event) => {
             if (!cancelled) {
-              await onChange();
-            }
-          });
-          unlistenRestarted = await listen("singbox-restarted", async () => {
-            if (!cancelled) {
-              await onChange();
-            }
-          });
-          unlistenMode = await listen<string>("proxy-mode-changed", (event) => {
-            if (!cancelled && onModeChange) {
-              onModeChange(event.payload);
+              await onChange(event.payload);
             }
           });
         } catch (e) {
@@ -115,8 +119,6 @@ function createTauriConnectionService(): ConnectionService {
       return () => {
         cancelled = true;
         if (unlistenConnectionState) unlistenConnectionState();
-        if (unlistenRestarted) unlistenRestarted();
-        if (unlistenMode) unlistenMode();
       };
     },
 

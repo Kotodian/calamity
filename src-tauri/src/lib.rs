@@ -86,6 +86,28 @@ pub fn run() {
                 }
             });
 
+            let app_handle_watchdog = app.handle().clone();
+            let process_watchdog = process.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut previous_running = Some(process_watchdog.is_running().await);
+
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+                    let current_running = process_watchdog.is_running().await;
+                    if crate::commands::connection::should_emit_connection_state_changed(
+                        previous_running,
+                        current_running,
+                    ) {
+                        crate::commands::connection::emit_connection_state_changed(
+                            &app_handle_watchdog,
+                        )
+                        .await;
+                    }
+                    previous_running = Some(current_running);
+                }
+            });
+
             // Tray icon setup
             let icon = Image::from_bytes(include_bytes!("../icons/icon.png"))
                 .expect("failed to load tray icon");

@@ -177,15 +177,15 @@ pub async fn test_group_latency(
 async fn restart_singbox(app: &AppHandle) {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let settings = storage::load_settings();
-    match process.restart(&settings).await {
+    match process.reload(&settings).await {
         Ok(()) => {
-            eprintln!("[nodes] sing-box restarted successfully");
+            eprintln!("[nodes] sing-box reloaded successfully");
             let _ = app.emit("singbox-restarted", ());
         }
         Err(e) => {
-            eprintln!("[nodes] sing-box restart failed: {}", e);
+            eprintln!("[nodes] sing-box reload failed: {}", e);
             let _ = app.emit("singbox-error", &e);
         }
     }
-    crate::commands::connection::emit_connection_state_changed(app);
+    crate::commands::connection::emit_connection_state_changed(app).await;
 }

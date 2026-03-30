@@ -36,7 +36,12 @@ describe("useConnectionStore", () => {
   });
 
   it("disconnect resets speed values", async () => {
-    useConnectionStore.setState({ uploadSpeed: 1000, downloadSpeed: 2000, status: "connected" });
+    useConnectionStore.setState({
+      uploadSpeed: 1000,
+      downloadSpeed: 2000,
+      status: "connected",
+      activeNode: "US-West",
+    });
     await useConnectionStore.getState().disconnect();
     const state = useConnectionStore.getState();
     expect(state.status).toBe("disconnected");

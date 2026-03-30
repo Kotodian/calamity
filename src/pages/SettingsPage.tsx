@@ -34,13 +34,23 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (tunEnabled) {
+      let cancelled = false;
       (async () => {
         try {
           const { invoke } = await import("@tauri-apps/api/core");
           const ok = await invoke<boolean>("check_tun_sudoers");
-          setSudoersInstalled(ok);
-        } catch { setSudoersInstalled(false); }
+          if (!cancelled) {
+            setSudoersInstalled(ok);
+          }
+        } catch {
+          if (!cancelled) {
+            setSudoersInstalled(false);
+          }
+        }
       })();
+      return () => {
+        cancelled = true;
+      };
     }
   }, [tunEnabled]);
 
