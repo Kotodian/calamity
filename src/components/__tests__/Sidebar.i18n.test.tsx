@@ -15,7 +15,7 @@ describe("Sidebar", () => {
     render(
       <I18nextProvider i18n={i18n}>
         <MemoryRouter>
-          <Sidebar />
+          <Sidebar collapsed={false} onToggle={() => {}} />
         </MemoryRouter>
       </I18nextProvider>
     );

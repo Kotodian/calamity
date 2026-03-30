@@ -96,6 +96,8 @@ export const resources = {
         tailnet: "Tailnet",
         dns: "DNS",
         settings: "Settings",
+        collapse: "Collapse sidebar",
+        expand: "Expand sidebar",
       },
       tray: {
         proxyMode: "Proxy Mode",
@@ -364,6 +366,8 @@ export const resources = {
         tailnet: "Tailnet",
         dns: "DNS",
         settings: "设置",
+        collapse: "收起侧边栏",
+        expand: "展开侧边栏",
       },
       tray: {
         proxyMode: "代理模式",
