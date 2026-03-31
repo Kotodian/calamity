@@ -411,6 +411,15 @@ fn build_pre_match_route_rules(settings: &AppSettings) -> Vec<Value> {
             "strategy": "ipv4_only"
         }));
     }
+    // Route tailscale peer traffic through the tailscale endpoint
+    let ts_settings = super::tailscale_storage::load_tailscale_settings();
+    if ts_settings.enabled {
+        rules.push(json!({
+            "ip_cidr": ["100.64.0.0/10"],
+            "action": "route",
+            "outbound": "tailscale-ep"
+        }));
+    }
     // Private/LAN traffic bypasses proxy
     rules.push(json!({
         "ip_is_private": true,

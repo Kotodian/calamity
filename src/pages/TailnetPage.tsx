@@ -6,7 +6,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { useTailnetStore } from "@/stores/tailnet";
 import { cn } from "@/lib/utils";
 import { tailnetService } from "@/services/tailnet";
@@ -105,10 +104,10 @@ export function TailnetPage() {
   }, [settings]);
 
   useEffect(() => {
-    if (settings?.enabled && settings.oauthClientId) {
+    if (settings?.oauthClientId && settings?.oauthClientSecret) {
       fetchDevices();
     }
-  }, [settings?.enabled, settings?.oauthClientId, fetchDevices]);
+  }, [settings?.oauthClientId, settings?.oauthClientSecret, fetchDevices]);
 
   const hasOAuth = !!(settings?.oauthClientId && settings?.oauthClientSecret);
   const onlineCount = devices.filter(d => d.status === "online").length;
@@ -129,19 +128,16 @@ export function TailnetPage() {
 
   async function handleSave() {
     if (!settings) return;
+    const enabled = !!(oauthId && oauthSecret);
     await saveSettings({
       ...settings,
+      enabled,
       oauthClientId: oauthId,
       oauthClientSecret: oauthSecret,
       authKey,
       hostname,
     });
     toast.success(t("tailnet.saved"));
-  }
-
-  async function handleToggle(enabled: boolean) {
-    if (!settings) return;
-    await saveSettings({ ...settings, enabled });
   }
 
   async function handleSetExitNode(name: string) {
@@ -158,12 +154,6 @@ export function TailnetPage() {
         <div>
           <h1 className="text-xl font-semibold">{t("tailnet.title")}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{t("tailnet.subtitle")}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">
-            {settings.enabled ? t("tailnet.enabled") : t("tailnet.disabled")}
-          </span>
-          <Switch checked={settings.enabled} onCheckedChange={handleToggle} />
         </div>
       </div>
 
@@ -211,7 +201,7 @@ export function TailnetPage() {
       </div>
 
       {/* Exit Node */}
-      {settings.enabled && (
+      {hasOAuth && (
         <div className="rounded-xl border border-primary/20 bg-primary/[0.04] backdrop-blur-xl p-4 animate-slide-up shadow-[0_0_25px_rgba(254,151,185,0.06)]" style={{ animationDelay: "160ms" }}>
           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">{t("tailnet.exitNode")}</p>
           {currentExitName ? (
@@ -274,7 +264,7 @@ export function TailnetPage() {
         </>
       )}
 
-      {settings.enabled && !hasOAuth && (
+      {!hasOAuth && (
         <p className="text-xs text-muted-foreground text-center py-4">{t("tailnet.noOAuth")}</p>
       )}
     </div>
