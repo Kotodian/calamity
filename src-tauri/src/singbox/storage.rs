@@ -13,6 +13,10 @@ pub fn singbox_config_path() -> PathBuf {
     app_data_dir().join("singbox-config.json")
 }
 
+pub fn singbox_config_dir() -> PathBuf {
+    app_data_dir().join("singbox-config.d")
+}
+
 pub fn read_json<T: DeserializeOwned + Default>(filename: &str) -> T {
     let path = app_data_dir().join(filename);
     match fs::read_to_string(&path) {

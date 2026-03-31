@@ -200,10 +200,6 @@ impl SingboxProcess {
             let _ = std::fs::remove_file(&pid_path);
         }
 
-        // Kill any remaining sing-box processes (needs sudo for root processes)
-        let _ = std::process::Command::new("sudo")
-            .args(["-n", "pkill", "-9", "-f", "sing-box run"])
-            .output();
         // Also try unprivileged pkill for non-TUN managed child
         let _ = std::process::Command::new("pkill")
             .args(["-9", "-f", "sing-box run"])
@@ -308,7 +304,7 @@ impl SingboxProcess {
     fn spawn_managed(&self, config_path: &str) -> Result<Child, String> {
         let child = Command::new(&self.singbox_path)
             .arg("run")
-            .arg("-c")
+            .arg("-C")
             .arg(config_path)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::inherit())
@@ -330,7 +326,7 @@ impl SingboxProcess {
         let pid_path = build_tun_pid_path(config_path);
         let log_file = std::fs::File::create(&log_path).ok();
         let sudo_result = Command::new("sudo")
-            .args(["-n", &self.singbox_path, "run", "-c", config_path])
+            .args(["-n", &self.singbox_path, "run", "-C", config_path])
             .stdout(log_file.map_or(std::process::Stdio::null(), |f| f.into()))
             .stderr(std::process::Stdio::null())
             .spawn();
@@ -476,7 +472,7 @@ fn build_tun_run_command(singbox_path: &str, config_path: &str) -> String {
         .unwrap_or("/tmp");
 
     format!(
-        "mkdir -p {} && {} run -c {} > {} 2>&1 & echo $! > {}",
+        "mkdir -p {} && {} run -C {} > {} 2>&1 & echo $! > {}",
         shell_quote(log_dir),
         shell_quote(singbox_path),
         shell_quote(config_path),
@@ -681,18 +677,23 @@ fn escape_applescript_string(value: &str) -> String {
 }
 
 fn build_tun_log_path(config_path: &str) -> String {
-    let config_path = std::path::Path::new(config_path);
-    let directory = config_path
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("/tmp"));
+    let path = std::path::Path::new(config_path);
+    // config_path is now a directory (sing-box -C), use its parent for log/pid
+    let directory = if path.is_dir() || path.extension().is_none() {
+        path.parent().unwrap_or(path)
+    } else {
+        path.parent().unwrap_or_else(|| std::path::Path::new("/tmp"))
+    };
     directory.join("singbox-tun.log").to_string_lossy().to_string()
 }
 
 fn build_tun_pid_path(config_path: &str) -> String {
-    let config_path = std::path::Path::new(config_path);
-    let directory = config_path
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("/tmp"));
+    let path = std::path::Path::new(config_path);
+    let directory = if path.is_dir() || path.extension().is_none() {
+        path.parent().unwrap_or(path)
+    } else {
+        path.parent().unwrap_or_else(|| std::path::Path::new("/tmp"))
+    };
     directory.join("singbox-tun.pid").to_string_lossy().to_string()
 }
 
@@ -770,7 +771,7 @@ mod tests {
 
         assert_eq!(
             command,
-            "mkdir -p '/tmp' && '/Applications/Calamity App/sing-box' run -c '/tmp/calamity config.json' > '/tmp/singbox-tun.log' 2>&1 & echo $! > '/tmp/singbox-tun.pid'"
+            "mkdir -p '/tmp' && '/Applications/Calamity App/sing-box' run -C '/tmp/calamity config.json' > '/tmp/singbox-tun.log' 2>&1 & echo $! > '/tmp/singbox-tun.pid'"
         );
     }
 
@@ -781,7 +782,7 @@ mod tests {
 
         assert_eq!(
             script,
-            "do shell script \"mkdir -p '/tmp' && '/usr/local/bin/sing-box' run -c '/tmp/config.json' > '/tmp/singbox-tun.log' 2>&1 & echo $! > '/tmp/singbox-tun.pid'\" with administrator privileges"
+            "do shell script \"mkdir -p '/tmp' && '/usr/local/bin/sing-box' run -C '/tmp/config.json' > '/tmp/singbox-tun.log' 2>&1 & echo $! > '/tmp/singbox-tun.pid'\" with administrator privileges"
         );
     }
 

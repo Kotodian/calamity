@@ -83,14 +83,26 @@ fn clash_tls_config(proxy: &Value) -> Value {
         .map(|seq| seq.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
         .unwrap_or_default();
 
+    // Clash uses "reality-opts" with "public-key" and "short-id"
+    let reality_opts = proxy.get("reality-opts");
+    let is_reality = reality_opts.is_some();
+    let reality_public_key = reality_opts
+        .and_then(|r| r.get("public-key"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let reality_short_id = reality_opts
+        .and_then(|r| r.get("short-id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
     json!({
-        "enabled": tls_enabled,
+        "enabled": tls_enabled || is_reality,
         "sni": sni,
         "alpn": alpn,
         "insecure": insecure,
-        "reality": false,
-        "realityPublicKey": "",
-        "realityShortId": "",
+        "reality": is_reality,
+        "realityPublicKey": reality_public_key,
+        "realityShortId": reality_short_id,
     })
 }
 
@@ -305,6 +317,33 @@ proxies:
         assert_eq!(cfg["uuid"], "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         assert_eq!(cfg["tls"]["enabled"], true);
         assert_eq!(cfg["transport"]["type"], "ws");
+    }
+
+    #[test]
+    fn parse_clash_vless_reality_node() {
+        let yaml = r#"
+proxies:
+  - name: "UK Reality"
+    type: vless
+    server: 23.249.19.42
+    port: 29443
+    uuid: "70edd6a6-a7a1-35d8-92d0-baee7646f940"
+    flow: xtls-rprx-vision
+    tls: true
+    servername: gateway.icloud.com
+    client-fingerprint: random
+    reality-opts:
+      public-key: r7Y4Yuz27lReHIk3rOh3hjmLh7vYZA-DuaP8TRvJEB0
+      short-id: 9dbff664bba71287
+"#;
+        let result = parse_clash_yaml(yaml).unwrap();
+        assert_eq!(result.nodes.len(), 1);
+        let cfg = result.nodes[0].protocol_config.as_ref().unwrap();
+        assert_eq!(cfg["tls"]["reality"], true);
+        assert_eq!(cfg["tls"]["enabled"], true);
+        assert_eq!(cfg["tls"]["realityPublicKey"], "r7Y4Yuz27lReHIk3rOh3hjmLh7vYZA-DuaP8TRvJEB0");
+        assert_eq!(cfg["tls"]["realityShortId"], "9dbff664bba71287");
+        assert_eq!(cfg["tls"]["sni"], "gateway.icloud.com");
     }
 
     #[test]

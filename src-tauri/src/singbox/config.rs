@@ -478,12 +478,56 @@ fn resolve_outbound(
     }
 }
 
+/// Write sing-box config as split files in a config directory.
+/// Returns the path to the config directory (for use with `sing-box run -C`).
 pub fn write_config(settings: &AppSettings) -> Result<String, String> {
     let config = generate_config(settings);
-    let path = storage::singbox_config_path();
-    let content = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
-    std::fs::write(&path, content).map_err(|e| e.to_string())?;
-    Ok(path.to_string_lossy().to_string())
+    let config_dir = storage::singbox_config_dir();
+    std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+
+    // Clean old files
+    if let Ok(entries) = std::fs::read_dir(&config_dir) {
+        for entry in entries.flatten() {
+            if entry.path().extension().is_some_and(|e| e == "json") {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    // 01 - log + experimental (clash api)
+    let base = json!({
+        "log": config["log"],
+        "experimental": config["experimental"],
+    });
+    write_split_file(&config_dir, "01-base.json", &base)?;
+
+    // 02 - dns
+    let dns = json!({ "dns": config["dns"] });
+    write_split_file(&config_dir, "02-dns.json", &dns)?;
+
+    // 03 - inbounds
+    let inbounds = json!({ "inbounds": config["inbounds"] });
+    write_split_file(&config_dir, "03-inbounds.json", &inbounds)?;
+
+    // 04 - outbounds
+    let outbounds = json!({ "outbounds": config["outbounds"] });
+    write_split_file(&config_dir, "04-outbounds.json", &outbounds)?;
+
+    // 05 - route (may be large due to rules)
+    let route = json!({ "route": config["route"] });
+    write_split_file(&config_dir, "05-route.json", &route)?;
+
+    Ok(config_dir.to_string_lossy().to_string())
+}
+
+fn write_split_file(
+    dir: &std::path::Path,
+    filename: &str,
+    value: &serde_json::Value,
+) -> Result<(), String> {
+    let path = dir.join(filename);
+    let content = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
