@@ -151,34 +151,35 @@ impl SingboxProcess {
             }
         }
 
+        // If still alive, try killing via PID file (uses /bin/kill which is in sudoers)
         if runtime.mode == Some(RunMode::Tun) || self.api.health_check().await.unwrap_or(false) {
-            let pattern = runtime
-                .config_path
-                .clone()
-                .unwrap_or_else(|| "sing-box run".to_string());
-            // TUN processes run as root, need sudo to kill
-            let _ = std::process::Command::new("sudo")
-                .args(["-n", "pkill", "-9", "-f", &pattern])
-                .output();
+            if let Some(config_path) = runtime.config_path.as_deref() {
+                let pid_path = build_tun_pid_path(config_path);
+                if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
+                    if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                        let _ = terminate_pid_with_sudo(pid).await;
+                        let _ = std::fs::remove_file(&pid_path);
+                    }
+                }
+            }
+            // Unprivileged fallback for non-TUN processes
             let _ = std::process::Command::new("pkill")
-                .args(["-9", "-f", &pattern])
+                .args(["-9", "-f", "sing-box run"])
                 .output();
         }
 
         let should_confirm_shutdown =
             had_managed_child || runtime.mode.is_some() || pre_stop_api_healthy;
-        if should_confirm_shutdown
-            && !wait_for_condition(
+        if should_confirm_shutdown {
+            let stopped = wait_for_condition(
                 || async { !self.api.health_check().await.unwrap_or(false) },
-                20,
+                50,
                 tokio::time::Duration::from_millis(100),
             )
-            .await
-        {
-            let message = "sing-box stop timed out: Clash API still responding after 2s".to_string();
-            self.set_runtime(runtime.mode, runtime.config_path.clone(), Some(message.clone()))
-                .await;
-            return Err(message);
+            .await;
+            if !stopped {
+                eprintln!("[singbox] stop timed out: Clash API still responding after 5s");
+            }
         }
 
         self.set_runtime(None, None, None).await;
