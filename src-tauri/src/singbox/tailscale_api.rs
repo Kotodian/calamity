@@ -41,10 +41,15 @@ struct ApiDevice {
     os: String,
     #[serde(default)]
     last_seen: String,
-    #[serde(default)]
-    online: bool,
-    #[serde(rename = "allowedIPs", default)]
-    allowed_ips: Vec<String>,
+    /// API uses connectedToControl, not "online"
+    #[serde(default, rename = "connectedToControl")]
+    connected_to_control: bool,
+    /// Advertised routes — only present on nodes advertising exit node
+    #[serde(default, rename = "advertisedRoutes")]
+    advertised_routes: Vec<String>,
+    /// Whether this device is an approved exit node in the admin panel
+    #[serde(default, rename = "enabledRoutes")]
+    enabled_routes: Vec<String>,
 }
 
 /// Check if the cached OAuth token is still valid.
@@ -110,10 +115,13 @@ pub async fn get_oauth_token(settings: &mut TailscaleSettings) -> Result<String,
 /// Map API device response to our TailscaleDevice type.
 fn map_api_device(device: ApiDevice, our_hostname: &str) -> TailscaleDevice {
     let ip = device.addresses.first().cloned().unwrap_or_default();
+    // Exit node: has 0.0.0.0/0 in enabled_routes (approved by admin)
+    // or in advertised_routes (offered but maybe not approved)
     let is_exit = device
-        .allowed_ips
+        .enabled_routes
         .iter()
-        .any(|ip| ip == "0.0.0.0/0" || ip == "::/0");
+        .chain(device.advertised_routes.iter())
+        .any(|r| r == "0.0.0.0/0" || r == "::/0");
     let display_name = device
         .name
         .split('.')
@@ -128,7 +136,12 @@ fn map_api_device(device: ApiDevice, our_hostname: &str) -> TailscaleDevice {
         hostname: device.hostname,
         ip,
         os: device.os,
-        status: if device.online { "online" } else { "offline" }.to_string(),
+        status: if device.connected_to_control {
+            "online"
+        } else {
+            "offline"
+        }
+        .to_string(),
         last_seen: device.last_seen,
         is_exit_node: is_exit,
         is_self,
@@ -228,8 +241,9 @@ mod tests {
             addresses: vec!["100.64.0.1".to_string(), "fd7a::1".to_string()],
             os: "linux".to_string(),
             last_seen: "2026-03-31T12:00:00Z".to_string(),
-            online: true,
-            allowed_ips: vec![],
+            connected_to_control: true,
+            advertised_routes: vec![],
+            enabled_routes: vec![],
         };
 
         let result = map_api_device(device, "other-host");
@@ -249,8 +263,9 @@ mod tests {
             addresses: vec!["100.64.0.2".to_string()],
             os: "linux".to_string(),
             last_seen: String::new(),
-            online: false,
-            allowed_ips: vec![
+            connected_to_control: false,
+            advertised_routes: vec![],
+            enabled_routes: vec![
                 "100.64.0.2/32".to_string(),
                 "0.0.0.0/0".to_string(),
                 "::/0".to_string(),
@@ -271,8 +286,9 @@ mod tests {
             addresses: vec!["100.64.0.3".to_string()],
             os: "macOS".to_string(),
             last_seen: String::new(),
-            online: true,
-            allowed_ips: vec![],
+            connected_to_control: true,
+            advertised_routes: vec![],
+            enabled_routes: vec![],
         };
 
         let result = map_api_device(device, "calamity");
@@ -288,8 +304,9 @@ mod tests {
             addresses: vec![],
             os: "linux".to_string(),
             last_seen: String::new(),
-            online: false,
-            allowed_ips: vec![],
+            connected_to_control: false,
+            advertised_routes: vec![],
+            enabled_routes: vec![],
         };
 
         let result = map_api_device(device, "other");
@@ -307,8 +324,8 @@ mod tests {
                     "addresses": ["100.64.0.1"],
                     "os": "linux",
                     "lastSeen": "2026-03-31T00:00:00Z",
-                    "online": true,
-                    "allowedIPs": ["0.0.0.0/0", "::/0"]
+                    "connectedToControl": true,
+                    "enabledRoutes": ["0.0.0.0/0", "::/0"]
                 },
                 {
                     "nodeId": "n2",
@@ -316,7 +333,7 @@ mod tests {
                     "hostname": "laptop",
                     "addresses": ["100.64.0.2"],
                     "os": "macOS",
-                    "online": false
+                    "connectedToControl": false
                 }
             ]
         }"#;
@@ -325,11 +342,11 @@ mod tests {
             serde_json::from_str(json).expect("should parse API response");
         assert_eq!(resp.devices.len(), 2);
         assert_eq!(resp.devices[0].node_id, "n1");
-        assert!(resp.devices[0].online);
-        assert_eq!(resp.devices[0].allowed_ips.len(), 2);
+        assert!(resp.devices[0].connected_to_control);
+        assert_eq!(resp.devices[0].enabled_routes.len(), 2);
         assert_eq!(resp.devices[1].node_id, "n2");
-        assert!(!resp.devices[1].online);
-        assert!(resp.devices[1].allowed_ips.is_empty());
+        assert!(!resp.devices[1].connected_to_control);
+        assert!(resp.devices[1].enabled_routes.is_empty());
     }
 
     #[tokio::test]
