@@ -218,16 +218,16 @@ fn clear_system_proxy() {
 }
 
 #[tauri::command]
-pub async fn install_tun_sudoers() -> Result<bool, String> {
-    let settings = storage::load_settings();
-    let raw_path = &settings.singbox_path;
+pub async fn install_tun_sudoers(app: AppHandle) -> Result<bool, String> {
+    let process = app.state::<Arc<SingboxProcess>>().inner().clone();
+    let raw_path = process.singbox_path();
     let resolved_path = resolve_singbox_path(raw_path);
 
     // Include both the symlink and resolved paths so sudo matches either
     // Only add fully-qualified paths (sudoers rejects bare command names)
     let mut paths = vec![resolved_path.clone()];
-    if raw_path != &resolved_path && raw_path.starts_with('/') {
-        paths.push(raw_path.clone());
+    if raw_path != resolved_path && raw_path.starts_with('/') {
+        paths.push(raw_path.to_string());
     }
     paths.push("/bin/kill".to_string());
     paths.push("/usr/bin/kill".to_string());
@@ -267,15 +267,22 @@ pub async fn install_tun_sudoers() -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub async fn check_tun_sudoers() -> Result<bool, String> {
-    let settings = storage::load_settings();
-    // Test with the exact path that will be used in sudo -n
-    let output = tokio::process::Command::new("sudo")
-        .args(["-n", &settings.singbox_path, "version"])
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(output.status.success())
+pub async fn check_tun_sudoers(app: AppHandle) -> Result<bool, String> {
+    let process = app.state::<Arc<SingboxProcess>>().inner().clone();
+    let raw_path = process.singbox_path();
+    let resolved_path = resolve_singbox_path(raw_path);
+    // Try resolved path first (what sudoers has), then raw path
+    for path in [&resolved_path, &raw_path.to_string()] {
+        let output = tokio::process::Command::new("sudo")
+            .args(["-n", path.as_str(), "version"])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        if output.status.success() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn whoami() -> String {

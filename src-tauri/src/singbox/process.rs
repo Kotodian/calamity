@@ -51,6 +51,10 @@ impl SingboxProcess {
         &self.api
     }
 
+    pub fn singbox_path(&self) -> &str {
+        &self.singbox_path
+    }
+
     pub async fn start(&self, settings: &AppSettings) -> Result<(), String> {
         let desired_mode = run_mode_for_settings(settings);
         let current_mode = self.runtime.lock().await.mode;
