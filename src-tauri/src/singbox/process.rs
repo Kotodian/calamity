@@ -317,7 +317,7 @@ impl SingboxProcess {
             unsafe { libc::setpgid(pid as i32, 0) };
         }
 
-        // Read stderr in background: forward to eprintln and detect Tailscale login URL
+        // Read stderr in background and forward to eprintln
         if let Some(stderr) = child.stderr.take() {
             tokio::spawn(async move {
                 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -325,17 +325,6 @@ impl SingboxProcess {
                 let mut lines = reader.lines();
                 while let Ok(Some(line)) = lines.next_line().await {
                     eprintln!("{}", line);
-                    // Detect Tailscale login URL and auto-open in browser
-                    if line.contains("https://login.tailscale.com/") {
-                        if let Some(url) = line.split_whitespace()
-                            .find(|s| s.starts_with("https://login.tailscale.com/"))
-                        {
-                            eprintln!("[singbox] detected Tailscale login URL, opening browser");
-                            let _ = std::process::Command::new("open")
-                                .arg(url)
-                                .spawn();
-                        }
-                    }
                 }
             });
         }
@@ -347,6 +336,8 @@ impl SingboxProcess {
         // Try sudo first (works if sudoers entry is installed)
         let log_path = build_tun_log_path(config_path);
         let pid_path = build_tun_pid_path(config_path);
+        // Fix ownership of root-owned files from previous TUN runs so we can recreate them
+        fix_root_owned_paths(&[&log_path]);
         let log_file = std::fs::File::create(&log_path).ok();
         // Duplicate the file handle so both stdout and stderr write to the same log
         let stderr_file = log_file
@@ -372,11 +363,6 @@ impl SingboxProcess {
                         let _ = std::fs::write(&pid_path, singbox_pid.to_string());
                     }
                     tokio::spawn(async move { let _ = child.wait().await; });
-                    // Monitor log file for Tailscale login URL (TUN stderr goes to log)
-                    let log_path_clone = log_path.clone();
-                    tokio::spawn(async move {
-                        monitor_log_for_tailscale_url(&log_path_clone).await;
-                    });
                     return Ok(());
                 }
                 Some(_) => {
@@ -708,51 +694,18 @@ fn escape_applescript_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-/// Monitor a log file for Tailscale login URL and auto-open in browser.
-/// Watches for up to 30 seconds after startup.
-async fn monitor_log_for_tailscale_url(log_path: &str) {
-    use tokio::io::{AsyncBufReadExt, BufReader};
-
-    // Wait for log file to exist
-    for _ in 0..10 {
-        if std::path::Path::new(log_path).exists() {
-            break;
-        }
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-    }
-
-    let file = match tokio::fs::File::open(log_path).await {
-        Ok(f) => f,
+/// Fix ownership of root-owned files from previous TUN (sudo) runs.
+/// Without this, File::create silently fails and stdout/stderr go to Stdio::null.
+fn fix_root_owned_paths(paths: &[&str]) {
+    let user = match std::env::var("USER") {
+        Ok(u) => u,
         Err(_) => return,
     };
-
-    let mut reader = BufReader::new(file);
-
-    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(30);
-    let mut buf = String::new();
-
-    while tokio::time::Instant::now() < deadline {
-        buf.clear();
-        match reader.read_line(&mut buf).await {
-            Ok(0) => {
-                // No new data, wait a bit
-                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-            }
-            Ok(_) => {
-                if buf.contains("https://login.tailscale.com/") {
-                    if let Some(url) = buf
-                        .split_whitespace()
-                        .find(|s| s.starts_with("https://login.tailscale.com/"))
-                    {
-                        eprintln!(
-                            "[singbox] detected Tailscale login URL in TUN log, opening browser"
-                        );
-                        let _ = std::process::Command::new("open").arg(url).spawn();
-                        return;
-                    }
-                }
-            }
-            Err(_) => break,
+    for path in paths {
+        if std::path::Path::new(path).exists() {
+            let _ = std::process::Command::new("sudo")
+                .args(["-n", "chown", &user, path])
+                .output();
         }
     }
 }

@@ -15,12 +15,48 @@ pub async fn tailscale_get_settings() -> Result<TailscaleSettings, String> {
 #[tauri::command]
 pub async fn tailscale_save_settings(
     app: AppHandle,
-    settings: TailscaleSettings,
+    mut settings: TailscaleSettings,
 ) -> Result<(), String> {
+    // Auto-create auth key via OAuth if not manually provided
+    if settings.enabled
+        && settings.auth_key.is_empty()
+        && !settings.oauth_client_id.is_empty()
+        && !settings.oauth_client_secret.is_empty()
+    {
+        match tailscale_api::create_auth_key(&mut settings).await {
+            Ok(key) => {
+                settings.auth_key = key;
+            }
+            Err(e) => {
+                eprintln!("[tailscale] auto-create auth key failed: {}", e);
+                // Continue without auth key — user can set one manually
+            }
+        }
+    }
+    // Fix root-owned tailscale state directory from previous TUN runs
+    fix_tailscale_state_permissions();
     tailscale_storage::save_tailscale_settings(&settings)?;
     tailscale_config::write_tailscale_config()?;
     reload_singbox(&app).await;
     Ok(())
+}
+
+/// Fix permissions on root-owned files left by previous TUN-mode (sudo) runs.
+fn fix_tailscale_state_permissions() {
+    let paths = [
+        tailscale_config::tailscale_state_dir(),
+        storage::app_data_dir().join("singbox-tun.log"),
+    ];
+    for path in &paths {
+        if path.exists() {
+            // Use sudo -n to chown back to current user (non-interactive, won't prompt)
+            if let Ok(user) = std::env::var("USER") {
+                let _ = std::process::Command::new("sudo")
+                    .args(["-n", "chown", "-R", &user, &path.to_string_lossy()])
+                    .output();
+            }
+        }
+    }
 }
 
 #[tauri::command]

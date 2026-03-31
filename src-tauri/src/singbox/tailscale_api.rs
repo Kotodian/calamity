@@ -148,6 +148,59 @@ fn map_api_device(device: ApiDevice, our_hostname: &str) -> TailscaleDevice {
     }
 }
 
+/// Create a pre-authorized auth key using the OAuth token.
+/// This allows sing-box's embedded Tailscale to auto-register without interactive login.
+pub async fn create_auth_key(settings: &mut TailscaleSettings) -> Result<String, String> {
+    let token = get_oauth_token(settings).await?;
+    let tailnet = if settings.tailnet.is_empty() {
+        "-"
+    } else {
+        &settings.tailnet
+    };
+
+    let url = format!(
+        "https://api.tailscale.com/api/v2/tailnet/{}/keys",
+        tailnet
+    );
+    let body = serde_json::json!({
+        "capabilities": {
+            "devices": {
+                "create": {
+                    "reusable": true,
+                    "ephemeral": false,
+                    "preauthorized": true
+                }
+            }
+        },
+        "expirySeconds": 86400
+    });
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(&url)
+        .bearer_auth(&token)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Create auth key failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("Create auth key error {}: {}", status, body));
+    }
+
+    let resp_json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Parse auth key response: {}", e))?;
+
+    resp_json["key"]
+        .as_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "No key in auth key response".to_string())
+}
+
 /// Fetch devices from Tailscale API v2.
 pub async fn fetch_devices(
     settings: &mut TailscaleSettings,
