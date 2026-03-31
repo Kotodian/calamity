@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import { connectionService } from "../services/connection";
 import type { ConnectionState, ProxyMode, SpeedRecord } from "../services/types";
 
@@ -54,8 +55,10 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     try {
       await connectionService.connect();
       await get().fetchState();
-    } catch {
+    } catch (e) {
       set({ status: "disconnected" });
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("sing-box", { description: msg, duration: 8000 });
     }
   },
 

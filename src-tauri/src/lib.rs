@@ -31,6 +31,16 @@ pub fn run() {
                 if let Some(dir) = exe_dir {
                     let sidecar = dir.join("sing-box");
                     if sidecar.exists() {
+                        // Strip macOS quarantine xattr so Gatekeeper doesn't block execution
+                        let _ = std::process::Command::new("xattr")
+                            .args(["-d", "com.apple.quarantine"])
+                            .arg(&sidecar)
+                            .output();
+                        // Ensure the binary is executable
+                        let _ = std::process::Command::new("chmod")
+                            .args(["+x"])
+                            .arg(&sidecar)
+                            .output();
                         sidecar.to_string_lossy().to_string()
                     } else {
                         "sing-box".to_string()
