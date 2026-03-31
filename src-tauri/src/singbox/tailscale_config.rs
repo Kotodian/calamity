@@ -10,6 +10,28 @@ pub fn tailscale_state_dir() -> std::path::PathBuf {
     storage::app_data_dir().join("tailscale")
 }
 
+/// Find the active proxy node tag to use as detour for Tailscale control plane.
+fn find_active_proxy_tag() -> Option<String> {
+    let nodes_data = super::nodes_storage::load_nodes();
+    // Use explicitly active node
+    if let Some(active) = &nodes_data.active_node {
+        for group in &nodes_data.groups {
+            for node in &group.nodes {
+                if &node.name == active {
+                    return Some(node.name.clone());
+                }
+            }
+        }
+    }
+    // Fallback to first available node
+    for group in &nodes_data.groups {
+        if let Some(node) = group.nodes.first() {
+            return Some(node.name.clone());
+        }
+    }
+    None
+}
+
 /// Build the sing-box Tailscale endpoint JSON config from settings.
 /// Returns None if Tailscale is disabled.
 pub fn build_tailscale_config(
@@ -39,6 +61,12 @@ pub fn build_tailscale_config(
 
     if !settings.advertise_routes.is_empty() {
         endpoint["advertise_routes"] = json!(settings.advertise_routes);
+    }
+
+    // Route Tailscale control plane traffic through an existing proxy node
+    // (controlplane.tailscale.com is blocked in China without a proxy)
+    if let Some(proxy_tag) = find_active_proxy_tag() {
+        endpoint["detour"] = json!(proxy_tag);
     }
 
     Some(json!({
