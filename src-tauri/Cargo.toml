@@ -1,6 +1,6 @@
 [package]
 name = "calamity"
-version = "0.2.0"
+version = "0.2.1"
 description = "A macOS proxy client based on SingBox"
 authors = ["you"]
 edition = "2021"
