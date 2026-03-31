@@ -10,4 +10,7 @@ pub mod rules_storage;
 pub mod storage;
 pub mod subscription_fetch;
 pub mod subscriptions_storage;
+pub mod tailscale_api;
 pub mod tailscale_cli;
+pub mod tailscale_config;
+pub mod tailscale_storage;
