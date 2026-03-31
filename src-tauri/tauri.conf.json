@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicovrc/tauri-config-schema/main/tauri.conf.json",
   "productName": "Calamity",
-  "version": "0.2.6-beta",
+  "version": "0.2.7-beta",
   "identifier": "com.calamity.app",
   "build": {
     "beforeDevCommand": "npm run dev",
