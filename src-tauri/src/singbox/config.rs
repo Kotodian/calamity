@@ -410,6 +410,12 @@ fn build_pre_match_route_rules(settings: &AppSettings) -> Vec<Value> {
             "strategy": "ipv4_only"
         }));
     }
+    // Private/LAN traffic bypasses proxy
+    rules.push(json!({
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "direct-out"
+    }));
     rules
 }
 

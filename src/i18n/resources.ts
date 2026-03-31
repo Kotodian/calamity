@@ -84,6 +84,9 @@ export const resources = {
         tunSudoersInstalling: "Installing...",
         tunSudoersInstalled: "Password-free TUN enabled",
         corePath: "Core Path",
+        restartCore: "Restart Core",
+        restartCoreDescription: "Restart the sing-box core process",
+        restarting: "Restarting...",
         logLevel: "Log Level",
         logLevels: {
           debug: "Debug",
@@ -371,6 +374,9 @@ export const resources = {
         tunSudoersInstalling: "安装中...",
         tunSudoersInstalled: "已启用免密 TUN",
         corePath: "核心路径",
+        restartCore: "重启内核",
+        restartCoreDescription: "重启 sing-box 核心进程",
+        restarting: "重启中...",
         logLevel: "日志级别",
         logLevels: {
           debug: "调试",

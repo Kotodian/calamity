@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Check, Download, Upload } from "lucide-react";
+import { Shield, Check, Download, Upload, RotateCw } from "lucide-react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import {
   Select,
@@ -23,6 +23,7 @@ export function SettingsPage() {
 
   const [sudoersInstalled, setSudoersInstalled] = useState<boolean | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [ioState, setIoState] = useState<{
     phase: "idle" | "exporting" | "importing" | "done" | "error";
     progress: number;
@@ -333,6 +334,30 @@ export function SettingsPage() {
                 <SelectItem value="error">{t("settings.logLevels.error")}</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <Separator className="bg-white/[0.04]" />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{t("settings.restartCore")}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.restartCoreDescription")}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-white/[0.06]"
+              disabled={restarting}
+              onClick={async () => {
+                setRestarting(true);
+                try {
+                  const { invoke } = await import("@tauri-apps/api/core");
+                  await invoke("singbox_restart");
+                } catch { /* ignore */ }
+                setRestarting(false);
+              }}
+            >
+              <RotateCw className={`h-3.5 w-3.5 mr-1.5 ${restarting ? "animate-spin" : ""}`} />
+              {restarting ? t("settings.restarting") : t("settings.restartCore")}
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -83,14 +83,8 @@ pub async fn singbox_stop(app: AppHandle) -> Result<(), String> {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     process.stop().await?;
 
-    // Clear system proxy and update settings
-    let mut settings = storage::load_settings();
-    if settings.system_proxy {
-        settings.system_proxy = false;
-        let _ = storage::save_settings(&settings);
-        crate::commands::settings::clear_system_proxy_on_exit();
-        let _ = app.emit("settings-changed", ());
-    }
+    // Clear system proxy without persisting — reconnect will restore it
+    crate::commands::settings::clear_system_proxy_on_exit();
 
     emit_connection_state_changed(&app).await;
     Ok(())
