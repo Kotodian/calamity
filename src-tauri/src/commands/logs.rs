@@ -1,8 +1,14 @@
 use serde::Serialize;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Manager};
+use tokio_util::sync::CancellationToken;
 
 use crate::singbox::clash_api::LogMessage;
 use crate::singbox::process::SingboxProcess;
+
+/// Global generation counter — each `start_log_stream` bumps it.
+/// Older tasks compare against it and self-terminate.
+static STREAM_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Serialize)]
 pub struct LogEvent {
@@ -13,11 +19,6 @@ pub struct LogEvent {
 }
 
 fn parse_log_source(payload: &str) -> (String, String) {
-    // sing-box payload examples:
-    //   "[1501454221 0ms] inbound/mixed[mixed-in]: inbound connection from 127.0.0.1:52341"
-    //   "inbound/mixed[mixed-in]: tcp server started at 127.0.0.1:7893"
-    //   "sing-box started (0.00s)"
-
     // Strip "[session_id duration] " prefix
     let rest = if payload.starts_with('[') {
         payload
@@ -28,14 +29,10 @@ fn parse_log_source(payload: &str) -> (String, String) {
         payload
     };
 
-    // Source is like "inbound/mixed[mixed-in]" or "outbound/direct[direct-out]"
-    // Extract the tag inside brackets as source, e.g. "mixed-in", "direct-out"
-    // The pattern: "category/type[tag]: message"
     if let Some(colon) = rest.find("]: ") {
-        let raw_source = &rest[..colon + 1]; // "inbound/mixed[mixed-in]"
+        let raw_source = &rest[..colon + 1];
         let message = &rest[colon + 3..];
 
-        // Extract tag from brackets: "mixed-in" from "inbound/mixed[mixed-in]"
         let source = if let Some(open) = raw_source.find('[') {
             &raw_source[open + 1..raw_source.len() - 1]
         } else {
@@ -60,17 +57,29 @@ fn now_timestamp() -> String {
 
 #[tauri::command]
 pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), String> {
+    // Bump generation so any previous stream task will self-terminate
+    let gen = STREAM_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+
     let process = app
         .state::<std::sync::Arc<SingboxProcess>>()
         .inner()
         .clone();
 
-    eprintln!("[logs] start_log_stream called, level={}", level);
+    // If there's a previous cancellation token, cancel it
+    let cancel = app
+        .try_state::<LogStreamCancel>()
+        .map(|s| s.0.clone());
+    if let Some(prev) = cancel {
+        prev.cancel();
+    }
+    let token = CancellationToken::new();
+    app.manage(LogStreamCancel(token.clone()));
+
+    eprintln!("[logs] start_log_stream called, level={}, gen={}", level, gen);
 
     // Emit version info as first log entry
     match process.api().version().await {
         Ok(ver) => {
-            eprintln!("[logs] sing-box version: {}", ver.version);
             let _ = app.emit(
                 "singbox-log",
                 &LogEvent {
@@ -85,10 +94,7 @@ pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), Strin
     }
 
     let response = match process.api().logs_stream(&level).await {
-        Ok(r) => {
-            eprintln!("[logs] connected to log stream successfully");
-            r
-        }
+        Ok(r) => r,
         Err(e) => {
             eprintln!("[logs] failed to connect log stream: {}", e);
             return Err(e);
@@ -100,37 +106,53 @@ pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), Strin
         let mut buffer = String::new();
 
         loop {
-            match response.chunk().await {
-                Ok(Some(chunk)) => {
-                    let text = String::from_utf8_lossy(&chunk);
-                    buffer.push_str(&text);
+            // Check if this task has been superseded
+            if token.is_cancelled() || STREAM_GENERATION.load(Ordering::SeqCst) != gen {
+                eprintln!("[logs] stream gen={} cancelled", gen);
+                break;
+            }
 
-                    // Process complete lines
-                    while let Some(newline_pos) = buffer.find('\n') {
-                        let line = buffer[..newline_pos].trim().to_string();
-                        buffer = buffer[newline_pos + 1..].to_string();
+            tokio::select! {
+                _ = token.cancelled() => {
+                    eprintln!("[logs] stream gen={} cancelled via token", gen);
+                    break;
+                }
+                chunk = response.chunk() => {
+                    match chunk {
+                        Ok(Some(data)) => {
+                            let text = String::from_utf8_lossy(&data);
+                            buffer.push_str(&text);
 
-                        if line.is_empty() {
-                            continue;
+                            while let Some(newline_pos) = buffer.find('\n') {
+                                let line = buffer[..newline_pos].trim().to_string();
+                                buffer = buffer[newline_pos + 1..].to_string();
+
+                                if line.is_empty() {
+                                    continue;
+                                }
+
+                                if let Ok(msg) = serde_json::from_str::<LogMessage>(&line) {
+                                    let (source, message) = parse_log_source(&msg.payload);
+                                    let event = LogEvent {
+                                        level: msg.level,
+                                        message,
+                                        timestamp: now_timestamp(),
+                                        source,
+                                    };
+                                    let _ = app.emit("singbox-log", &event);
+                                }
+                            }
                         }
-
-                        if let Ok(msg) = serde_json::from_str::<LogMessage>(&line) {
-                            let (source, message) = parse_log_source(&msg.payload);
-                            let event = LogEvent {
-                                level: msg.level,
-                                message,
-                                timestamp: now_timestamp(),
-                                source,
-                            };
-                            let _ = app.emit("singbox-log", &event);
-                        }
+                        Ok(None) => break,
+                        Err(_) => break,
                     }
                 }
-                Ok(None) => break, // Stream ended
-                Err(_) => break,   // Connection error
             }
         }
     });
 
     Ok(())
 }
+
+/// Wrapper so we can store the token in Tauri app state.
+struct LogStreamCancel(CancellationToken);

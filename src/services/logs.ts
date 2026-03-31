@@ -61,33 +61,42 @@ const mockLogsService: LogsService = {
 function createTauriLogsService(): LogsService {
   return {
     async getLogs() {
-      // Clash API doesn't provide log history — logs are streaming only.
       return [];
     },
-    async clearLogs() {
-      // No-op on backend; frontend clears its local array.
-    },
+    async clearLogs() {},
     subscribeLogs(callback) {
       let unlistenLog: (() => void) | null = null;
       let unlistenRestart: (() => void) | null = null;
-      let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
       let stopped = false;
-      let lastEventTime = Date.now();
+
+      // Batch log events to avoid per-event re-renders
+      let pending: LogEntry[] = [];
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+      function flush() {
+        flushTimer = null;
+        const batch = pending;
+        pending = [];
+        for (const entry of batch) {
+          callback(entry);
+        }
+      }
+
+      function enqueue(entry: LogEntry) {
+        pending.push(entry);
+        if (!flushTimer) {
+          flushTimer = setTimeout(flush, 100);
+        }
+      }
 
       async function startStream() {
-        const { invoke } = await import("@tauri-apps/api/core");
-        for (let i = 0; i < 10 && !stopped; i++) {
-          try {
-            await invoke("start_log_stream", { level: "debug" });
-            console.log("[logs] stream started");
-            lastEventTime = Date.now();
-            return;
-          } catch {
-            console.log(`[logs] retry ${i + 1}/10...`);
-            await new Promise((r) => setTimeout(r, 2000));
-          }
+        if (stopped) return;
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("start_log_stream", { level: "debug" });
+        } catch {
+          // sing-box not running — stream will start when it does via restart event
         }
-        console.error("[logs] failed to start stream after retries");
       }
 
       (async () => {
@@ -97,26 +106,14 @@ function createTauriLogsService(): LogsService {
           if (stopped) return;
 
           unlistenLog = await listen<RawLogEvent>("singbox-log", (event) => {
-            lastEventTime = Date.now();
-            const entry = parseLogEvent(event.payload);
-            callback(entry);
+            enqueue(parseLogEvent(event.payload));
           });
 
-          // Reconnect log stream when sing-box restarts
           unlistenRestart = await listen("singbox-restarted", () => {
-            console.log("[logs] sing-box restarted, reconnecting stream...");
             startStream();
           });
 
           await startStream();
-
-          // Heartbeat: if no log events for 30s, try to reconnect
-          heartbeatTimer = setInterval(() => {
-            if (!stopped && Date.now() - lastEventTime > 30000) {
-              console.log("[logs] heartbeat: no events for 30s, reconnecting...");
-              startStream();
-            }
-          }, 10000);
         } catch (e) {
           console.error("[logs] error:", e);
         }
@@ -124,9 +121,9 @@ function createTauriLogsService(): LogsService {
 
       return () => {
         stopped = true;
+        if (flushTimer) clearTimeout(flushTimer);
         if (unlistenLog) unlistenLog();
         if (unlistenRestart) unlistenRestart();
-        if (heartbeatTimer) clearInterval(heartbeatTimer);
       };
     },
   };
