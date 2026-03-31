@@ -348,10 +348,14 @@ impl SingboxProcess {
         let log_path = build_tun_log_path(config_path);
         let pid_path = build_tun_pid_path(config_path);
         let log_file = std::fs::File::create(&log_path).ok();
+        // Duplicate the file handle so both stdout and stderr write to the same log
+        let stderr_file = log_file
+            .as_ref()
+            .and_then(|f| f.try_clone().ok());
         let sudo_result = Command::new("sudo")
             .args(["-n", &self.singbox_path, "run", "-C", config_path])
             .stdout(log_file.map_or(std::process::Stdio::null(), |f| f.into()))
-            .stderr(std::process::Stdio::null())
+            .stderr(stderr_file.map_or(std::process::Stdio::null(), |f| f.into()))
             .spawn();
 
         if let Ok(mut child) = sudo_result {
@@ -368,6 +372,11 @@ impl SingboxProcess {
                         let _ = std::fs::write(&pid_path, singbox_pid.to_string());
                     }
                     tokio::spawn(async move { let _ = child.wait().await; });
+                    // Monitor log file for Tailscale login URL (TUN stderr goes to log)
+                    let log_path_clone = log_path.clone();
+                    tokio::spawn(async move {
+                        monitor_log_for_tailscale_url(&log_path_clone).await;
+                    });
                     return Ok(());
                 }
                 Some(_) => {
@@ -697,6 +706,55 @@ fn shell_quote(value: &str) -> String {
 
 fn escape_applescript_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// Monitor a log file for Tailscale login URL and auto-open in browser.
+/// Watches for up to 30 seconds after startup.
+async fn monitor_log_for_tailscale_url(log_path: &str) {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    // Wait for log file to exist
+    for _ in 0..10 {
+        if std::path::Path::new(log_path).exists() {
+            break;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    }
+
+    let file = match tokio::fs::File::open(log_path).await {
+        Ok(f) => f,
+        Err(_) => return,
+    };
+
+    let mut reader = BufReader::new(file);
+
+    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(30);
+    let mut buf = String::new();
+
+    while tokio::time::Instant::now() < deadline {
+        buf.clear();
+        match reader.read_line(&mut buf).await {
+            Ok(0) => {
+                // No new data, wait a bit
+                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            }
+            Ok(_) => {
+                if buf.contains("https://login.tailscale.com/") {
+                    if let Some(url) = buf
+                        .split_whitespace()
+                        .find(|s| s.starts_with("https://login.tailscale.com/"))
+                    {
+                        eprintln!(
+                            "[singbox] detected Tailscale login URL in TUN log, opening browser"
+                        );
+                        let _ = std::process::Command::new("open").arg(url).spawn();
+                        return;
+                    }
+                }
+            }
+            Err(_) => break,
+        }
+    }
 }
 
 fn build_tun_log_path(config_path: &str) -> String {
