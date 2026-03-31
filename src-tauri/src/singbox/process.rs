@@ -102,7 +102,9 @@ impl SingboxProcess {
             *self.child.lock().await = Some(child);
         }
 
-        for _ in 0..50 {
+        // Wait up to 15s for Clash API to become responsive.
+        // Tailscale endpoint may need extra time to connect to control server.
+        for _ in 0..150 {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             if self.api.health_check().await.unwrap_or(false) {
                 self.set_runtime(Some(run_mode), Some(config_path.to_string()), None)
@@ -115,22 +117,20 @@ impl SingboxProcess {
             }
         }
 
-        let message = format!(
-            "sing-box started in {} mode but Clash API not responding after 5s",
+        // Timeout is non-fatal: sing-box may still be starting (e.g. Tailscale login pending).
+        // Mark as started with a warning instead of returning an error.
+        let warning = format!(
+            "sing-box started in {} mode, Clash API not yet responding after 15s (may still be initializing)",
             run_mode.as_str()
         );
-        let message = if run_mode == RunMode::Tun {
-            format_tun_start_timeout_message(config_path, &message)
-        } else {
-            message
-        };
+        eprintln!("[singbox] warning: {}", warning);
         self.set_runtime(
             Some(run_mode),
             Some(config_path.to_string()),
-            Some(message.clone()),
+            None,
         )
         .await;
-        Err(message)
+        Ok(())
     }
 
     pub async fn stop(&self) -> Result<(), String> {
@@ -302,12 +302,12 @@ impl SingboxProcess {
     }
 
     fn spawn_managed(&self, config_path: &str) -> Result<Child, String> {
-        let child = Command::new(&self.singbox_path)
+        let mut child = Command::new(&self.singbox_path)
             .arg("run")
             .arg("-C")
             .arg(config_path)
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::piped())
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| format!("failed to spawn sing-box: {}", e))?;
@@ -315,6 +315,29 @@ impl SingboxProcess {
         #[cfg(unix)]
         if let Some(pid) = child.id() {
             unsafe { libc::setpgid(pid as i32, 0) };
+        }
+
+        // Read stderr in background: forward to eprintln and detect Tailscale login URL
+        if let Some(stderr) = child.stderr.take() {
+            tokio::spawn(async move {
+                use tokio::io::{AsyncBufReadExt, BufReader};
+                let reader = BufReader::new(stderr);
+                let mut lines = reader.lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    eprintln!("{}", line);
+                    // Detect Tailscale login URL and auto-open in browser
+                    if line.contains("https://login.tailscale.com/") {
+                        if let Some(url) = line.split_whitespace()
+                            .find(|s| s.starts_with("https://login.tailscale.com/"))
+                        {
+                            eprintln!("[singbox] detected Tailscale login URL, opening browser");
+                            let _ = std::process::Command::new("open")
+                                .arg(url)
+                                .spawn();
+                        }
+                    }
+                }
+            });
         }
 
         Ok(child)

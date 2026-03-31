@@ -5,6 +5,11 @@ use super::tailscale_storage;
 
 const TAILSCALE_CONFIG_FILE: &str = "06-tailscale.json";
 
+/// Get the absolute path for Tailscale state directory.
+pub fn tailscale_state_dir() -> std::path::PathBuf {
+    storage::app_data_dir().join("tailscale")
+}
+
 /// Build the sing-box Tailscale endpoint JSON config from settings.
 /// Returns None if Tailscale is disabled.
 pub fn build_tailscale_config(
@@ -14,10 +19,12 @@ pub fn build_tailscale_config(
         return None;
     }
 
+    let state_dir = tailscale_state_dir();
+
     let mut endpoint = json!({
         "type": "tailscale",
         "tag": "tailscale-ep",
-        "state_directory": "tailscale",
+        "state_directory": state_dir.to_string_lossy(),
         "hostname": settings.hostname,
         "accept_routes": settings.accept_routes,
     });
@@ -166,6 +173,8 @@ mod tests {
         assert_eq!(ep["exit_node"], "exit-1");
         assert_eq!(ep["accept_routes"], true);
         assert_eq!(ep["advertise_routes"][0], "172.16.0.0/12");
-        assert_eq!(ep["state_directory"], "tailscale");
+        // state_directory should be an absolute path
+        let state_dir = ep["state_directory"].as_str().unwrap();
+        assert!(state_dir.ends_with("/tailscale"), "state_directory should end with /tailscale, got: {}", state_dir);
     }
 }
