@@ -91,7 +91,26 @@
       "Bash(route -n get default)",
       "Bash(networksetup -listallhardwareports)",
       "Bash(networksetup -listnetworkserviceorder)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(git tag:*)",
+      "Bash(cargo test:*)",
+      "Bash(git push:*)",
+      "Bash(gh release:*)",
+      "WebSearch",
+      "Bash(bash src-tauri/target/release/bundle/dmg/bundle_dmg.sh)",
+      "Bash(hdiutil create:*)",
+      "Bash(TOKEN=\"tskey-token-vgE2Ucrwz11-6cemgTPKjgMJ8PisnNDR714hcdwygjk2h9Lz2fT1t61HGupv2XqmSDdAtKstvMmuCdgUKVLdVUYYLVGghMKBem1mfr9qQocndKWMHQ3ndz9de8tnssV5GujRMTmLQxrH7BUfrwNUYa3hHAKs5qhuY34iWbKb9RHAWfr7uoeR6MoCgTYLRmZkLaBertpBHAhMAnTZbKKsjYhu5SWuE58BvWJs3JGxRRxxzxLzx8dStnMjC49RqzrBZXfL69d1xVgvDFrK7HPbFQKX5RyDCob4H4uRNz1E47PqujHUkof2LTdB7z5dySbyJTGdGtK1pqyiyHstEWWFF4EF7hBtdgt9KpV6hAcjQMVeFhLz6umbDqsCcPUAX1xqf99LUdAn\" curl -s -H \"Authorization: Bearer $TOKEN\" \"https://api.tailscale.com/api/v2/tailnet/-/devices\")",
+      "Bash(sing-box format:*)",
+      "Bash(timeout 10 sing-box run -C \"$HOME/Library/Application Support/com.calamity.app/singbox-config.d/\")",
+      "Bash(gtimeout 10 sing-box run -C \"$HOME/Library/Application Support/com.calamity.app/singbox-config.d/\")",
+      "Read(//Users/linqiankai/calamity/$HOME/Library/Application Support/com.calamity.app/**)",
+      "Bash(open:*)",
+      "Bash(sudo -n kill 49654)",
+      "Bash(sudo -n rm -rf \"$HOME/Library/Application Support/com.calamity.app/tailscale\")",
+      "Bash(sudo -n lsof -p 64723 -i)",
+      "Bash(ping:*)",
+      "Bash(sed -i '' 's/0\\\\.2\\\\.8-beta/0.2.10-beta/g' src-tauri/Cargo.toml src-tauri/tauri.conf.json package.json)",
+      "Bash(cargo generate-lockfile:*)"
     ]
   }
 }

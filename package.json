@@ -1,6 +1,6 @@
 {
   "name": "calamity",
-  "version": "0.2.8-beta",
+  "version": "0.2.10-beta",
   "type": "module",
   "scripts": {
     "dev": "vite",

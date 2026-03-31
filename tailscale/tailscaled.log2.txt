@@ -1,0 +1,58 @@
+{"logtail":{"client_time":"2026-03-31T14:45:11.727638Z"},"text":"logtail started"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.730236Z"},"v":1,"text":"using fake (no-op) tun device"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.730252Z"},"v":1,"text":"using fake (no-op) OS network configurator"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.730574Z"},"text":"dns: using *tailscale.dnsConfigurtor"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.730603Z"},"text":"link state: interfaces.State{defaultRoute= ifs={bridge0:[192.168.3.1/24 fd01:a9fb:cea2:f37d:18e1:ce57:a634:c914/64 llu6] bridge100:[192.168.2.1/24 fda6:8a9a:8b0f:88b7:4f9:be45:aae9:3946/64 llu6] en0:[192.168.31.159/24 llu6] utun0:[100.72.73.32/32 fd7a:115c:a1e0::723b:4920/128 llu6] utun5:[198.18.0.1/8]} v4=true v6=true}"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.733285Z"},"v":1,"text":"magicsock: peermtu: peer MTU status is false"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.733566Z"},"text":"magicsock: disco key = d:9268cce496a6b50c"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.733936Z"},"text":"Creating WireGuard device..."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735282Z"},"text":"Bringing WireGuard device up..."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735341Z"},"v":2,"text":"wg: UDP bind has been updated"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735356Z"},"v":2,"text":"wg: Interface state was Down, requested Up, now Up"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735363Z"},"text":"Bringing router up..."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735369Z"},"v":1,"text":"warning: fakeRouter.Up: not implemented."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735374Z"},"text":"Clearing router settings..."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735378Z"},"v":1,"text":"warning: fakeRouter.Set: not implemented."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735382Z"},"text":"Starting network monitor..."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735525Z"},"text":"Engine created."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.73561Z"},"v":2,"text":"wg: Routine: receive incoming mkReceiveFunc - started"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735633Z"},"v":2,"text":"wg: Routine: receive incoming mkReceiveFunc - started"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.735707Z"},"v":2,"text":"wg: Routine: receive incoming receiveDERP - started"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.736351Z"},"text":"tsnet running state path /Users/linqiankai/calamity/tailscale/tailscaled.state"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.741449Z"},"text":"pm: migrating \"_daemon\" profile to new format"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.744829Z"},"v":1,"text":"netmap packet filter: (not ready yet)"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.74547Z"},"text":"tsnet starting with hostname \"calamity\", varRoot \"/Users/linqiankai/calamity/tailscale\""}
+{"logtail":{"client_time":"2026-03-31T14:45:11.745648Z"},"text":"Start"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.74566Z"},"text":"ipnext: active extensions: relayserver"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.746535Z"},"v":1,"Hostinfo":{"IPNVersion":"sing-box 1.13.4","BackendLogID":"dfe8db5874b563c0a643dc8006025a4111840d01c30af7019200bc6e1dc33ab8","OS":"macOS","Package":"sing-box","Hostname":"HUAWEI-MATEBOOK-X","NoLogsNoSupport":true,"Machine":"arm64","GoArch":"arm64","GoArchVar":"v8.0","GoVersion":"go1.26.1","Userspace":true,"UserspaceRouter":true,"AppConnector":false,"StateEncrypted":false}}
+{"logtail":{"client_time":"2026-03-31T14:45:11.746552Z"},"text":"Start: updated prefs: Prefs{ra=false dns=true want=true statefulFiltering=false host=\"calamity\" update=check Persist=nil}, reason: [opts.UpdatePrefs]"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.746577Z"},"text":"generating new machine key"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.750646Z"},"text":"machine key written to store"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.750821Z"},"v":1,"text":"control: HostInfo: {\"IPNVersion\":\"sing-box 1.13.4\",\"BackendLogID\":\"dfe8db5874b563c0a643dc8006025a4111840d01c30af7019200bc6e1dc33ab8\",\"OS\":\"macOS\",\"Package\":\"sing-box\",\"Hostname\":\"calamity\",\"NoLogsNoSupport\":true,\"Machine\":\"arm64\",\"GoArch\":\"arm64\",\"GoArchVar\":\"v8.0\",\"GoVersion\":\"go1.26.1\",\"Userspace\":true,\"UserspaceRouter\":true,\"AppConnector\":false,\"StateEncrypted\":false}"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.75148Z"},"text":"Backend: logs: be:dfe8db5874b563c0a643dc8006025a4111840d01c30af7019200bc6e1dc33ab8 fe:"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.751666Z"},"v":1,"text":"control: authRoutine: loggedIn=false; goal=nil paused=false"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.751704Z"},"text":"Switching ipn state NoState -> NeedsLogin (WantRunning=true, nm=false)"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.751715Z"},"text":"blockEngineUpdates(true)"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.751743Z"},"v":1,"text":"magicsock: peermtu: peer MTU status is false"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.751751Z"},"text":"wgengine: Reconfig: configuring userspace WireGuard config (with 0/0 peers)"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.751841Z"},"v":1,"text":"control: mapRoutine: loggedIn=false"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752306Z"},"text":"wgengine: Reconfig: configuring router"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752313Z"},"v":1,"text":"warning: fakeRouter.Set: not implemented."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752335Z"},"text":"wgengine: Reconfig: user dialer"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.75234Z"},"text":"wgengine: Reconfig: configuring DNS"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752351Z"},"text":"dns: Set: {DefaultResolvers:[] Routes:{} SearchDomains:[] Hosts:0}"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752359Z"},"text":"dns: Resolvercfg: {Routes:{} Hosts:0 LocalDomains:[]}"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752364Z"},"text":"dns: OScfg: {}"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752372Z"},"v":1,"text":"wgengine: Reconfig done"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752386Z"},"text":"health(warnable=warming-up): error: Tailscale is starting. Please wait."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752531Z"},"text":"LocalBackend state is NeedsLogin; running StartLoginInteractive..."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.75266Z"},"text":"StartLoginInteractiveAs(\"\"): url=false"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752676Z"},"text":"control: client.Login(10)"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752684Z"},"text":"health(warnable=is-using-unstable-version): error: This is an unstable version of Tailscale meant for testing and development purposes. Please report any issues to Tailscale."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752692Z"},"v":1,"text":"control: authRoutine: context done."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752705Z"},"v":1,"text":"control: authRoutine: loggedIn=false; wantLoggedIn=true"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.752713Z"},"v":1,"text":"control: direct.TryLogin(flags=10)"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.753166Z"},"v":1,"text":"control: mapRoutine: context done."}
+{"logtail":{"client_time":"2026-03-31T14:45:11.753217Z"},"v":1,"text":"control: mapRoutine: loggedIn=false"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.753265Z"},"text":"control: LoginInteractive -> regen=true"}
+{"logtail":{"client_time":"2026-03-31T14:45:11.753272Z"},"text":"control: doLogin(regen=true, hasUrl=false)"}
