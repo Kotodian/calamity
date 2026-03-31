@@ -1,4 +1,5 @@
 pub mod clash_api;
+pub mod clash_parse;
 pub mod config_io;
 pub mod config;
 pub mod dns_storage;

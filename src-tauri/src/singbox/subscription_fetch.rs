@@ -15,6 +15,8 @@ pub struct SubscriptionUserInfo {
 pub struct FetchResult {
     pub nodes: Vec<ProxyNode>,
     pub user_info: Option<SubscriptionUserInfo>,
+    pub rules: Vec<super::rules_storage::RouteRuleConfig>,
+    pub final_outbound: Option<String>,
 }
 
 fn parse_userinfo(header_value: &str) -> SubscriptionUserInfo {
@@ -121,7 +123,7 @@ fn make_transport_config(params: &std::collections::HashMap<String, String>) -> 
     serde_json::json!({ "type": transport_type })
 }
 
-fn infer_country(name: &str) -> (String, String) {
+pub fn infer_country(name: &str) -> (String, String) {
     let patterns: &[(&[&str], &str, &str)] = &[
         (&["HK", "Hong Kong", "香港"], "Hong Kong", "HK"),
         (
@@ -506,6 +508,18 @@ pub async fn fetch_subscription(url: &str) -> Result<FetchResult, String> {
         .await
         .map_err(|e| format!("failed to read response body: {}", e))?;
 
+    // Auto-detect format: Clash YAML or base64 URI list
+    if super::clash_parse::is_clash_yaml(&body) {
+        let clash_result = super::clash_parse::parse_clash_yaml(&body)
+            .map_err(|e| format!("Clash parse error: {}", e))?;
+        return Ok(FetchResult {
+            nodes: clash_result.nodes,
+            user_info,
+            rules: clash_result.rules,
+            final_outbound: clash_result.final_outbound,
+        });
+    }
+
     // Try base64 decode first, fall back to raw text
     let decoded = base64::engine::general_purpose::STANDARD
         .decode(body.trim())
@@ -515,5 +529,10 @@ pub async fn fetch_subscription(url: &str) -> Result<FetchResult, String> {
 
     let nodes: Vec<ProxyNode> = decoded.lines().filter_map(parse_v2ray_uri).collect();
 
-    Ok(FetchResult { nodes, user_info })
+    Ok(FetchResult {
+        nodes,
+        user_info,
+        rules: vec![],
+        final_outbound: None,
+    })
 }

@@ -4,6 +4,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::singbox::nodes_storage::{self, NodeGroup, NodesData, ProxyNode};
 use crate::singbox::process::SingboxProcess;
+use crate::singbox::rules_storage;
 use crate::singbox::storage;
 use crate::singbox::subscription_fetch;
 use crate::singbox::subscriptions_storage::{self, SubscriptionConfig, SubscriptionsData};
@@ -67,6 +68,10 @@ pub async fn add_subscription(
     // Fetch subscription
     let result = subscription_fetch::fetch_subscription(&url).await?;
 
+    // Extract rules before moving nodes
+    let imported_rules = result.rules;
+    let imported_final = result.final_outbound;
+
     let deduped_nodes = deduplicate_nodes(result.nodes, &nodes_data, &group_id);
     let node_count = deduped_nodes.len() as u32;
     nodes_data.groups.push(NodeGroup {
@@ -76,6 +81,8 @@ pub async fn add_subscription(
         nodes: deduped_nodes,
     });
     nodes_storage::save_nodes(&nodes_data)?;
+
+    merge_imported_rules(&imported_rules, &imported_final)?;
 
     let sub = SubscriptionConfig {
         id: sub_id,
@@ -112,6 +119,9 @@ pub async fn update_subscription(app: AppHandle, id: String) -> Result<Subscript
 
     let result = subscription_fetch::fetch_subscription(&sub.url).await?;
 
+    let imported_rules = result.rules;
+    let imported_final = result.final_outbound;
+
     // Full replacement of nodes in the group
     let group_id = sub.group_id.clone();
     let deduped_nodes = deduplicate_nodes(result.nodes, &nodes_data, &group_id);
@@ -120,6 +130,8 @@ pub async fn update_subscription(app: AppHandle, id: String) -> Result<Subscript
         group.name = sub.name.clone();
     }
     nodes_storage::save_nodes(&nodes_data)?;
+
+    merge_imported_rules(&imported_rules, &imported_final)?;
 
     sub.last_updated = Some(chrono::Utc::now().to_rfc3339());
     sub.node_count = nodes_data
@@ -241,6 +253,35 @@ pub async fn toggle_subscription(id: String, enabled: bool) -> Result<Subscripti
     let updated = sub.clone();
     subscriptions_storage::save_subscriptions(&subs_data)?;
     Ok(updated)
+}
+
+fn merge_imported_rules(
+    rules: &[rules_storage::RouteRuleConfig],
+    final_outbound: &Option<String>,
+) -> Result<(), String> {
+    if rules.is_empty() && final_outbound.is_none() {
+        return Ok(());
+    }
+    let mut rules_data = rules_storage::load_rules();
+    let existing_keys: HashSet<String> = rules_data
+        .rules
+        .iter()
+        .map(|r| format!("{}:{}", r.match_type, r.match_value))
+        .collect();
+    let base_order = rules_data.rules.len();
+    for (i, rule) in rules.iter().enumerate() {
+        let key = format!("{}:{}", rule.match_type, rule.match_value);
+        if !existing_keys.contains(&key) {
+            let mut new_rule = rule.clone();
+            new_rule.order = base_order + i;
+            new_rule.id = format!("sub-rule-{}", uuid::Uuid::new_v4());
+            rules_data.rules.push(new_rule);
+        }
+    }
+    if let Some(final_ob) = final_outbound {
+        rules_data.final_outbound = final_ob.clone();
+    }
+    rules_storage::save_rules(&rules_data)
 }
 
 async fn restart_singbox(app: &AppHandle) {
