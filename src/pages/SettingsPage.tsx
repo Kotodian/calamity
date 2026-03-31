@@ -21,17 +21,21 @@ export function SettingsPage() {
   const { t } = useTranslation();
   const { settings, tunStatus, fetchSettings, updateSettings, setTheme } = useSettingsStore();
 
+  const [sudoersInstalled, setSudoersInstalled] = useState<boolean | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [ioState, setIoState] = useState<{
+    phase: "idle" | "exporting" | "importing" | "done" | "error";
+    progress: number;
+    message: string;
+  }>({ phase: "idle", progress: 0, message: "" });
+
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
-  if (!settings) return null;
-
-  const tunEnabled = tunStatus?.targetEnhancedMode ?? settings.enhancedMode;
+  const tunEnabled = tunStatus?.targetEnhancedMode ?? settings?.enhancedMode ?? false;
   const tunRunning = tunStatus?.running ?? false;
   const tunLastError = tunStatus?.lastError;
-  const [sudoersInstalled, setSudoersInstalled] = useState<boolean | null>(null);
-  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
     if (tunEnabled) {
@@ -65,11 +69,7 @@ export function SettingsPage() {
     setInstalling(false);
   };
 
-  const [ioState, setIoState] = useState<{
-    phase: "idle" | "exporting" | "importing" | "done" | "error";
-    progress: number;
-    message: string;
-  }>({ phase: "idle", progress: 0, message: "" });
+  if (!settings) return null;
 
   const animateProgress = (
     onComplete: () => Promise<{ message: string }>,
