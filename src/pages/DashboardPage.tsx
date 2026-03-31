@@ -46,7 +46,7 @@ export function DashboardPage() {
     fetchState, subscribeTraffic, fetchDashboardInfo, toggleConnection,
   } = useConnectionStore();
   const { groups, fetchGroups } = useNodesStore();
-  const { devices, fetchAccount, fetchDevices } = useTailnetStore();
+  const { settings: tailscaleSettings, devices, fetchSettings: fetchTailscaleSettings, fetchDevices } = useTailnetStore();
   const [justConnected, setJustConnected] = useState(false);
   const [justDisconnected, setJustDisconnected] = useState(false);
   const [uptimeStr, setUptimeStr] = useState("0s");
@@ -57,7 +57,7 @@ export function DashboardPage() {
     fetchState();
     fetchDashboardInfo();
     fetchGroups();
-    fetchAccount();
+    fetchTailscaleSettings();
     fetchDevices();
 
     let unsubTraffic = subscribeTraffic();
@@ -80,7 +80,7 @@ export function DashboardPage() {
       unsubTraffic();
       if (unlistenRestart) unlistenRestart();
     };
-  }, [fetchState, fetchDashboardInfo, subscribeTraffic, fetchGroups, fetchAccount, fetchDevices]);
+  }, [fetchState, fetchDashboardInfo, subscribeTraffic, fetchGroups, fetchTailscaleSettings, fetchDevices]);
 
   // Update uptime every second
   useEffect(() => {
@@ -116,7 +116,8 @@ export function DashboardPage() {
   const isConnecting = status === "connecting";
   const isDisconnecting = status === "disconnecting";
   const activeNodeObj = groups.flatMap((g) => g.nodes).find((n) => n.active);
-  const exitNode = devices.find((d) => d.isCurrentExitNode);
+  const exitNodeName = tailscaleSettings?.exitNode || "";
+  const exitNode = exitNodeName ? devices.find((d) => d.name === exitNodeName || d.ip === exitNodeName) : null;
 
   return (
     <div className="p-6 min-h-full flex flex-col">

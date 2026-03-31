@@ -201,6 +201,20 @@ export interface TailnetDevice {
   isSelf: boolean;
 }
 
+export interface TailscaleSettings {
+  enabled: boolean;
+  authKey: string;
+  oauthClientId: string;
+  oauthClientSecret: string;
+  oauthAccessToken: string;
+  oauthTokenExpires: string;
+  tailnet: string;
+  hostname: string;
+  exitNode: string;
+  acceptRoutes: boolean;
+  advertiseRoutes: string[];
+}
+
 // DNS
 export type DnsMode = "fake-ip" | "redir-host" | "direct";
 

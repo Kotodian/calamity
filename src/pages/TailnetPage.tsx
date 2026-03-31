@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
-import { Monitor, Smartphone, Server, LogOut, LogIn, Network, User, Loader2, Plus, Trash2, Globe } from "lucide-react";
+import {
+  Monitor, Smartphone, Server, LogOut, Settings2, Loader2,
+  RefreshCw, Check, Power,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTailnetStore } from "@/stores/tailnet";
 import { cn } from "@/lib/utils";
+import { tailnetService } from "@/services/tailnet";
 import type { TailnetDevice } from "@/services/types";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 function deviceIcon(os: string) {
   switch (os.toLowerCase()) {
@@ -18,7 +22,12 @@ function deviceIcon(os: string) {
   }
 }
 
-function DeviceCard({ device, index, onSetExitNode }: { device: TailnetDevice; index: number; onSetExitNode: (id: string | null) => void }) {
+function DeviceCard({
+  device, index, isCurrentExit, onSetExitNode,
+}: {
+  device: TailnetDevice; index: number; isCurrentExit: boolean;
+  onSetExitNode: (name: string) => void;
+}) {
   const { t } = useTranslation();
   const Icon = deviceIcon(device.os);
   const isOnline = device.status === "online";
@@ -38,7 +47,11 @@ function DeviceCard({ device, index, onSetExitNode }: { device: TailnetDevice; i
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium truncate text-sm">{device.name}</span>
-            {device.isSelf && <Badge variant="outline" className="text-[10px] border-primary/30 bg-primary/15 text-primary">{t("tailnet.thisDevice")}</Badge>}
+            {device.isSelf && (
+              <Badge variant="outline" className="text-[10px] border-primary/30 bg-primary/15 text-primary">
+                {t("tailnet.thisDevice")}
+              </Badge>
+            )}
             <span className="relative">
               <span className={cn("block h-2 w-2 rounded-full", isOnline ? "bg-green-500" : "bg-muted-foreground/40")} />
               {isOnline && <span className="absolute inset-0 h-2 w-2 rounded-full bg-green-500 animate-ping opacity-75" />}
@@ -48,52 +61,19 @@ function DeviceCard({ device, index, onSetExitNode }: { device: TailnetDevice; i
         </div>
         {device.isExitNode && !device.isSelf && (
           <Button
-            variant={device.isCurrentExitNode ? "default" : "outline"}
+            variant={isCurrentExit ? "default" : "outline"}
             size="sm"
             className={cn(
               "transition-all duration-200",
-              device.isCurrentExitNode ? "shadow-[0_0_15px_rgba(254,151,185,0.15)]" : "border-white/[0.06]"
+              isCurrentExit ? "shadow-[0_0_15px_rgba(254,151,185,0.15)]" : "border-white/[0.06]"
             )}
-            onClick={() => onSetExitNode(device.isCurrentExitNode ? null : device.id)}
+            onClick={() => onSetExitNode(isCurrentExit ? "" : device.name)}
             disabled={!isOnline}
           >
             <LogOut className="mr-2 h-3.5 w-3.5" />
-            {device.isCurrentExitNode ? t("tailnet.active") : t("tailnet.exitNode")}
+            {isCurrentExit ? t("tailnet.active") : t("tailnet.exitNode")}
           </Button>
         )}
-      </div>
-    </div>
-  );
-}
-
-function LoginPanel({ onLogin, loggingIn }: { onLogin: () => void; loggingIn: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center space-y-6 animate-slide-up">
-        <div className="mx-auto h-20 w-20 rounded-full border border-white/[0.06] bg-muted/30 flex items-center justify-center">
-          <Network className="h-10 w-10 text-muted-foreground" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold mb-1">{t("tailnet.connectTitle")}</h2>
-          <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            {t("tailnet.connectSubtitle")}
-          </p>
-        </div>
-        <Button
-          onClick={onLogin}
-          disabled={loggingIn}
-          className="shadow-[0_0_20px_rgba(254,151,185,0.15)] px-6"
-        >
-          {loggingIn ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("tailnet.connecting")}</>
-          ) : (
-            <><LogIn className="mr-2 h-4 w-4" /> {t("tailnet.signIn")}</>
-          )}
-        </Button>
-        <p className="text-[10px] text-muted-foreground/50">
-          {t("tailnet.loginBrowserHint")}
-        </p>
       </div>
     </div>
   );
@@ -101,175 +81,202 @@ function LoginPanel({ onLogin, loggingIn }: { onLogin: () => void; loggingIn: bo
 
 export function TailnetPage() {
   const { t } = useTranslation();
-  const { account, devices, funnels, loggingIn, fetchAccount, login, logout, fetchDevices, setExitNode, fetchFunnels, addFunnel, toggleFunnel, removeFunnel } = useTailnetStore();
-  const [funnelPort, setFunnelPort] = useState("3000");
-  const [funnelProtocol, setFunnelProtocol] = useState<"https" | "tcp" | "tls-terminated-tcp">("https");
+  const { settings, devices, loading, fetchSettings, saveSettings, fetchDevices, setExitNode } = useTailnetStore();
+
+  const [oauthId, setOauthId] = useState("");
+  const [oauthSecret, setOauthSecret] = useState("");
+  const [authKey, setAuthKey] = useState("");
+  const [hostname, setHostname] = useState("calamity");
+  const [testing, setTesting] = useState(false);
+  const [manualExitNode, setManualExitNode] = useState("");
 
   useEffect(() => {
-    fetchAccount();
-  }, [fetchAccount]);
+    fetchSettings();
+  }, [fetchSettings]);
 
   useEffect(() => {
-    if (account?.loggedIn) {
-      fetchDevices();
-      fetchFunnels();
+    if (settings) {
+      setOauthId(settings.oauthClientId);
+      setOauthSecret(settings.oauthClientSecret);
+      setAuthKey(settings.authKey);
+      setHostname(settings.hostname);
+      setManualExitNode(settings.exitNode);
     }
-  }, [account?.loggedIn, fetchDevices, fetchFunnels]);
+  }, [settings]);
 
-  const onlineCount = devices.filter((d) => d.status === "online").length;
-  const currentExit = devices.find((d) => d.isCurrentExitNode);
+  useEffect(() => {
+    if (settings?.enabled && settings.oauthClientId) {
+      fetchDevices();
+    }
+  }, [settings?.enabled, settings?.oauthClientId, fetchDevices]);
 
-  // Not logged in
-  if (!account?.loggedIn) {
-    return (
-      <div className="p-6 flex flex-col min-h-full">
-        <div className="animate-slide-up">
-          <h1 className="text-xl font-semibold">{t("tailnet.title")}</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("tailnet.subtitle")}</p>
-        </div>
-        <LoginPanel onLogin={login} loggingIn={loggingIn} />
-      </div>
-    );
+  const hasOAuth = !!(settings?.oauthClientId && settings?.oauthClientSecret);
+  const onlineCount = devices.filter(d => d.status === "online").length;
+  const currentExitName = settings?.exitNode || "";
+  const currentExitDevice = devices.find(d => d.name === currentExitName || d.ip === currentExitName);
+
+  async function handleTestOAuth() {
+    setTesting(true);
+    try {
+      await tailnetService.testOAuth(oauthId, oauthSecret);
+      toast.success(t("tailnet.testSuccess"));
+    } catch (e: any) {
+      toast.error(e?.message || String(e));
+    } finally {
+      setTesting(false);
+    }
   }
 
-  // Logged in
+  async function handleSave() {
+    if (!settings) return;
+    await saveSettings({
+      ...settings,
+      oauthClientId: oauthId,
+      oauthClientSecret: oauthSecret,
+      authKey,
+      hostname,
+    });
+    toast.success(t("tailnet.saved"));
+  }
+
+  async function handleToggle(enabled: boolean) {
+    if (!settings) return;
+    await saveSettings({ ...settings, enabled });
+  }
+
+  async function handleSetExitNode(name: string) {
+    await setExitNode(name);
+    setManualExitNode(name);
+  }
+
+  if (!settings) return null;
+
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between animate-slide-up">
         <div>
           <h1 className="text-xl font-semibold">{t("tailnet.title")}</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {t("tailnet.devicesOnline", { online: onlineCount, total: devices.length })}
-            {currentExit && ` • ${t("tailnet.exitNodeSummary", { name: currentExit.name })}`}
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("tailnet.subtitle")}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">
+            {settings.enabled ? t("tailnet.enabled") : t("tailnet.disabled")}
+          </span>
+          <Switch checked={settings.enabled} onCheckedChange={handleToggle} />
         </div>
       </div>
 
-      {/* Account Card */}
-      <div className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-4 flex items-center justify-between animate-slide-up" style={{ animationDelay: "80ms" }}>
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center">
-            <User className="h-4 w-4 text-primary" />
+      {/* Setup Section */}
+      <div className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5 animate-slide-up space-y-4" style={{ animationDelay: "80ms" }}>
+        <div className="flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-medium">{t("tailnet.setup")}</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">{t("tailnet.setupDescription")}</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t("tailnet.oauthClientId")}</label>
+            <Input className="bg-muted/30 border-white/[0.06] h-8 text-xs font-mono" value={oauthId} onChange={e => setOauthId(e.target.value)} />
           </div>
-          <div>
-            <p className="text-sm font-medium">{account.loginName}</p>
-            <p className="text-[10px] text-muted-foreground">{account.tailnetName}</p>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t("tailnet.oauthClientSecret")}</label>
+            <Input className="bg-muted/30 border-white/[0.06] h-8 text-xs font-mono" type="password" value={oauthSecret} onChange={e => setOauthSecret(e.target.value)} />
           </div>
         </div>
-        <Button variant="outline" size="sm" className="border-white/[0.06] text-xs" onClick={logout}>
-          <LogOut className="mr-1.5 h-3 w-3" />
-          {t("tailnet.signOut")}
-        </Button>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t("tailnet.authKey")}</label>
+            <Input className="bg-muted/30 border-white/[0.06] h-8 text-xs font-mono" type="password" value={authKey} onChange={e => setAuthKey(e.target.value)} placeholder={t("tailnet.authKeyHint")} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t("tailnet.hostname")}</label>
+            <Input className="bg-muted/30 border-white/[0.06] h-8 text-xs" value={hostname} onChange={e => setHostname(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {oauthId && oauthSecret && (
+            <Button variant="outline" size="sm" className="border-white/[0.06] text-xs" onClick={handleTestOAuth} disabled={testing}>
+              {testing ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Check className="mr-1.5 h-3 w-3" />}
+              {testing ? t("tailnet.testing") : t("tailnet.testOAuth")}
+            </Button>
+          )}
+          <Button size="sm" className="text-xs shadow-[0_0_15px_rgba(254,151,185,0.15)]" onClick={handleSave}>
+            {t("tailnet.save")}
+          </Button>
+        </div>
       </div>
 
       {/* Exit Node */}
-      <div className="rounded-xl border border-primary/20 bg-primary/[0.04] backdrop-blur-xl p-4 animate-slide-up shadow-[0_0_25px_rgba(254,151,185,0.06)]" style={{ animationDelay: "160ms" }}>
-        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">{t("tailnet.exitNode")}</p>
-        {currentExit ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-sm">{currentExit.name}</p>
-              <p className="text-xs text-muted-foreground">{currentExit.ip}</p>
+      {settings.enabled && (
+        <div className="rounded-xl border border-primary/20 bg-primary/[0.04] backdrop-blur-xl p-4 animate-slide-up shadow-[0_0_25px_rgba(254,151,185,0.06)]" style={{ animationDelay: "160ms" }}>
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">{t("tailnet.exitNode")}</p>
+          {currentExitName ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-sm">{currentExitDevice?.name || currentExitName}</p>
+                <p className="text-xs text-muted-foreground">{currentExitDevice?.ip || currentExitName}</p>
+              </div>
+              <Button variant="outline" size="sm" className="border-white/[0.06]" onClick={() => handleSetExitNode("")}>
+                {t("tailnet.disconnect")}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" className="border-white/[0.06]" onClick={() => setExitNode(null)}>
-              {t("tailnet.disconnect")}
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("tailnet.noExitNode")}</p>
-        )}
-      </div>
+          ) : hasOAuth ? (
+            <p className="text-sm text-muted-foreground">{t("tailnet.noExitNode")}</p>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                className="bg-muted/30 border-white/[0.06] h-8 text-xs flex-1"
+                value={manualExitNode}
+                onChange={e => setManualExitNode(e.target.value)}
+                placeholder={t("tailnet.manualExitNode")}
+              />
+              <Button size="sm" className="h-8 text-xs" onClick={() => handleSetExitNode(manualExitNode)}>
+                <Power className="mr-1 h-3 w-3" /> Set
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Devices */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {[...devices]
-          .sort((a, b) => {
-            if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
-            if ((a.status === "online") !== (b.status === "online")) return a.status === "online" ? -1 : 1;
-            return 0;
-          })
-          .map((device, i) => (
-            <DeviceCard key={device.id} device={device} index={i} onSetExitNode={setExitNode} />
-          ))}
-      </div>
-
-      {/* Funnel */}
-      <div className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5 animate-slide-up space-y-4" style={{ animationDelay: "320ms" }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-medium">{t("tailnet.funnel")}</h3>
+      {settings.enabled && hasOAuth && (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {t("tailnet.devicesOnline", { online: onlineCount, total: devices.length })}
+            </p>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={fetchDevices} disabled={loading}>
+              <RefreshCw className={cn("mr-1 h-3 w-3", loading && "animate-spin")} />
+              {t("tailnet.refreshDevices")}
+            </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground">{t("tailnet.funnelSubtitle")}</p>
-        </div>
-
-        {/* Add funnel */}
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder={t("tailnet.port")}
-            type="number"
-            className="w-24 bg-muted/30 border-white/[0.06] h-8 text-xs"
-            value={funnelPort}
-            onChange={(e) => setFunnelPort(e.target.value)}
-          />
-          <Select value={funnelProtocol} onValueChange={(v) => setFunnelProtocol(v as typeof funnelProtocol)}>
-            <SelectTrigger className="w-44 bg-muted/30 border-white/[0.06] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="https">HTTPS</SelectItem>
-              <SelectItem value="tcp">TCP</SelectItem>
-              <SelectItem value="tls-terminated-tcp">TLS-terminated TCP</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            className="h-8 text-xs shadow-[0_0_15px_rgba(254,151,185,0.15)]"
-            onClick={() => {
-              addFunnel({ localPort: parseInt(funnelPort) || 3000, protocol: funnelProtocol, allowPublic: true });
-            }}
-          >
-            <Plus className="mr-1 h-3 w-3" /> {t("tailnet.add")}
-          </Button>
-        </div>
-
-        {/* Funnel list */}
-        {funnels.length > 0 && (
-          <div className="space-y-2">
-            {funnels.map((f) => (
-              <div key={f.id} className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-muted/10 p-3">
-                <Switch
-                  checked={f.enabled}
-                  onCheckedChange={(v) => toggleFunnel(f.id, v)}
-                  className="scale-75"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[...devices]
+              .sort((a, b) => {
+                if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
+                if ((a.status === "online") !== (b.status === "online")) return a.status === "online" ? -1 : 1;
+                return 0;
+              })
+              .map((device, i) => (
+                <DeviceCard
+                  key={device.id}
+                  device={device}
+                  index={i}
+                  isCurrentExit={device.name === currentExitName || device.ip === currentExitName}
+                  onSetExitNode={handleSetExitNode}
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono truncate">{f.publicUrl}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    localhost:{f.localPort} • {f.protocol}
-                  </p>
-                </div>
-                <Badge variant={f.enabled ? "default" : "secondary"} className="text-[9px]">
-                  {f.enabled ? t("tailnet.live") : t("tailnet.off")}
-                </Badge>
-                <button
-                  onClick={() => removeFunnel(f.id)}
-                  className="text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
+              ))}
           </div>
-        )}
+        </>
+      )}
 
-        {funnels.length === 0 && (
-          <p className="text-xs text-muted-foreground/50 text-center py-2">
-            No funnels active. Add a port to expose it via your Tailnet.
-          </p>
-        )}
-      </div>
+      {settings.enabled && !hasOAuth && (
+        <p className="text-xs text-muted-foreground text-center py-4">{t("tailnet.noOAuth")}</p>
+      )}
     </div>
   );
 }
