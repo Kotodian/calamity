@@ -5,6 +5,7 @@ use super::nodes_storage;
 use super::outbounds;
 use super::rules_storage;
 use super::storage::{self, AppSettings};
+use super::tailscale_config;
 
 pub fn generate_config(settings: &AppSettings) -> Value {
     let listen = if settings.allow_lan {
@@ -485,11 +486,14 @@ pub fn write_config(settings: &AppSettings) -> Result<String, String> {
     let config_dir = storage::singbox_config_dir();
     std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
 
-    // Clean old files
+    // Clean old files (preserve 06-tailscale.json — managed by tailscale_config)
     if let Ok(entries) = std::fs::read_dir(&config_dir) {
         for entry in entries.flatten() {
-            if entry.path().extension().is_some_and(|e| e == "json") {
-                let _ = std::fs::remove_file(entry.path());
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "json")
+                && path.file_name().is_some_and(|n| n != "06-tailscale.json")
+            {
+                let _ = std::fs::remove_file(path);
             }
         }
     }
@@ -516,6 +520,9 @@ pub fn write_config(settings: &AppSettings) -> Result<String, String> {
     // 05 - route (may be large due to rules)
     let route = json!({ "route": config["route"] });
     write_split_file(&config_dir, "05-route.json", &route)?;
+
+    // Write Tailscale endpoint config (06-tailscale.json) if enabled
+    tailscale_config::write_tailscale_config()?;
 
     Ok(config_dir.to_string_lossy().to_string())
 }
