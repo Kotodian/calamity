@@ -113,6 +113,7 @@ mod tests {
             exit_node: "exit-server".to_string(),
             accept_routes: true,
             advertise_routes: vec!["192.168.1.0/24".to_string()],
+            tags: vec!["tag:server".to_string()],
         };
 
         let json = serde_json::to_string(&settings).expect("should serialize");

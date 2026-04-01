@@ -6,6 +6,7 @@ use super::outbounds;
 use super::rules_storage;
 use super::storage::{self, AppSettings};
 use super::tailscale_config;
+use super::tailscale_storage;
 
 pub fn generate_config(settings: &AppSettings) -> Value {
     let listen = if settings.allow_lan {
@@ -16,7 +17,8 @@ pub fn generate_config(settings: &AppSettings) -> Value {
     let inbounds = build_inbounds(settings, listen);
 
     let dns_settings = dns_storage::load_dns_settings();
-    let dns_section = build_dns_section(&dns_settings, settings.enhanced_mode);
+    let ts_settings = tailscale_storage::load_tailscale_settings();
+    let dns_section = build_dns_section(&dns_settings, settings.enhanced_mode, ts_settings.enabled);
 
     // Use bootstrap resolver (plain UDP) as default_domain_resolver
     let default_resolver = dns_settings
@@ -158,7 +160,7 @@ fn build_tun_inbound(settings: &AppSettings) -> Value {
     })
 }
 
-fn build_dns_section(dns: &DnsSettings, force_fake_ip: bool) -> Value {
+fn build_dns_section(dns: &DnsSettings, force_fake_ip: bool, tailscale_enabled: bool) -> Value {
     let mut servers: Vec<Value> = dns
         .servers
         .iter()
@@ -172,6 +174,21 @@ fn build_dns_section(dns: &DnsSettings, force_fake_ip: bool) -> Value {
         .filter(|r| r.enabled)
         .filter_map(|r| build_dns_rule(r))
         .collect();
+
+    // Inject Tailscale MagicDNS server and rule when tailscale is enabled
+    if tailscale_enabled {
+        servers.push(json!({
+            "type": "udp",
+            "tag": "dns-tailscale",
+            "server": "100.100.100.100",
+            "detour": "tailscale-ep"
+        }));
+        // Insert at front so .ts.net rule takes priority
+        rules.insert(0, json!({
+            "domain_suffix": [".ts.net"],
+            "server": "dns-tailscale"
+        }));
+    }
 
     if force_fake_ip || dns.mode == "fake-ip" {
         // sing-box 1.12+: fakeip is a DNS server type, not a top-level field
@@ -645,7 +662,7 @@ mod tests {
         let mut dns = DnsSettings::default();
         dns.mode = "direct".to_string();
 
-        let section = build_dns_section(&dns, true);
+        let section = build_dns_section(&dns, true, false);
         let servers = section["servers"]
             .as_array()
             .expect("dns servers should be present");
@@ -668,7 +685,7 @@ mod tests {
         let mut dns = DnsSettings::default();
         dns.mode = "direct".to_string();
 
-        let section = build_dns_section(&dns, false);
+        let section = build_dns_section(&dns, false, false);
 
         assert!(section.get("fakeip").is_none());
     }
