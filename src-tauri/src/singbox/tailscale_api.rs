@@ -162,13 +162,18 @@ pub async fn create_auth_key(settings: &mut TailscaleSettings) -> Result<String,
         "https://api.tailscale.com/api/v2/tailnet/{}/keys",
         tailnet
     );
+    if settings.tags.is_empty() {
+        return Err("Tags are required for OAuth auth key creation".to_string());
+    }
+
     let body = serde_json::json!({
         "capabilities": {
             "devices": {
                 "create": {
                     "reusable": true,
                     "ephemeral": false,
-                    "preauthorized": true
+                    "preauthorized": true,
+                    "tags": settings.tags
                 }
             }
         },

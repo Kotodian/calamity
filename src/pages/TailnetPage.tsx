@@ -86,6 +86,7 @@ export function TailnetPage() {
   const [oauthSecret, setOauthSecret] = useState("");
   const [authKey, setAuthKey] = useState("");
   const [hostname, setHostname] = useState("calamity");
+  const [tags, setTags] = useState("");
   const [testing, setTesting] = useState(false);
   const [manualExitNode, setManualExitNode] = useState("");
 
@@ -99,6 +100,7 @@ export function TailnetPage() {
       setOauthSecret(settings.oauthClientSecret);
       setAuthKey(settings.authKey);
       setHostname(settings.hostname);
+      setTags(settings.tags?.join(", ") || "");
       setManualExitNode(settings.exitNode);
     }
   }, [settings]);
@@ -136,6 +138,7 @@ export function TailnetPage() {
       oauthClientSecret: oauthSecret,
       authKey,
       hostname,
+      tags: tags.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean),
     });
     toast.success(t("tailnet.saved"));
   }
@@ -185,6 +188,11 @@ export function TailnetPage() {
             <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t("tailnet.hostname")}</label>
             <Input className="bg-muted/30 border-white/[0.06] h-8 text-xs" value={hostname} onChange={e => setHostname(e.target.value)} />
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t("tailnet.tags")}</label>
+          <Input className="bg-muted/30 border-white/[0.06] h-8 text-xs font-mono" value={tags} onChange={e => setTags(e.target.value)} placeholder="tag:server, tag:calamity" />
         </div>
 
         <div className="flex items-center gap-2">

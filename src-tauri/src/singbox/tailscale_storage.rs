@@ -29,6 +29,8 @@ pub struct TailscaleSettings {
     pub accept_routes: bool,
     #[serde(default)]
     pub advertise_routes: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 fn default_hostname() -> String {
@@ -49,6 +51,7 @@ impl Default for TailscaleSettings {
             exit_node: String::new(),
             accept_routes: false,
             advertise_routes: Vec::new(),
+            tags: Vec::new(),
         }
     }
 }

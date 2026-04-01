@@ -213,6 +213,7 @@ export interface TailscaleSettings {
   exitNode: string;
   acceptRoutes: boolean;
   advertiseRoutes: string[];
+  tags: string[];
 }
 
 // DNS

@@ -219,6 +219,7 @@ export const resources = {
         saved: "Saved",
         acceptRoutes: "Accept Routes",
         refreshDevices: "Refresh",
+        tags: "ACL Tags",
       },
       dns: {
         title: "DNS",
@@ -515,6 +516,7 @@ export const resources = {
         saved: "已保存",
         acceptRoutes: "接受路由",
         refreshDevices: "刷新",
+        tags: "ACL 标签",
       },
       dns: {
         title: "DNS",
