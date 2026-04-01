@@ -6,6 +6,7 @@ pub mod dns;
 pub mod logs;
 pub mod nodes;
 pub mod rules;
+pub mod ruleset_market;
 pub mod settings;
 pub mod subscriptions;
 pub mod tailscale;

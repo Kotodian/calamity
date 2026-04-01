@@ -10,6 +10,7 @@ import { DnsPage } from "./pages/DnsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage";
+import { RuleSetMarketPage } from "./pages/RuleSetMarketPage";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useSettingsStore } from "./stores/settings";
@@ -55,6 +56,7 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="nodes" element={<NodesPage />} />
           <Route path="rules" element={<RulesPage />} />
+          <Route path="ruleset-market" element={<RuleSetMarketPage />} />
           <Route path="connections" element={<ConnectionsPage />} />
           <Route path="logs" element={<LogsPage />} />
           <Route path="tailnet" element={<TailnetPage />} />

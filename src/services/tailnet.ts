@@ -46,6 +46,7 @@ function createMockTailnetService(): TailnetService {
     exitNode: "",
     acceptRoutes: false,
     advertiseRoutes: [],
+    tags: [],
   };
 
   const mockDevices: TailnetDevice[] = [

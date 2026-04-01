@@ -11,6 +11,7 @@ import {
   Rss,
   PanelLeftClose,
   PanelLeftOpen,
+  PackageSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection";
@@ -28,6 +29,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { to: "/", icon: LayoutDashboard, label: t("sidebar.dashboard") },
     { to: "/nodes", icon: Globe, label: t("sidebar.nodes") },
     { to: "/rules", icon: Route, label: t("sidebar.rules") },
+    { to: "/ruleset-market", icon: PackageSearch, label: t("sidebar.ruleSetMarket") },
     { to: "/connections", icon: Cable, label: t("sidebar.connections") },
     { to: "/logs", icon: ScrollText, label: t("sidebar.logs") },
     { to: "/subscriptions", icon: Rss, label: t("sidebar.subscriptions") },

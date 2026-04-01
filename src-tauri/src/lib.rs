@@ -236,6 +236,7 @@ pub fn run() {
             commands::rules::reorder_rules,
             commands::rules::update_ruleset_interval,
             commands::rules::update_final_outbound,
+            commands::ruleset_market::get_ruleset_list,
             commands::traffic::subscribe_traffic,
             commands::traffic::get_dashboard_info,
             commands::config_io::export_config,

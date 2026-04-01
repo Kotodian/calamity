@@ -12,4 +12,5 @@ pub mod subscription_fetch;
 pub mod subscriptions_storage;
 pub mod tailscale_api;
 pub mod tailscale_config;
+pub mod ruleset_market;
 pub mod tailscale_storage;
