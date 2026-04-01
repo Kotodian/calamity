@@ -21,6 +21,8 @@ pub struct RouteRuleConfig {
     pub rule_set_local_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_detour: Option<String>,
+    #[serde(default)]
+    pub invert: bool,
     pub order: usize,
 }
 

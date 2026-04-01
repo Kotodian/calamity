@@ -242,6 +242,7 @@ fn parse_rules(yaml: &Value) -> (Vec<RouteRuleConfig>, Option<String>) {
             rule_set_url: None,
             rule_set_local_path: None,
             download_detour: None,
+            invert: false,
             order: i,
         });
     }

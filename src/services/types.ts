@@ -161,12 +161,13 @@ export interface RouteRule {
   id: string;
   name: string;
   enabled: boolean;
-  matchType: "domain-suffix" | "domain-keyword" | "domain-full" | "domain-regex" | "geosite" | "geoip" | "ip-cidr" | "process-name" | "process-path" | "process-path-regex" | "port" | "port-range" | "network";
+  matchType: "domain-suffix" | "domain-keyword" | "domain-full" | "domain-regex" | "geosite" | "geoip" | "ip-cidr" | "process-name" | "process-path" | "process-path-regex" | "port" | "port-range" | "network" | "rule-set";
   // For geosite/geoip rule sets
   ruleSetUrl?: string;
   ruleSetLocalPath?: string;
   downloadDetour?: string;
   matchValue: string;
+  invert?: boolean;
   outbound: OutboundType;
   outboundNode?: string;
   outboundDevice?: string;

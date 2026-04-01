@@ -570,6 +570,7 @@ fn parse_route_rule(rule: &Value, order: usize) -> Option<RouteRuleConfig> {
         rule_set_url: None,
         rule_set_local_path: None,
         download_detour: None,
+        invert: false,
         order,
     })
 }

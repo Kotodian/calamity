@@ -314,11 +314,15 @@ fn build_route_rules(
             "geosite" | "geoip" => {
                 let rule_set_tag = format!("{}-{}", rule.match_type, rule.match_value);
 
-                route_rules.push(json!({
+                let mut route_rule = json!({
                     "rule_set": rule_set_tag,
                     "action": "route",
                     "outbound": outbound_tag
-                }));
+                });
+                if rule.invert {
+                    route_rule["invert"] = json!(true);
+                }
+                route_rules.push(route_rule);
 
                 if !seen_rule_sets.contains(&rule_set_tag) {
                     seen_rule_sets.insert(rule_set_tag.clone());
@@ -369,6 +373,46 @@ fn build_route_rules(
                     }
                 }
             }
+            "rule-set" => {
+                let rule_set_tag = format!("ruleset-{}", rule.match_value);
+
+                let mut route_rule = json!({
+                    "rule_set": rule_set_tag,
+                    "action": "route",
+                    "outbound": outbound_tag
+                });
+                if rule.invert {
+                    route_rule["invert"] = json!(true);
+                }
+                route_rules.push(route_rule);
+
+                if !seen_rule_sets.contains(&rule_set_tag) {
+                    seen_rule_sets.insert(rule_set_tag.clone());
+
+                    let url = rule.rule_set_url.clone().unwrap_or_default();
+                    let mut rs = json!({
+                        "tag": rule_set_tag,
+                        "type": "remote",
+                        "format": "binary",
+                        "url": url,
+                        "update_interval": format!("{}s", rules_data.update_interval)
+                    });
+
+                    if let Some(detour) = &rule.download_detour {
+                        let detour_tag = match detour.as_str() {
+                            "direct" => "direct-out".to_string(),
+                            "proxy" => all_node_tags
+                                .first()
+                                .cloned()
+                                .unwrap_or_else(|| "direct-out".to_string()),
+                            other => other.to_string(),
+                        };
+                        rs["download_detour"] = json!(detour_tag);
+                    }
+
+                    rule_sets.push(rs);
+                }
+            }
             _ => {
                 let key = match rule.match_type.as_str() {
                     "domain-suffix" => "domain_suffix",
@@ -402,11 +446,15 @@ fn build_route_rules(
                     _ => json!([&rule.match_value]),
                 };
 
-                route_rules.push(json!({
+                let mut route_rule = json!({
                     key: value,
                     "action": "route",
                     "outbound": outbound_tag
-                }));
+                });
+                if rule.invert {
+                    route_rule["invert"] = json!(true);
+                }
+                route_rules.push(route_rule);
             }
         }
     }
@@ -482,6 +530,7 @@ fn resolve_outbound(
     match outbound {
         "direct" => "direct-out".to_string(),
         "reject" => "block-out".to_string(),
+        "tailnet" => "tailscale-ep".to_string(),
         "proxy" => {
             // 1. Use specified node if valid
             if let Some(node) = outbound_node {
@@ -629,6 +678,7 @@ mod tests {
                 rule_set_url: None,
                 rule_set_local_path: None,
                 download_detour: None,
+                invert: false,
                 order: 0,
             }],
             final_outbound: "proxy".to_string(),

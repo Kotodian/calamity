@@ -45,6 +45,7 @@ const outboundColors: Record<string, string> = {
   proxy: "border-l-primary",
   direct: "border-l-green-500",
   reject: "border-l-red-500",
+  tailnet: "border-l-blue-500",
 };
 
 function SortableRule({
@@ -88,6 +89,7 @@ function SortableRule({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">{rule.name}</span>
             <Badge variant="outline" className="text-[10px] border-white/[0.06] bg-muted/30">{rule.matchType}</Badge>
+            {rule.invert && <Badge variant="outline" className="text-[10px] border-orange-500/30 bg-orange-500/10 text-orange-400">NOT</Badge>}
           </div>
           <p className="text-xs text-muted-foreground truncate">
             {rule.matchValue} → {outboundLabels[rule.outbound]}
@@ -118,6 +120,7 @@ const defaultForm: RuleFormData = {
   enabled: true,
   matchType: "domain-suffix",
   matchValue: "",
+  invert: false,
   outbound: "proxy",
   outboundNode: "",
   ruleSetUrl: "",
@@ -173,6 +176,7 @@ export function RulesPage() {
       enabled: rule.enabled,
       matchType: rule.matchType,
       matchValue: rule.matchValue,
+      invert: rule.invert ?? false,
       outbound: rule.outbound,
       outboundNode: rule.outboundNode,
       ruleSetUrl: rule.ruleSetUrl,
@@ -294,31 +298,39 @@ export function RulesPage() {
                 <SelectItem value="port">port</SelectItem>
                 <SelectItem value="port-range">port-range</SelectItem>
                 <SelectItem value="network">network (tcp/udp)</SelectItem>
+                <SelectItem value="rule-set">rule-set</SelectItem>
               </SelectContent>
             </Select>
-            <Input
-              placeholder={
-                form.matchType === "process-name" ? "e.g. Chrome, qbittorrent" :
-                form.matchType === "process-path" ? "e.g. /Applications/Safari.app/Contents/MacOS/Safari" :
-                form.matchType === "process-path-regex" ? "e.g. ^/Applications/.+" :
-                form.matchType === "port" ? "e.g. 80, 443" :
-                form.matchType === "port-range" ? "e.g. 1000:2000" :
-                form.matchType === "network" ? "tcp or udp" :
-                form.matchType === "domain-regex" ? "e.g. ^stun\\..+" :
-                form.matchType === "geosite" ? "e.g. cn, geolocation-!cn, google, netflix" :
-                form.matchType === "geoip" ? "e.g. cn, us, jp" :
-                "Match value"
-              }
-              className="bg-muted/30 border-white/[0.06]"
-              value={form.matchValue}
-              onChange={(e) => setForm({ ...form, matchValue: e.target.value })}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder={
+                  form.matchType === "process-name" ? "e.g. Chrome, qbittorrent" :
+                  form.matchType === "process-path" ? "e.g. /Applications/Safari.app/Contents/MacOS/Safari" :
+                  form.matchType === "process-path-regex" ? "e.g. ^/Applications/.+" :
+                  form.matchType === "port" ? "e.g. 80, 443" :
+                  form.matchType === "port-range" ? "e.g. 1000:2000" :
+                  form.matchType === "network" ? "tcp or udp" :
+                  form.matchType === "domain-regex" ? "e.g. ^stun\\..+" :
+                  form.matchType === "geosite" ? "e.g. cn, geolocation-!cn, google, netflix" :
+                  form.matchType === "geoip" ? "e.g. cn, us, jp" :
+                  "Match value"
+                }
+                className="flex-1 bg-muted/30 border-white/[0.06]"
+                value={form.matchValue}
+                onChange={(e) => setForm({ ...form, matchValue: e.target.value })}
+              />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Switch checked={form.invert ?? false} onCheckedChange={(v) => setForm({ ...form, invert: v })} />
+                <span className="text-xs text-muted-foreground">{t("rules.invert")}</span>
+              </div>
+            </div>
             <Select value={form.outbound} onValueChange={(v) => setForm({ ...form, outbound: v as OutboundType })}>
               <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue /></SelectTrigger>
               <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                 <SelectItem value="proxy">Proxy</SelectItem>
                 <SelectItem value="direct">DIRECT</SelectItem>
                 <SelectItem value="reject">REJECT</SelectItem>
+                <SelectItem value="tailnet">Tailnet</SelectItem>
               </SelectContent>
             </Select>
             {form.outbound === "proxy" && (
