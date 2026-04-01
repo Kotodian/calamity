@@ -467,6 +467,11 @@ fn build_pre_match_route_rules(settings: &AppSettings) -> Vec<Value> {
         json!({
             "action": "sniff"
         }),
+        // Hijack DNS traffic into the DNS subsystem (required in sing-box 1.12+)
+        json!({
+            "protocol": "dns",
+            "action": "hijack-dns"
+        }),
     ];
     if settings.enhanced_mode {
         rules.push(json!({
