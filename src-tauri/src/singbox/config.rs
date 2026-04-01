@@ -178,14 +178,13 @@ fn build_dns_section(dns: &DnsSettings, force_fake_ip: bool, tailscale_enabled: 
     // Inject Tailscale MagicDNS server and rule when tailscale is enabled
     if tailscale_enabled {
         servers.push(json!({
-            "type": "udp",
+            "type": "tailscale",
             "tag": "dns-tailscale",
-            "server": "100.100.100.100",
-            "detour": "tailscale-ep"
+            "endpoint": "tailscale-ep"
         }));
         // Insert at front so .ts.net rule takes priority
         rules.insert(0, json!({
-            "domain_suffix": [".ts.net"],
+            "domain_suffix": ["ts.net"],
             "server": "dns-tailscale"
         }));
     }
