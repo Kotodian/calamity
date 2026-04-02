@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "calamity"
-version = "0.2.10-beta"
+version = "0.2.11-beta"
 dependencies = [
  "base64 0.22.1",
  "chrono",

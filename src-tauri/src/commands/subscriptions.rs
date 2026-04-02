@@ -106,8 +106,11 @@ pub async fn add_subscription(
     Ok(sub)
 }
 
-#[tauri::command]
-pub async fn update_subscription(app: AppHandle, id: String) -> Result<SubscriptionConfig, String> {
+/// Apply a fetch result to a subscription: update nodes/rules/metadata, save. Does NOT reload sing-box.
+fn apply_fetch_result(
+    id: &str,
+    result: subscription_fetch::FetchResult,
+) -> Result<SubscriptionConfig, String> {
     let mut subs_data = subscriptions_storage::load_subscriptions();
     let mut nodes_data = nodes_storage::load_nodes();
 
@@ -116,8 +119,6 @@ pub async fn update_subscription(app: AppHandle, id: String) -> Result<Subscript
         .iter_mut()
         .find(|s| s.id == id)
         .ok_or_else(|| format!("subscription {} not found", id))?;
-
-    let result = subscription_fetch::fetch_subscription(&sub.url).await?;
 
     let imported_rules = result.rules;
     let imported_final = result.final_outbound;
@@ -150,6 +151,20 @@ pub async fn update_subscription(app: AppHandle, id: String) -> Result<Subscript
     let updated = sub.clone();
     subscriptions_storage::save_subscriptions(&subs_data)?;
 
+    Ok(updated)
+}
+
+#[tauri::command]
+pub async fn update_subscription(app: AppHandle, id: String) -> Result<SubscriptionConfig, String> {
+    let subs_data = subscriptions_storage::load_subscriptions();
+    let sub = subs_data
+        .subscriptions
+        .iter()
+        .find(|s| s.id == id)
+        .ok_or_else(|| format!("subscription {} not found", id))?;
+
+    let result = subscription_fetch::fetch_subscription(&sub.url).await?;
+    let updated = apply_fetch_result(&id, result)?;
     restart_singbox(&app).await;
     Ok(updated)
 }
@@ -157,19 +172,45 @@ pub async fn update_subscription(app: AppHandle, id: String) -> Result<Subscript
 #[tauri::command]
 pub async fn update_all_subscriptions(app: AppHandle) -> Result<Vec<SubscriptionConfig>, String> {
     let subs_data = subscriptions_storage::load_subscriptions();
-    let enabled_ids: Vec<String> = subs_data
+    let subs_to_update: Vec<(String, String)> = subs_data
         .subscriptions
         .iter()
         .filter(|s| s.enabled)
-        .map(|s| s.id.clone())
+        .map(|s| (s.id.clone(), s.url.clone()))
         .collect();
 
-    let mut results = Vec::new();
-    for id in enabled_ids {
-        match update_subscription(app.clone(), id).await {
-            Ok(sub) => results.push(sub),
-            Err(e) => eprintln!("[subscriptions] update failed: {}", e),
+    // Fetch all subscriptions concurrently
+    let mut fetch_tasks = tokio::task::JoinSet::new();
+    for (idx, (_, url)) in subs_to_update.iter().enumerate() {
+        let url = url.clone();
+        fetch_tasks.spawn(async move {
+            (idx, subscription_fetch::fetch_subscription(&url).await)
+        });
+    }
+    let mut fetch_results: Vec<(usize, Result<subscription_fetch::FetchResult, String>)> = Vec::new();
+    while let Some(result) = fetch_tasks.join_next().await {
+        if let Ok(r) = result {
+            fetch_results.push(r);
         }
+    }
+    fetch_results.sort_by_key(|(idx, _)| *idx);
+
+    // Apply results sequentially (shared storage)
+    let mut results = Vec::new();
+    for (idx, fetch_result) in fetch_results {
+        let id = &subs_to_update[idx].0;
+        match fetch_result {
+            Ok(result) => match apply_fetch_result(id, result) {
+                Ok(sub) => results.push(sub),
+                Err(e) => eprintln!("[subscriptions] apply {} failed: {}", id, e),
+            },
+            Err(e) => eprintln!("[subscriptions] fetch {} failed: {}", id, e),
+        }
+    }
+
+    // Reload sing-box only once after all updates
+    if !results.is_empty() {
+        restart_singbox(&app).await;
     }
     Ok(results)
 }

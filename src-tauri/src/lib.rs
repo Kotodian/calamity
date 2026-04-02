@@ -65,31 +65,38 @@ pub fn run() {
                     let subs = crate::singbox::subscriptions_storage::load_subscriptions();
                     let now = chrono::Utc::now();
 
-                    for sub in &subs.subscriptions {
-                        if !sub.enabled || sub.auto_update_interval == 0 {
-                            continue;
-                        }
-                        let should_update = match &sub.last_updated {
-                            Some(last) => {
-                                if let Ok(last_dt) = chrono::DateTime::parse_from_rfc3339(last) {
-                                    let elapsed =
-                                        (now - last_dt.with_timezone(&chrono::Utc)).num_seconds();
-                                    elapsed >= sub.auto_update_interval as i64
-                                } else {
-                                    true
-                                }
+                    let due_ids: Vec<String> = subs
+                        .subscriptions
+                        .iter()
+                        .filter(|sub| {
+                            if !sub.enabled || sub.auto_update_interval == 0 {
+                                return false;
                             }
-                            None => true,
-                        };
+                            match &sub.last_updated {
+                                Some(last) => {
+                                    chrono::DateTime::parse_from_rfc3339(last)
+                                        .map(|dt| {
+                                            (now - dt.with_timezone(&chrono::Utc)).num_seconds()
+                                                >= sub.auto_update_interval as i64
+                                        })
+                                        .unwrap_or(true)
+                                }
+                                None => true,
+                            }
+                        })
+                        .map(|s| s.id.clone())
+                        .collect();
 
-                        if should_update {
-                            eprintln!("[subscriptions] auto-updating: {}", sub.name);
-                            let _ = crate::commands::subscriptions::update_subscription(
-                                app_handle_subs.clone(),
-                                sub.id.clone(),
-                            )
-                            .await;
-                        }
+                    if !due_ids.is_empty() {
+                        eprintln!(
+                            "[subscriptions] auto-updating {} subscription(s)",
+                            due_ids.len()
+                        );
+                        // update_all_subscriptions handles concurrent fetch + single reload
+                        let _ = crate::commands::subscriptions::update_all_subscriptions(
+                            app_handle_subs.clone(),
+                        )
+                        .await;
                     }
 
                     // Check every 60 seconds

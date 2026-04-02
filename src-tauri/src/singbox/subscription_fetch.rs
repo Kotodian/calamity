@@ -1,7 +1,16 @@
 use base64::Engine;
 use serde_json::Value;
+use std::sync::LazyLock;
 
 use super::nodes_storage::ProxyNode;
+
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("failed to create HTTP client")
+});
 
 #[derive(Debug, Clone)]
 pub struct SubscriptionUserInfo {
@@ -480,13 +489,7 @@ fn parse_v2ray_uri(uri: &str) -> Option<ProxyNode> {
 }
 
 pub async fn fetch_subscription(url: &str) -> Result<FetchResult, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .danger_accept_invalid_certs(true)
-        .build()
-        .map_err(|e| format!("failed to create HTTP client: {}", e))?;
-
-    let response = client
+    let response = HTTP_CLIENT
         .get(url)
         .header("User-Agent", "Calamity/1.0")
         .send()
