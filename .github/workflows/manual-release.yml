@@ -65,6 +65,7 @@ jobs:
       - name: Download sing-box sidecar
         run: |
           SINGBOX_VERSION="1.13.4"
+          mkdir -p src-tauri/binaries
           curl -sL "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-darwin-arm64.tar.gz" -o /tmp/sing-box.tar.gz
           tar -xzf /tmp/sing-box.tar.gz -C /tmp
           cp "/tmp/sing-box-${SINGBOX_VERSION}-darwin-arm64/sing-box" src-tauri/binaries/sing-box-aarch64-apple-darwin
