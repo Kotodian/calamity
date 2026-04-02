@@ -8,7 +8,7 @@ describe("manual release workflow", () => {
     const workflow = readFileSync(workflowPath, "utf8");
 
     expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("tauri-apps/tauri-action@v1");
+    expect(workflow).toContain("tauri-apps/tauri-action@v0.5");
     expect(workflow).toContain("uploadWorkflowArtifacts: true");
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("macos-latest");
