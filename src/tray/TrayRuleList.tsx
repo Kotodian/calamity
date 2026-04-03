@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLink } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import {
   Select,
   SelectContent,
@@ -45,6 +46,12 @@ export function TrayRuleList() {
   useEffect(() => {
     fetchRules();
     fetchGroups();
+    // Re-fetch when nodes/rules change (e.g. after adding a node)
+    const unlisten = listen("singbox-restarted", () => {
+      fetchRules();
+      fetchGroups();
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, [fetchRules, fetchGroups]);
 
   const enabledRules = rules.filter((r) => r.enabled).slice(0, MAX_VISIBLE_RULES);

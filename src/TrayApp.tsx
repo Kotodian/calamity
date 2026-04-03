@@ -5,9 +5,11 @@ import { TrayEnhancedMode } from "./tray/TrayEnhancedMode";
 import { TrayRuleList } from "./tray/TrayRuleList";
 import { TraySiteRule } from "./tray/TraySiteRule";
 import { TrayActions } from "./tray/TrayActions";
+import { TrayImportNode } from "./tray/TrayImportNode";
 import { Separator } from "@/components/ui/separator";
 import { useConnectionStore } from "@/stores/connection";
 import { useSettingsStore } from "@/stores/settings";
+import { useNodesStore } from "@/stores/nodes";
 
 export function TrayApp() {
   const mode = useConnectionStore((s) => s.mode);
@@ -17,11 +19,13 @@ export function TrayApp() {
   const subscribeTraffic = useConnectionStore((s) => s.subscribeTraffic);
   const subscribeStateChanges = useConnectionStore((s) => s.subscribeStateChanges);
   const fetchDashboardInfo = useConnectionStore((s) => s.fetchDashboardInfo);
+  const fetchGroups = useNodesStore((s) => s.fetchGroups);
 
   useEffect(() => {
     fetchState();
     fetchSettings();
     fetchDashboardInfo();
+    fetchGroups();
     const unsubTraffic = subscribeTraffic();
     const unsubStateChanges = subscribeStateChanges();
     const unsubSettings = subscribeSettingsChanges();
@@ -48,6 +52,8 @@ export function TrayApp() {
         )}
         <Separator className="bg-border/50" />
         <TraySiteRule />
+        <Separator className="bg-border/50" />
+        <TrayImportNode />
         <Separator className="bg-border/50" />
         <TrayActions />
       </div>
