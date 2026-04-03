@@ -249,6 +249,7 @@ pub fn run() {
             commands::config_io::export_config,
             commands::config_io::import_config,
             commands::connection::app_quit,
+            commands::apps::list_apps,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

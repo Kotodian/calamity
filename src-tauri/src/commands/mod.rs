@@ -1,3 +1,4 @@
+pub mod apps;
 pub mod browser;
 pub mod config_io;
 pub mod connection;

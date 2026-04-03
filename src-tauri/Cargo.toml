@@ -30,3 +30,4 @@ uuid = { version = "1", features = ["v4"] }
 tauri-plugin-dialog = "2"
 serde_yaml = "0.9"
 tokio-util = "0.7"
+plist = "1"
