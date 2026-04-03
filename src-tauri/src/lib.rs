@@ -127,7 +127,7 @@ pub fn run() {
             });
 
             // Tray icon setup
-            let icon = Image::from_bytes(include_bytes!("../icons/icon.png"))
+            let icon = Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
                 .expect("failed to load tray icon");
 
             let _tray = TrayIconBuilder::new()
