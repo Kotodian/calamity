@@ -87,6 +87,7 @@ pub fn generate_config(settings: &AppSettings) -> Value {
 
     let mut route_section = json!({
         "auto_detect_interface": true,
+        "find_process": true,
         "final": route_final,
         "default_domain_resolver": {
             "server": default_resolver
@@ -1131,6 +1132,16 @@ mod tests {
         assert_eq!(auto_servers.len(), 1);
         assert_eq!(auto_rules.len(), 2);
         assert_eq!(auto_rules[0]["server"], auto_rules[1]["server"]);
+    }
+
+    #[test]
+    fn route_section_enables_find_process() {
+        let settings = AppSettings::default();
+        let config = generate_config(&settings);
+        assert_eq!(
+            config["route"]["find_process"], true,
+            "route section should have find_process enabled"
+        );
     }
 
     #[test]
