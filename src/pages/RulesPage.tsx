@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GripVertical, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
+import { GripVertical, Plus, Trash2, Pencil, Loader2, FolderOpen } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
@@ -20,6 +20,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandItem,
+} from "@/components/ui/command";
 import {
   DndContext,
   closestCenter,
@@ -136,12 +148,27 @@ export function RulesPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<RuleFormData>(defaultForm);
+  const [apps, setApps] = useState<{ name: string; bundleId: string; executablePath: string; appPath: string }[]>([]);
+  const [appPickerOpen, setAppPickerOpen] = useState(false);
 
   useEffect(() => {
     fetchRules();
     fetchFinalOutbound();
     fetchGroups();
   }, [fetchRules, fetchFinalOutbound, fetchGroups]);
+
+  useEffect(() => {
+    if (!appPickerOpen || apps.length > 0) return;
+    (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const result = await invoke<typeof apps>("list_apps");
+        setApps(result);
+      } catch {
+        // Not on Tauri or command failed
+      }
+    })();
+  }, [appPickerOpen]);
 
   const allNodes = groups.flatMap((g) => g.nodes);
 
@@ -319,6 +346,45 @@ export function RulesPage() {
                 value={form.matchValue}
                 onChange={(e) => setForm({ ...form, matchValue: e.target.value })}
               />
+              {(form.matchType === "process-path" || form.matchType === "process-name") && (
+                <Popover open={appPickerOpen} onOpenChange={setAppPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="shrink-0 border-white/[0.06]">
+                      <FolderOpen className="h-3.5 w-3.5 mr-1" />
+                      {t("rules.browseApp")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 border-white/[0.06] bg-card/90 backdrop-blur-2xl" align="start">
+                    <Command>
+                      <CommandInput placeholder={t("rules.searchApp")} />
+                      <CommandList className="max-h-[240px]">
+                        <CommandEmpty>{t("rules.noAppsFound")}</CommandEmpty>
+                        {apps.map((app) => (
+                          <CommandItem
+                            key={app.executablePath}
+                            value={`${app.name} ${app.bundleId}`}
+                            onSelect={() => {
+                              setForm({
+                                ...form,
+                                matchValue: form.matchType === "process-name"
+                                  ? app.executablePath.split("/").pop() || app.name
+                                  : app.executablePath,
+                              });
+                              setAppPickerOpen(false);
+                            }}
+                            className="text-xs"
+                          >
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium">{app.name}</span>
+                              <span className="text-[10px] text-muted-foreground truncate">{app.bundleId}</span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
               <div className="flex items-center gap-1.5 shrink-0">
                 <Switch checked={form.invert ?? false} onCheckedChange={(v) => setForm({ ...form, invert: v })} />
                 <span className="text-xs text-muted-foreground">{t("rules.invert")}</span>

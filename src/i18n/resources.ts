@@ -277,6 +277,10 @@ export const resources = {
         invert: "NOT",
         finalOutbound: "Final Outbound",
         finalDescription: "Traffic not matching any rule goes to",
+        browseApp: "Browse",
+        selectApp: "Select Application",
+        searchApp: "Search applications...",
+        noAppsFound: "No applications found",
       },
       ruleSetMarket: {
         title: "Rule Sets",
@@ -592,6 +596,10 @@ export const resources = {
         invert: "反转",
         finalOutbound: "最终出口",
         finalDescription: "未匹配任何规则的流量走向",
+        browseApp: "浏览",
+        selectApp: "选择应用程序",
+        searchApp: "搜索应用程序...",
+        noAppsFound: "未找到应用程序",
       },
       ruleSetMarket: {
         title: "规则集",
