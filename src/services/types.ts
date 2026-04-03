@@ -17,6 +17,7 @@ export interface ConnectionSnapshot {
   status: Exclude<ConnectionStatus, "connecting">;
   mode: ProxyMode;
   activeNode: string | null;
+  crashReason?: string;
 }
 
 export interface SpeedRecord {

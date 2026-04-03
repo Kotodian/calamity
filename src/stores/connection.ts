@@ -136,11 +136,24 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
 
   subscribeStateChanges() {
     return connectionService.subscribeStateChanges((snapshot) => {
+      const prevStatus = get().status;
       set({
         status: snapshot.status,
         mode: snapshot.mode,
         activeNode: snapshot.activeNode,
       });
+
+      // Show crash reason when sing-box stops unexpectedly
+      if (
+        prevStatus === "connected" &&
+        snapshot.status === "disconnected" &&
+        snapshot.crashReason
+      ) {
+        toast.error("sing-box crashed", {
+          description: snapshot.crashReason,
+          duration: 15000,
+        });
+      }
     });
   },
 

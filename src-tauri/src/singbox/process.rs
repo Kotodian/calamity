@@ -28,6 +28,9 @@ struct RuntimeState {
     mode: Option<RunMode>,
     config_path: Option<String>,
     last_error: Option<String>,
+    /// Collects recent stderr lines from the managed sing-box process.
+    /// Used to surface crash reasons when the process exits unexpectedly.
+    recent_stderr: Vec<String>,
 }
 
 pub struct SingboxProcess {
@@ -282,6 +285,72 @@ impl SingboxProcess {
         self.api.health_check().await.unwrap_or(false)
     }
 
+    /// Collect crash diagnostics when sing-box stops unexpectedly.
+    /// Returns the last error or recent stderr/log lines that explain the crash.
+    pub async fn collect_crash_reason(&self) -> Option<String> {
+        let runtime = self.runtime.lock().await.clone();
+
+        // 1. Check explicit last_error
+        if let Some(ref err) = runtime.last_error {
+            return Some(err.clone());
+        }
+
+        // 2. For normal mode: extract FATAL/ERROR/WARN lines from captured stderr
+        if !runtime.recent_stderr.is_empty() {
+            let important: Vec<&String> = runtime
+                .recent_stderr
+                .iter()
+                .filter(|line| {
+                    line.contains("FATAL")
+                        || line.contains("ERROR")
+                        || line.contains("WARN")
+                        || line.contains("panic")
+                })
+                .collect();
+
+            if !important.is_empty() {
+                return Some(important.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
+            }
+            // If no important lines, return the last few lines as context
+            let tail: Vec<&String> = runtime.recent_stderr.iter().rev().take(5).collect();
+            if !tail.is_empty() {
+                let lines: Vec<&str> = tail.iter().rev().map(|s| s.as_str()).collect();
+                return Some(lines.join("\n"));
+            }
+        }
+
+        // 3. For TUN mode: read tail of log file for FATAL/ERROR
+        if runtime.mode == Some(RunMode::Tun) {
+            if let Some(config_path) = runtime.config_path.as_deref() {
+                let log_path = build_tun_log_path(config_path);
+                if let Ok(content) = std::fs::read_to_string(&log_path) {
+                    let important: Vec<&str> = content
+                        .lines()
+                        .rev()
+                        .take(50)
+                        .filter(|line| {
+                            line.contains("FATAL")
+                                || line.contains("ERROR")
+                                || line.contains("panic")
+                        })
+                        .collect();
+                    if !important.is_empty() {
+                        let lines: Vec<&str> = important.into_iter().rev().collect();
+                        return Some(lines.join("\n"));
+                    }
+                    // Fallback: last 5 lines
+                    let tail: Vec<&str> = content.lines().rev().take(5).collect();
+                    if !tail.is_empty() {
+                        let lines: Vec<&str> = tail.into_iter().rev().collect();
+                        return Some(lines.join("\n"));
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
     pub async fn tun_status(&self, settings: &AppSettings) -> TunRuntimeStatus {
         let runtime = self.runtime.lock().await.clone();
         let running = self.is_running().await;
@@ -317,14 +386,21 @@ impl SingboxProcess {
             unsafe { libc::setpgid(pid as i32, 0) };
         }
 
-        // Read stderr in background and forward to eprintln
+        // Read stderr in background: forward to eprintln and store recent lines
         if let Some(stderr) = child.stderr.take() {
+            let runtime_for_stderr = self.runtime.clone();
             tokio::spawn(async move {
                 use tokio::io::{AsyncBufReadExt, BufReader};
+                const MAX_RECENT_LINES: usize = 50;
                 let reader = BufReader::new(stderr);
                 let mut lines = reader.lines();
                 while let Ok(Some(line)) = lines.next_line().await {
                     eprintln!("{}", line);
+                    let mut rt = runtime_for_stderr.lock().await;
+                    rt.recent_stderr.push(line);
+                    if rt.recent_stderr.len() > MAX_RECENT_LINES {
+                        rt.recent_stderr.remove(0);
+                    }
                 }
             });
         }

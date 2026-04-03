@@ -18,6 +18,9 @@ pub struct ConnectionSnapshot {
     pub status: String,
     pub mode: String,
     pub active_node: Option<String>,
+    /// Present when sing-box crashed unexpectedly — contains stderr/log diagnostics.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crash_reason: Option<String>,
 }
 
 async fn cleanup_before_app_exit<F, Fut>(stop: F) -> Result<(), String>
@@ -33,6 +36,7 @@ fn build_connection_snapshot(
     running: bool,
     proxy_mode: &str,
     active_node: Option<String>,
+    crash_reason: Option<String>,
 ) -> ConnectionSnapshot {
     ConnectionSnapshot {
         status: if running {
@@ -42,6 +46,7 @@ fn build_connection_snapshot(
         },
         mode: proxy_mode.to_string(),
         active_node,
+        crash_reason,
     }
 }
 
@@ -56,7 +61,16 @@ pub async fn emit_connection_state_changed(app: &AppHandle) {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let settings = storage::load_settings();
     let nodes = nodes_storage::load_nodes();
-    let snapshot = build_connection_snapshot(process.is_running().await, &settings.proxy_mode, nodes.active_node);
+    let running = process.is_running().await;
+
+    // Collect crash reason when transitioning to disconnected
+    let crash_reason = if !running {
+        process.collect_crash_reason().await
+    } else {
+        None
+    };
+
+    let snapshot = build_connection_snapshot(running, &settings.proxy_mode, nodes.active_node, crash_reason);
     let _ = app.emit("connection-state-changed", snapshot);
 }
 
@@ -153,7 +167,7 @@ mod tests {
 
     #[test]
     fn running_snapshot_is_connected_without_active_node() {
-        let snapshot = build_connection_snapshot(true, "rule", None);
+        let snapshot = build_connection_snapshot(true, "rule", None, None);
 
         assert_eq!(snapshot.status, "connected");
         assert_eq!(snapshot.mode, "rule");
