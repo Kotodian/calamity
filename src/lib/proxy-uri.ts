@@ -37,6 +37,7 @@ export function parseProxyUri(uri: string): (NewNodeInput & { name: string }) | 
     else if (uri.startsWith("ss://")) result = parseSS(uri);
     else if (uri.startsWith("hy2://") || uri.startsWith("hysteria2://")) result = parseHy2(uri);
     else if (uri.startsWith("tuic://")) result = parseTUIC(uri);
+    else if (uri.startsWith("anytls://")) result = parseAnyTLS(uri);
   } catch {
     return null;
   }
@@ -278,6 +279,26 @@ function parseTUIC(uri: string): NewNodeInput & { name: string } {
         realityPublicKey: "",
         realityShortId: "",
       },
+    },
+  };
+}
+
+function parseAnyTLS(uri: string): NewNodeInput & { name: string } {
+  const { userinfo: password, host, port, params, fragment } = parseStandardUri(uri);
+  return {
+    name: fragment || "AnyTLS Node",
+    server: host,
+    port,
+    protocol: "AnyTLS",
+    country: "",
+    countryCode: "",
+    protocolConfig: {
+      type: "anytls",
+      password: decodeURIComponent(password),
+      sni: params.get("sni") || host,
+      idleTimeout: parseInt(params.get("idle_timeout") || "900"),
+      minPaddingLen: parseInt(params.get("min_padding") || "0"),
+      maxPaddingLen: parseInt(params.get("max_padding") || "0"),
     },
   };
 }
