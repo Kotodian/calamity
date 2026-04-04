@@ -61,17 +61,12 @@ fn build_pf_rules(mtu: u16) -> String {
     let mut rules = String::new();
     // 1. Scrub (normalization) — clamp MSS
     rules.push_str(&format!("scrub on en0 max-mss {}\n", max_mss));
-    // 2. Redirect forwarded TCP from LAN clients to sing-box redirect port
+    // 2. Table of private/reserved ranges to exclude from redirect
+    rules.push_str("table <private> const { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 }\n");
+    // 3. Redirect forwarded TCP from LAN clients to sing-box redirect port
+    //    Only match non-private destinations (single rule, not OR'd)
     rules.push_str(&format!(
-        "rdr pass on en0 proto tcp from any to !10.0.0.0/8 -> 127.0.0.1 port {}\n",
-        REDIRECT_PORT
-    ));
-    rules.push_str(&format!(
-        "rdr pass on en0 proto tcp from any to !172.16.0.0/12 -> 127.0.0.1 port {}\n",
-        REDIRECT_PORT
-    ));
-    rules.push_str(&format!(
-        "rdr pass on en0 proto tcp from any to !192.168.0.0/16 -> 127.0.0.1 port {}\n",
+        "rdr pass on en0 proto tcp from any to !<private> -> 127.0.0.1 port {}\n",
         REDIRECT_PORT
     ));
     rules
@@ -228,14 +223,6 @@ pub fn disable_pf_rules() {
     }
 }
 
-// Keep old names as aliases for settings.rs compatibility
-pub fn enable_mss_clamp(mtu: u16) -> Result<(), String> {
-    enable_pf_rules(mtu)
-}
-
-pub fn disable_mss_clamp() {
-    disable_pf_rules()
-}
 
 #[cfg(test)]
 mod tests {
@@ -258,10 +245,11 @@ mod tests {
     }
 
     #[test]
-    fn build_pf_rules_excludes_private_ranges() {
+    fn build_pf_rules_uses_single_rule_with_private_table() {
         let rules = build_pf_rules(1500);
-        assert!(rules.contains("!10.0.0.0/8"));
-        assert!(rules.contains("!172.16.0.0/12"));
-        assert!(rules.contains("!192.168.0.0/16"));
+        assert!(rules.contains("table <private>"));
+        assert!(rules.contains("!<private>"));
+        // Should be exactly one rdr rule, not multiple OR'd rules
+        assert_eq!(rules.matches("rdr pass").count(), 1);
     }
 }
