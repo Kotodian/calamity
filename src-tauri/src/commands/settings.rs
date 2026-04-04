@@ -66,22 +66,19 @@ pub async fn update_settings(
         }
     }
 
-    // Handle gateway mode IP forwarding + MSS clamping
+    // Handle gateway mode IP forwarding + pf rules (redirect + MSS clamp)
     if settings.gateway_mode && !GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
         if let Err(e) = gateway::enable_ip_forwarding() {
             eprintln!("[gateway] failed to enable IP forwarding: {}", e);
         } else {
             GATEWAY_IP_FWD_ENABLED.store(true, Ordering::Relaxed);
         }
-        // Clamp MSS when TUN MTU < 1500 to avoid fragmentation from LAN clients
-        if settings.tun_config.mtu < 1500 {
-            if let Err(e) = gateway::enable_mss_clamp(settings.tun_config.mtu) {
-                eprintln!("[gateway] failed to enable MSS clamp: {}", e);
-            }
+        if let Err(e) = gateway::enable_pf_rules(settings.tun_config.mtu) {
+            eprintln!("[gateway] failed to enable pf rules: {}", e);
         }
     } else if !settings.gateway_mode && GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
         gateway::disable_ip_forwarding();
-        gateway::disable_mss_clamp();
+        gateway::disable_pf_rules();
         GATEWAY_IP_FWD_ENABLED.store(false, Ordering::Relaxed);
     }
 
@@ -356,7 +353,7 @@ pub fn clear_system_proxy_on_exit() {
 pub fn cleanup_gateway_on_exit() {
     if GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
         gateway::disable_ip_forwarding();
-        gateway::disable_mss_clamp();
+        gateway::disable_pf_rules();
     }
 }
 

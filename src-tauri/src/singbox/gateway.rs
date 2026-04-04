@@ -1,6 +1,7 @@
 use std::process::Command;
 
 const PF_ANCHOR: &str = "com.calamity.gateway";
+const REDIRECT_PORT: u16 = 7894;
 
 /// Read the current value of net.inet.ip.forwarding.
 fn get_ip_forwarding() -> bool {
@@ -51,19 +52,35 @@ pub fn disable_ip_forwarding() {
     }
 }
 
-/// Build the pf scrub rule for MSS clamping.
-/// MSS = MTU - 40 (20 bytes IPv4 header + 20 bytes TCP header).
+/// Build pf rules for gateway mode:
+/// - rdr: redirect forwarded TCP traffic to sing-box redirect inbound
+/// - scrub: clamp MSS to fit TUN MTU
 fn build_pf_rules(mtu: u16) -> String {
     let max_mss = mtu.saturating_sub(40);
-    format!("scrub on {{ en0 en1 }} max-mss {}\n", max_mss)
+    // Redirect forwarded TCP from LAN clients to sing-box redirect port.
+    // "pass" skips further rdr evaluation for matched packets.
+    // We exclude traffic destined to private/LAN addresses to avoid redirecting local traffic.
+    let mut rules = String::new();
+    rules.push_str(&format!(
+        "rdr pass on en0 proto tcp from any to !10.0.0.0/8 -> 127.0.0.1 port {}\n",
+        REDIRECT_PORT
+    ));
+    rules.push_str(&format!(
+        "rdr pass on en0 proto tcp from any to !172.16.0.0/12 -> 127.0.0.1 port {}\n",
+        REDIRECT_PORT
+    ));
+    rules.push_str(&format!(
+        "rdr pass on en0 proto tcp from any to !192.168.0.0/16 -> 127.0.0.1 port {}\n",
+        REDIRECT_PORT
+    ));
+    rules.push_str(&format!("scrub on en0 max-mss {}\n", max_mss));
+    rules
 }
 
-/// Enable MSS clamping via pfctl anchor to avoid fragmentation
-/// when LAN clients use MTU 1500 but TUN MTU is smaller.
-pub fn enable_mss_clamp(mtu: u16) -> Result<(), String> {
+/// Enable pf rules for gateway mode: redirect forwarded traffic + MSS clamping.
+pub fn enable_pf_rules(mtu: u16) -> Result<(), String> {
     let rules = build_pf_rules(mtu);
 
-    // Load rules into our anchor
     let output = Command::new("sudo")
         .args(["-n", "pfctl", "-a", PF_ANCHOR, "-f", "-"])
         .stdin(std::process::Stdio::piped())
@@ -91,23 +108,32 @@ pub fn enable_mss_clamp(mtu: u16) -> Result<(), String> {
         .args(["-n", "pfctl", "-e"])
         .output();
 
-    eprintln!("[gateway] MSS clamp enabled (max-mss {})", mtu.saturating_sub(40));
+    eprintln!("[gateway] pf rules enabled (redirect port {}, max-mss {})", REDIRECT_PORT, mtu.saturating_sub(40));
     Ok(())
 }
 
-/// Remove MSS clamping rules.
-pub fn disable_mss_clamp() {
+/// Remove all gateway pf rules.
+pub fn disable_pf_rules() {
     let output = Command::new("sudo")
         .args(["-n", "pfctl", "-a", PF_ANCHOR, "-F", "all"])
         .output();
     match output {
-        Ok(o) if o.status.success() => eprintln!("[gateway] MSS clamp disabled"),
+        Ok(o) if o.status.success() => eprintln!("[gateway] pf rules disabled"),
         Ok(o) => eprintln!(
             "[gateway] failed to flush pf anchor: {}",
             String::from_utf8_lossy(&o.stderr).trim()
         ),
         Err(e) => eprintln!("[gateway] failed to flush pf anchor: {}", e),
     }
+}
+
+// Keep old names as aliases for settings.rs compatibility
+pub fn enable_mss_clamp(mtu: u16) -> Result<(), String> {
+    enable_pf_rules(mtu)
+}
+
+pub fn disable_mss_clamp() {
+    disable_pf_rules()
 }
 
 #[cfg(test)]
@@ -121,14 +147,18 @@ mod tests {
     }
 
     #[test]
-    fn build_pf_rules_clamps_mss_correctly() {
+    fn build_pf_rules_contains_redirect_and_scrub() {
         let rules = build_pf_rules(1280);
-        assert_eq!(rules, "scrub on { en0 en1 } max-mss 1240\n");
+        assert!(rules.contains("rdr pass on en0 proto tcp"));
+        assert!(rules.contains(&format!("port {}", REDIRECT_PORT)));
+        assert!(rules.contains("max-mss 1240"));
     }
 
     #[test]
-    fn build_pf_rules_standard_mtu() {
-        let rules = build_pf_rules(9000);
-        assert_eq!(rules, "scrub on { en0 en1 } max-mss 8960\n");
+    fn build_pf_rules_excludes_private_ranges() {
+        let rules = build_pf_rules(1500);
+        assert!(rules.contains("!10.0.0.0/8"));
+        assert!(rules.contains("!172.16.0.0/12"));
+        assert!(rules.contains("!192.168.0.0/16"));
     }
 }
