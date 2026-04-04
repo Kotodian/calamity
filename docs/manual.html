@@ -379,6 +379,7 @@
           <a href="#subs">订阅管理</a>
           <a href="#dns">DNS 配置</a>
           <a href="#tun">TUN 模式</a>
+          <a href="#gateway">网关模式</a>
           <a href="#tailscale">Tailscale</a>
           <a href="#settings">设置</a>
           <a href="#logs">日志与排障</a>
@@ -704,9 +705,58 @@
         <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <!-- ════ 10. Tailscale ════ -->
+      <!-- ════ 10. 网关模式 ════ -->
+      <section class="section" id="gateway">
+        <h2>10. 网关模式</h2>
+        <p class="subtitle">透明代理网关 — 让局域网设备共享代理</p>
+
+        <p>
+          开启网关模式后，Calamity 会将这台 Mac 变成一个透明代理网关。局域网内的其他设备（手机、电视、游戏机等）只需将网关和 DNS 指向本机 IP，即可自动走代理，无需在每台设备上单独配置。
+        </p>
+
+        <h3>工作原理</h3>
+        <ul>
+          <li><strong>IP 转发</strong> — 启用 macOS 内核的 IP forwarding，让本机可以转发其他设备的流量</li>
+          <li><strong>pf 重定向</strong> — 通过 macOS 防火墙（pf）将转发的 TCP 流量重定向到 sing-box 的 redirect 端口</li>
+          <li><strong>DNS 劫持</strong> — 自动劫持 53 端口的 DNS 请求，防止域名污染</li>
+          <li><strong>MSS 钳位</strong> — 当 Tailscale 要求 MTU 1280 时，自动钳位 TCP MSS 避免分片</li>
+        </ul>
+
+        <h3>启用步骤</h3>
+        <ol class="steps">
+          <li>进入设置页面，确保已安装 TUN sudoers（点击"安装 sudoers 权限"按钮）。</li>
+          <li>打开"网关模式"开关。Calamity 会自动启用 TUN 模式、允许局域网连接、配置 pf 规则。</li>
+          <li>记下本机的局域网 IP（通常为 192.168.x.x）。</li>
+          <li>在其他设备的 Wi-Fi 设置中：
+            <ul>
+              <li>将<strong>网关/路由器</strong>设为本机 IP</li>
+              <li>将<strong>DNS</strong>也设为本机 IP</li>
+            </ul>
+          </li>
+          <li>打开浏览器测试访问，确认流量正常代理。</li>
+        </ol>
+
+        <h3>替代方式</h3>
+        <p>也可以在路由器的 DHCP 设置中将网关地址改为本机 IP，这样所有连接该路由器的设备会自动使用 Calamity 作为网关，无需逐台配置。</p>
+
+        <div class="callout info">
+          <p>
+            网关模式同时代理本机和局域网设备的流量。关闭网关模式或退出 Calamity 时，IP 转发和 pf 规则会自动清理。
+          </p>
+        </div>
+
+        <div class="callout warn">
+          <p>
+            首次开启前需要重新安装 sudoers 权限，确保 sysctl 和 pfctl 命令包含在免密列表中。
+          </p>
+        </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 11. Tailscale ════ -->
       <section class="section" id="tailscale">
-        <h2>10. Tailscale 集成</h2>
+        <h2>11. Tailscale 集成</h2>
         <p class="subtitle">Mesh VPN 设备管理</p>
 
         <div class="screenshot-wrap">
@@ -766,9 +816,9 @@
         <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <!-- ════ 11. 设置 ════ -->
+      <!-- ════ 12. 设置 ════ -->
       <section class="section" id="settings">
-        <h2>11. 设置</h2>
+        <h2>12. 设置</h2>
         <p class="subtitle">全局配置选项</p>
 
         <div class="screenshot-wrap">
@@ -792,9 +842,9 @@
         <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <!-- ════ 12. 日志与排障 ════ -->
+      <!-- ════ 13. 日志与排障 ════ -->
       <section class="section" id="logs">
-        <h2>12. 日志与排障</h2>
+        <h2>13. 日志与排障</h2>
         <p class="subtitle">诊断连接问题</p>
 
         <div class="screenshot-wrap">

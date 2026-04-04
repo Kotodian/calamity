@@ -94,6 +94,13 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
 - Configurable stack, MTU, auto-route, strict-route, and DNS hijack settings
 - Automatic Fake-IP enforcement and graceful cleanup on exit
 
+**Gateway Mode**
+
+- Transparent LAN gateway — other devices set this Mac as their gateway to proxy all traffic
+- Automatic IP forwarding, pf redirect rules, and DNS hijack for LAN clients
+- TCP MSS clamping to avoid fragmentation when Tailscale forces lower MTU
+- One-toggle activation with automatic cleanup on exit
+
 **Subscriptions**
 
 - Multi-subscription management with auto-update intervals
@@ -212,6 +219,7 @@ calamity/
 - [x] Ruleset Market
 - [x] DNS auto-detour generation
 - [x] Concurrent subscription fetching
+- [x] Gateway mode (transparent LAN proxy)
 - [ ] Config hot-reload
 - [ ] Versioned releases
 - [ ] CLI tool (`calamity start/stop/restart/status`)
