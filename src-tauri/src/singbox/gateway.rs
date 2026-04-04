@@ -83,8 +83,8 @@ fn detect_tun_interface() -> Option<String> {
     None
 }
 
-/// Detect the Tailscale interface and IP from the 100.64/10 route.
-fn detect_tailscale_interface() -> Option<(String, String)> {
+/// Detect the Tailscale interface name from the 100.64/10 route.
+fn detect_tailscale_interface() -> Option<String> {
     let output = Command::new("netstat")
         .args(["-rn", "-f", "inet"])
         .output()
@@ -92,20 +92,7 @@ fn detect_tailscale_interface() -> Option<(String, String)> {
     let text = String::from_utf8_lossy(&output.stdout);
     for line in text.lines() {
         if line.contains("100.64/10") {
-            let iface = line.split_whitespace().last()?;
-            // Get IP from the interface
-            let if_output = Command::new("ifconfig")
-                .arg(iface)
-                .output()
-                .ok()?;
-            let if_text = String::from_utf8_lossy(&if_output.stdout);
-            for if_line in if_text.lines() {
-                let trimmed = if_line.trim();
-                if trimmed.starts_with("inet ") {
-                    let ip = trimmed.split_whitespace().nth(1)?;
-                    return Some((iface.to_string(), ip.to_string()));
-                }
-            }
+            return line.split_whitespace().last().map(|s| s.to_string());
         }
     }
     None
@@ -262,12 +249,15 @@ fn register_pf_anchor() -> Result<(), String> {
 
 /// Enable pf rules for gateway mode.
 /// Detects TUN, Tailscale interfaces and Mac IP dynamically.
-pub fn enable_pf_rules(mtu: u16) -> Result<(), String> {
+/// `tailscale_ip` should come from the Tailscale API (is_self device IP).
+pub fn enable_pf_rules(mtu: u16, tailscale_ip: Option<&str>) -> Result<(), String> {
     register_pf_anchor()?;
 
     let mac_ip = detect_en0_ip().ok_or("failed to detect en0 IP")?;
     let tun_iface = detect_tun_interface().ok_or("failed to detect TUN interface")?;
-    let ts = detect_tailscale_interface();
+    let ts = tailscale_ip.and_then(|ip| {
+        detect_tailscale_interface().map(|iface| (iface, ip.to_string()))
+    });
 
     let rules = build_pf_rules(
         mtu,

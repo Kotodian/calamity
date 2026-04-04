@@ -73,7 +73,7 @@ pub async fn update_settings(
         } else {
             GATEWAY_IP_FWD_ENABLED.store(true, Ordering::Relaxed);
         }
-        if let Err(e) = gateway::enable_pf_rules(settings.tun_config.mtu) {
+        if let Err(e) = gateway::enable_pf_rules(settings.tun_config.mtu, None) {
             eprintln!("[gateway] failed to enable pf rules: {}", e);
         }
     } else if !settings.gateway_mode && GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
