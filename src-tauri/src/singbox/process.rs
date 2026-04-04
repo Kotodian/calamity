@@ -62,10 +62,11 @@ impl SingboxProcess {
         let desired_mode = run_mode_for_settings(settings);
         let current_mode = self.runtime.lock().await.mode;
 
-        // If Clash API is already responding in the expected mode, reuse it.
+        // If Clash API is already responding in the expected mode, reuse it
+        // but still regenerate config and hot-reload so any setting changes take effect.
         if self.api.health_check().await.unwrap_or(false) && current_mode == Some(desired_mode) {
-            eprintln!("[singbox] existing instance detected, reusing");
-            return Ok(());
+            eprintln!("[singbox] existing instance detected, reloading config");
+            return self.reload(settings).await;
         }
 
         let config_path = config::write_config(settings)?;
