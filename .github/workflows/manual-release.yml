@@ -77,6 +77,22 @@ jobs:
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Find the previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ inputs.tag_name }}$" | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            # No previous tag, use all commits
+            LOG=$(git log --pretty=format:"- %s" --no-merges HEAD)
+          else
+            LOG=$(git log --pretty=format:"- %s" --no-merges "${PREV_TAG}..HEAD")
+          fi
+          # Filter out chore commits, keep feat/fix/refactor etc
+          CHANGELOG=$(echo "$LOG" | grep -v "^- chore" || echo "$LOG")
+          # Write to file to preserve newlines
+          echo "$CHANGELOG" > /tmp/changelog.md
+
       - name: Build and upload Tauri release artifacts
         uses: tauri-apps/tauri-action@v0.5
         env:
@@ -84,8 +100,14 @@ jobs:
         with:
           tagName: ${{ inputs.tag_name }}
           releaseName: ${{ inputs.release_name != '' && inputs.release_name || inputs.tag_name }}
-          releaseBody: ${{ inputs.release_notes != '' && inputs.release_notes || 'Manual release build triggered from GitHub Actions.' }}
+          releaseBody: ${{ inputs.release_notes != '' && inputs.release_notes || '' }}
           releaseDraft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           uploadWorkflowArtifacts: true
           args: --target ${{ matrix.target }}
+
+      - name: Update release notes from changelog
+        if: inputs.release_notes == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ inputs.tag_name }}" --notes-file /tmp/changelog.md
