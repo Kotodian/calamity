@@ -35,31 +35,31 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
 
 <table>
   <tr>
-    <td><img src="./docs/screenshots/dashboard-light.png" alt="Dashboard Light" width="550" /></td>
-    <td><img src="./docs/screenshots/dashboard-dark.png" alt="Dashboard Dark" width="550" /></td>
+    <td><img src="./docs/screenshots/dashboard-light.png?v=2" alt="Dashboard Light" width="550" /></td>
+    <td><img src="./docs/screenshots/dashboard-dark.png?v=2" alt="Dashboard Dark" width="550" /></td>
   </tr>
   <tr>
     <td align="center"><strong>Dashboard</strong> — Light Mode</td>
     <td align="center"><strong>Dashboard</strong> — Dark Mode</td>
   </tr>
   <tr>
-    <td><img src="./docs/screenshots/nodes.png" alt="Nodes" width="550" /></td>
-    <td><img src="./docs/screenshots/rules.png" alt="Rules" width="550" /></td>
+    <td><img src="./docs/screenshots/nodes.png?v=2" alt="Nodes" width="550" /></td>
+    <td><img src="./docs/screenshots/rules.png?v=2" alt="Rules" width="550" /></td>
   </tr>
   <tr>
     <td align="center"><strong>Nodes</strong> — Proxy group & node management</td>
     <td align="center"><strong>Rules</strong> — Routing rules & rulesets</td>
   </tr>
   <tr>
-    <td><img src="./docs/screenshots/subscriptions.png" alt="Subscriptions" width="550" /></td>
-    <td><img src="./docs/screenshots/tray.png" alt="Tray" width="550" /></td>
+    <td><img src="./docs/screenshots/subscriptions.png?v=2" alt="Subscriptions" width="550" /></td>
+    <td><img src="./docs/screenshots/tray.png?v=2" alt="Tray" width="550" /></td>
   </tr>
   <tr>
     <td align="center"><strong>Subscriptions</strong> — Node subscription management</td>
     <td align="center"><strong>Tray</strong> — Compact quick-access window</td>
   </tr>
     <tr>
-    <td><img src="./docs/screenshots/tailscale.png" alt="Tailscale" width="550" /></td>
+    <td><img src="./docs/screenshots/tailscale.png?v=2" alt="Tailscale" width="550" /></td>
   </tr>
   <tr>
     <td align="center"><strong>Tailscale</strong> — Tailscale management</td>
