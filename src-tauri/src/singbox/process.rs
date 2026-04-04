@@ -38,6 +38,8 @@ pub struct SingboxProcess {
     runtime: Arc<Mutex<RuntimeState>>,
     api: ClashApi,
     singbox_path: String,
+    /// Set to true during restart/reload to suppress false crash detection.
+    restarting: std::sync::atomic::AtomicBool,
 }
 
 impl SingboxProcess {
@@ -47,6 +49,7 @@ impl SingboxProcess {
             runtime: Arc::new(Mutex::new(RuntimeState::default())),
             api: ClashApi::new(),
             singbox_path,
+            restarting: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -214,19 +217,25 @@ impl SingboxProcess {
 
     /// Stop any running sing-box (managed or orphan), then start fresh
     pub async fn restart(&self, settings: &AppSettings) -> Result<(), String> {
-        self.stop().await?;
-        let config_path = config::write_config(settings)?;
-        self.start_with_config(settings, &config_path).await
+        self.restarting.store(true, std::sync::atomic::Ordering::Relaxed);
+        let result = async {
+            self.stop().await?;
+            let config_path = config::write_config(settings)?;
+            self.start_with_config(settings, &config_path).await
+        }.await;
+        self.restarting.store(false, std::sync::atomic::Ordering::Relaxed);
+        result
     }
 
     /// Hot-reload config by writing new config and sending SIGHUP to sing-box process.
     /// Works for both managed (normal) and privileged (TUN) processes.
     pub async fn reload(&self, settings: &AppSettings) -> Result<(), String> {
         // If sing-box isn't running, nothing to reload
-        if !self.is_running().await {
+        if !self.api.health_check().await.unwrap_or(false) {
             return Ok(());
         }
 
+        self.restarting.store(true, std::sync::atomic::Ordering::Relaxed);
         config::write_config(settings)?;
 
         let sent = {
@@ -278,10 +287,12 @@ impl SingboxProcess {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             if self.api.health_check().await.unwrap_or(false) {
                 eprintln!("[singbox] Clash API recovered after reload");
+                self.restarting.store(false, std::sync::atomic::Ordering::Relaxed);
                 return Ok(());
             }
         }
 
+        self.restarting.store(false, std::sync::atomic::Ordering::Relaxed);
         eprintln!("[singbox] warning: Clash API not responding 5s after reload");
         Ok(())
     }
@@ -312,6 +323,10 @@ impl SingboxProcess {
     }
 
     pub async fn is_running(&self) -> bool {
+        // During restart/reload, suppress false "not running" to avoid crash detection
+        if self.restarting.load(std::sync::atomic::Ordering::Relaxed) {
+            return true;
+        }
         // Check actual API availability, not just child process existence
         self.api.health_check().await.unwrap_or(false)
     }
