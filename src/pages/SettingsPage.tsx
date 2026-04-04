@@ -34,7 +34,7 @@ export function SettingsPage() {
     fetchSettings();
   }, [fetchSettings]);
 
-  const tunEnabled = tunStatus?.targetEnhancedMode ?? settings?.enhancedMode ?? settings?.gatewayMode ?? false;
+  const tunEnabled = (tunStatus?.targetEnhancedMode ?? settings?.enhancedMode ?? false) || (settings?.gatewayMode ?? false);
   const tunRunning = tunStatus?.running ?? false;
   const tunLastError = tunStatus?.lastError;
 
