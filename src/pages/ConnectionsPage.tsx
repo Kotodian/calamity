@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Search, Trash2, X, Globe, Shield, Ban, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,12 +27,31 @@ export function ConnectionsPage() {
     clearAll, closeConnection, subscribe, filteredRecords,
   } = useConnectionsStore();
 
+  const [appIcons, setAppIcons] = useState<Map<string, string>>(new Map());
+
   useEffect(() => {
     fetchRecords();
     fetchStats();
     const unsub = subscribe();
     return unsub;
   }, [fetchRecords, fetchStats, subscribe]);
+
+  // Load app icons once
+  useEffect(() => {
+    (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const apps = await invoke<{ executablePath: string; icon: string }[]>("list_apps");
+        const map = new Map<string, string>();
+        for (const app of apps) {
+          if (app.icon) map.set(app.executablePath, app.icon);
+        }
+        setAppIcons(map);
+      } catch {
+        // Not on Tauri
+      }
+    })();
+  }, []);
 
   const records = filteredRecords();
   const filters = [
@@ -153,7 +172,14 @@ export function ConnectionsPage() {
                 </span>
                 <span className="truncate">{r.matchedRule}</span>
                 <span className="ml-auto shrink-0 flex items-center gap-2">
-                  {r.process && <span className="text-muted-foreground/50">{r.process}</span>}
+                  {r.process && (
+                    <span className="flex items-center gap-1 text-muted-foreground/50">
+                      {r.processPath && appIcons.get(r.processPath) && (
+                        <img src={`data:image/png;base64,${appIcons.get(r.processPath)}`} className="h-3 w-3" alt="" />
+                      )}
+                      {r.process}
+                    </span>
+                  )}
                   <span className="font-mono tabular-nums">
                     {r.upload > 1024 ? `${(r.upload / 1024).toFixed(1)}K` : `${r.upload}B`} / {r.download > 1024 ? `${(r.download / 1024).toFixed(1)}K` : `${r.download}B`}
                   </span>

@@ -12,6 +12,7 @@ export interface ConnectionRecord {
   upload: number;   // bytes
   download: number; // bytes
   process?: string;
+  processPath?: string;
   status: "active" | "closed";
 }
 
@@ -42,14 +43,23 @@ const sampleHosts = [
   { host: "192.168.1.1", rule: "Local", outbound: "direct", node: "Direct" },
 ];
 
-const processes = ["Google Chrome", "Safari", "curl", "node", "git", undefined];
+const processes: (readonly [string, string] | undefined)[] = [
+  ["Google Chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
+  ["Safari", "/Applications/Safari.app/Contents/MacOS/Safari"],
+  ["curl", "/usr/bin/curl"],
+  ["node", "/usr/local/bin/node"],
+  ["git", "/usr/bin/git"],
+  undefined,
+];
 
 let mockRecords: ConnectionRecord[] = [];
 let recordId = 0;
 
 function generateRecord(): ConnectionRecord {
   const sample = sampleHosts[Math.floor(Math.random() * sampleHosts.length)];
-  const process = processes[Math.floor(Math.random() * processes.length)];
+  const processEntry = processes[Math.floor(Math.random() * processes.length)];
+  const process = processEntry?.[0];
+  const processPath = processEntry?.[1];
   return {
     id: `conn-${recordId++}`,
     timestamp: new Date().toISOString(),
@@ -64,6 +74,7 @@ function generateRecord(): ConnectionRecord {
     upload: Math.floor(Math.random() * 10000),
     download: Math.floor(Math.random() * 100000),
     process,
+    processPath,
     status: Math.random() > 0.3 ? "closed" : "active",
   };
 }
@@ -165,6 +176,7 @@ function mapConnection(raw: RawConnection): ConnectionRecord {
     upload: raw.upload ?? 0,
     download: raw.download ?? 0,
     process,
+    processPath: processPath || undefined,
     status: "active",
   };
 }

@@ -148,7 +148,7 @@ export function RulesPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<RuleFormData>(defaultForm);
-  const [apps, setApps] = useState<{ name: string; bundleId: string; executablePath: string; appPath: string }[]>([]);
+  const [apps, setApps] = useState<{ name: string; bundleId: string; executablePath: string; appPath: string; icon: string }[]>([]);
   const [appPickerOpen, setAppPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -374,9 +374,16 @@ export function RulesPage() {
                             }}
                             className="text-xs"
                           >
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-medium">{app.name}</span>
-                              <span className="text-[10px] text-muted-foreground truncate">{app.bundleId}</span>
+                            <div className="flex items-center gap-2">
+                              {app.icon ? (
+                                <img src={`data:image/png;base64,${app.icon}`} className="h-5 w-5 shrink-0 rounded-sm" alt="" />
+                              ) : (
+                                <div className="h-5 w-5 shrink-0 rounded-sm bg-muted/50" />
+                              )}
+                              <div className="flex flex-col gap-0.5 min-w-0">
+                                <span className="font-medium">{app.name}</span>
+                                <span className="text-[10px] text-muted-foreground truncate">{app.bundleId}</span>
+                              </div>
                             </div>
                           </CommandItem>
                         ))}
