@@ -290,7 +290,9 @@ pub async fn check_tun_sudoers(app: AppHandle) -> Result<bool, String> {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let raw_path = process.singbox_path();
     let resolved_path = resolve_singbox_path(raw_path);
-    // Try resolved path first (what sudoers has), then raw path
+
+    // Check sing-box can sudo
+    let mut singbox_ok = false;
     for path in [&resolved_path, &raw_path.to_string()] {
         let output = tokio::process::Command::new("sudo")
             .args(["-n", path.as_str(), "version"])
@@ -298,10 +300,34 @@ pub async fn check_tun_sudoers(app: AppHandle) -> Result<bool, String> {
             .await
             .map_err(|e| e.to_string())?;
         if output.status.success() {
-            return Ok(true);
+            singbox_ok = true;
+            break;
         }
     }
-    Ok(false)
+    if !singbox_ok {
+        return Ok(false);
+    }
+
+    // Check all required gateway commands are in sudoers
+    let required = [
+        ("/usr/sbin/sysctl", &["-n", "net.inet.ip.forwarding"] as &[&str]),
+        ("/sbin/pfctl", &["-s", "info"]),
+        ("/usr/bin/pmset", &["-g"]),
+    ];
+    for (cmd, args) in required {
+        let output = tokio::process::Command::new("sudo")
+            .arg("-n")
+            .arg(cmd)
+            .args(args)
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
 }
 
 fn whoami() -> String {
