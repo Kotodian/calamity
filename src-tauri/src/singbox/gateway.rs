@@ -259,8 +259,19 @@ pub fn enable_pf_rules(mtu: u16, tailscale_ip: Option<&str>) -> Result<(), Strin
 
     let mac_ip = detect_en0_ip().ok_or("failed to detect en0 IP")?;
     let tun_iface = detect_tun_interface().ok_or("failed to detect TUN interface")?;
-    let ts = tailscale_ip.and_then(|ip| {
-        detect_tailscale_interface().map(|iface| (iface, ip.to_string()))
+    // Detect Tailscale interface; use provided IP or fall back to interface IP
+    let ts = detect_tailscale_interface().and_then(|iface| {
+        let ip = tailscale_ip.map(|s| s.to_string()).or_else(|| {
+            let output = Command::new("ifconfig").arg(&iface).output().ok()?;
+            let text = String::from_utf8_lossy(&output.stdout);
+            text.lines()
+                .find(|l| l.trim().starts_with("inet "))?
+                .trim()
+                .split_whitespace()
+                .nth(1)
+                .map(|s| s.to_string())
+        })?;
+        Some((iface, ip))
     });
 
     let rules = build_pf_rules(
