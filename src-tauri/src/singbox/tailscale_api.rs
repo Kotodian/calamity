@@ -267,22 +267,20 @@ pub async fn fetch_devices(
         .await
         .map_err(|e| format!("Tailscale API parse error: {}", e))?;
 
+    // Use the local Tailscale interface IP as the authoritative source for is_self.
+    // Hostname matching is unreliable when sing-box re-registers and creates duplicate devices.
+    let local_ip = detect_local_tailscale_ip();
+
     let mut devices: Vec<TailscaleDevice> = api_resp
         .devices
         .into_iter()
         .map(|d| map_api_device(d, &settings.hostname))
         .collect();
 
-    // If multiple devices match our hostname (stale registrations from sing-box restarts),
-    // use the local Tailscale interface IP to identify the real current device.
-    let self_count = devices.iter().filter(|d| d.is_self).count();
-    if self_count > 1 {
-        if let Some(local_ip) = detect_local_tailscale_ip() {
-            for d in &mut devices {
-                if d.is_self {
-                    d.is_self = d.ip == local_ip;
-                }
-            }
+    if let Some(ref lip) = local_ip {
+        // Clear all hostname-based is_self, use interface IP instead
+        for d in &mut devices {
+            d.is_self = d.ip == *lip;
         }
     }
 
