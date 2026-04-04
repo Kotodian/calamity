@@ -229,30 +229,60 @@ impl SingboxProcess {
 
         config::write_config(settings)?;
 
-        // Try managed child first
-        let guard = self.child.lock().await;
-        if let Some(ref child) = *guard {
-            if let Some(pid) = child.id() {
+        let sent = {
+            // Try managed child first
+            let guard = self.child.lock().await;
+            if let Some(ref child) = *guard {
+                if let Some(pid) = child.id() {
+                    drop(guard);
+                    self.send_sighup(pid as i32, false)?;
+                    true
+                } else {
+                    drop(guard);
+                    false
+                }
+            } else {
                 drop(guard);
-                return self.send_sighup(pid as i32, false);
-            }
-        }
-        drop(guard);
-
-        // Try TUN process via PID file
-        let runtime = self.runtime.lock().await.clone();
-        if runtime.mode == Some(RunMode::Tun) {
-            if let Some(config_path) = runtime.config_path.as_deref() {
-                let pid_path = build_tun_pid_path(config_path);
-                if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
-                    if let Ok(pid) = pid_str.trim().parse::<i32>() {
-                        return self.send_sighup(pid, true);
+                // Try TUN process via PID file
+                let runtime = self.runtime.lock().await.clone();
+                if runtime.mode == Some(RunMode::Tun) {
+                    if let Some(config_path) = runtime.config_path.as_deref() {
+                        let pid_path = build_tun_pid_path(config_path);
+                        if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
+                            if let Ok(pid) = pid_str.trim().parse::<i32>() {
+                                self.send_sighup(pid, true)?;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
                     }
+                } else {
+                    false
                 }
             }
+        };
+
+        if !sent {
+            eprintln!("[singbox] no process found to reload");
+            return Ok(());
         }
 
-        eprintln!("[singbox] no process found to reload");
+        // Wait for Clash API to recover after SIGHUP (up to 5s)
+        eprintln!("[singbox] config reloaded, waiting for Clash API...");
+        for _ in 0..50 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            if self.api.health_check().await.unwrap_or(false) {
+                eprintln!("[singbox] Clash API recovered after reload");
+                return Ok(());
+            }
+        }
+
+        eprintln!("[singbox] warning: Clash API not responding 5s after reload");
         Ok(())
     }
 
