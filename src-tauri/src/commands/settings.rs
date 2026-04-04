@@ -66,16 +66,9 @@ pub async fn update_settings(
         }
     }
 
-    // Handle gateway mode IP forwarding + pf rules (redirect + MSS clamp)
+    // Handle gateway mode IP forwarding + pf rules
     if settings.gateway_mode && !GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
-        if let Err(e) = gateway::enable_ip_forwarding() {
-            eprintln!("[gateway] failed to enable IP forwarding: {}", e);
-        } else {
-            GATEWAY_IP_FWD_ENABLED.store(true, Ordering::Relaxed);
-        }
-        if let Err(e) = gateway::enable_pf_rules(settings.tun_config.mtu, None) {
-            eprintln!("[gateway] failed to enable pf rules: {}", e);
-        }
+        apply_gateway_rules(&settings);
     } else if !settings.gateway_mode && GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
         gateway::disable_ip_forwarding();
         gateway::disable_pf_rules();
@@ -343,6 +336,19 @@ fn escape_applescript_string(value: &str) -> String {
 pub fn apply_system_proxy_on_start(settings: &AppSettings) {
     if settings.system_proxy {
         set_system_proxy(settings.http_port, settings.socks_port);
+    }
+}
+
+
+/// Apply gateway mode rules (IP forwarding + pf). Called on connect and settings change.
+pub fn apply_gateway_rules(settings: &AppSettings) {
+    if let Err(e) = gateway::enable_ip_forwarding() {
+        eprintln!("[gateway] failed to enable IP forwarding: {}", e);
+    } else {
+        GATEWAY_IP_FWD_ENABLED.store(true, Ordering::Relaxed);
+    }
+    if let Err(e) = gateway::enable_pf_rules(settings.tun_config.mtu, None) {
+        eprintln!("[gateway] failed to enable pf rules: {}", e);
     }
 }
 

@@ -80,6 +80,11 @@ pub async fn singbox_start(app: AppHandle) -> Result<(), String> {
     let mut settings = storage::load_settings();
     process.start(&settings).await?;
 
+    // Restore gateway mode rules (IP forwarding + pf) after sing-box starts
+    if settings.gateway_mode {
+        crate::commands::settings::apply_gateway_rules(&settings);
+    }
+
     // Auto-enable system proxy if TUN is not enabled
     if !settings.enhanced_mode && !settings.system_proxy {
         settings.system_proxy = true;

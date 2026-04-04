@@ -1,35 +1,8 @@
-use std::process::Command;
-
 use serde::{Deserialize, Serialize};
 
 use super::tailscale_storage::{self, TailscaleSettings};
 
 const TOKEN_URL: &str = "https://api.tailscale.com/api/v2/oauth/token";
-
-/// Detect the local Tailscale IP from the kernel interface bound to the 100.64/10 route.
-fn detect_local_tailscale_ip() -> Option<String> {
-    let output = Command::new("netstat")
-        .args(["-rn", "-f", "inet"])
-        .output()
-        .ok()?;
-    let text = String::from_utf8_lossy(&output.stdout);
-    let iface = text.lines()
-        .find(|l| l.contains("100.64/10"))?
-        .split_whitespace()
-        .last()?
-        .to_string();
-    let if_output = Command::new("ifconfig")
-        .arg(&iface)
-        .output()
-        .ok()?;
-    let if_text = String::from_utf8_lossy(&if_output.stdout);
-    if_text.lines()
-        .find(|l| l.trim().starts_with("inet "))?
-        .trim()
-        .split_whitespace()
-        .nth(1)
-        .map(|s| s.to_string())
-}
 
 #[derive(Debug, Deserialize)]
 struct OAuthTokenResponse {
@@ -267,22 +240,14 @@ pub async fn fetch_devices(
         .await
         .map_err(|e| format!("Tailscale API parse error: {}", e))?;
 
-    // Use the local Tailscale interface IP as the authoritative source for is_self.
-    // Hostname matching is unreliable when sing-box re-registers and creates duplicate devices.
-    let local_ip = detect_local_tailscale_ip();
-
-    let mut devices: Vec<TailscaleDevice> = api_resp
+    let devices: Vec<TailscaleDevice> = api_resp
         .devices
         .into_iter()
         .map(|d| map_api_device(d, &settings.hostname))
+        // Filter out devices matching our hostname — cannot reliably identify
+        // which one is the current instance due to sing-box re-registration
+        .filter(|d| !d.is_self)
         .collect();
-
-    if let Some(ref lip) = local_ip {
-        // Clear all hostname-based is_self, use interface IP instead
-        for d in &mut devices {
-            d.is_self = d.ip == *lip;
-        }
-    }
 
     Ok(devices)
 }
