@@ -711,14 +711,15 @@
         <p class="subtitle">透明代理网关 — 让局域网设备共享代理</p>
 
         <p>
-          开启网关模式后，Calamity 会将这台 Mac 变成一个透明代理网关。局域网内的其他设备（手机、电视、游戏机等）只需将网关和 DNS 指向本机 IP，即可自动走代理，无需在每台设备上单独配置。
+          开启网关模式后，Calamity 会将这台 Mac 变成一个透明代理网关。局域网内的其他设备（手机、电视、游戏机等）只需将网关指向本机 IP、DNS 设为 <code>198.18.0.2</code>，即可自动走代理，无需在每台设备上单独配置。
         </p>
 
         <h3>工作原理</h3>
         <ul>
           <li><strong>IP 转发</strong> — 启用 macOS 内核的 IP forwarding，让本机可以转发其他设备的流量</li>
-          <li><strong>pf 重定向</strong> — 通过 macOS 防火墙（pf）将转发的 TCP 流量重定向到 sing-box 的 redirect 端口</li>
-          <li><strong>DNS 劫持</strong> — 自动劫持 53 端口的 DNS 请求，防止域名污染</li>
+          <li><strong>pf route-to</strong> — 通过 macOS 防火墙（pf）将转发的流量强制路由到 sing-box 的 TUN 接口</li>
+          <li><strong>Fake-IP DNS</strong> — 客户端 DNS 设为 <code>198.18.0.2</code>，sing-box 通过 Fake-IP 实现零延迟域名解析和智能分流</li>
+          <li><strong>Tailscale SNAT</strong> — 访问 Tailscale 节点的流量自动 SNAT 为本机 Tailscale IP，确保回程路由正确</li>
           <li><strong>MSS 钳位</strong> — 当 Tailscale 要求 MTU 1280 时，自动钳位 TCP MSS 避免分片</li>
         </ul>
 
@@ -729,15 +730,22 @@
           <li>记下本机的局域网 IP（通常为 192.168.x.x）。</li>
           <li>在其他设备的 Wi-Fi 设置中：
             <ul>
-              <li>将<strong>网关/路由器</strong>设为本机 IP</li>
-              <li>将<strong>DNS</strong>也设为本机 IP</li>
+              <li>将<strong>网关/路由器</strong>设为本机 IP（例如 <code>192.168.31.159</code>）</li>
+              <li>将<strong>DNS</strong> 设为 <code>198.18.0.2</code>（sing-box Fake-IP 地址，<strong>不要</strong>设为本机 IP）</li>
+              <li>子网掩码 <code>255.255.255.0</code>，IP 与 Mac 同网段</li>
             </ul>
           </li>
           <li>打开浏览器测试访问，确认流量正常代理。</li>
         </ol>
 
         <h3>替代方式</h3>
-        <p>也可以在路由器的 DHCP 设置中将网关地址改为本机 IP，这样所有连接该路由器的设备会自动使用 Calamity 作为网关，无需逐台配置。</p>
+        <p>也可以在路由器的 DHCP 设置中将网关地址改为本机 IP、DNS 改为 <code>198.18.0.2</code>，所有设备自动生效。</p>
+
+        <h3>Tailscale 访问</h3>
+        <p>
+          如果启用了 Tailscale 集成，局域网设备也可以通过网关访问 Tailscale 网络中的其他节点（100.x.x.x）。
+          Calamity 会自动检测 Tailscale 接口并配置 SNAT 规则，确保远端节点能正确回包。
+        </p>
 
         <div class="callout info">
           <p>

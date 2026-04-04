@@ -1,7 +1,6 @@
 use std::process::Command;
 
 const PF_ANCHOR: &str = "com.calamity.gateway";
-const REDIRECT_PORT: u16 = 7894;
 
 /// Read the current value of net.inet.ip.forwarding.
 fn get_ip_forwarding() -> bool {
@@ -52,30 +51,107 @@ pub fn disable_ip_forwarding() {
     }
 }
 
+/// Detect the primary LAN interface IP (en0).
+fn detect_en0_ip() -> Option<String> {
+    let output = Command::new("ifconfig")
+        .arg("en0")
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("inet ") {
+            return trimmed.split_whitespace().nth(1).map(|s| s.to_string());
+        }
+    }
+    None
+}
+
+/// Detect the TUN interface name from the 172.19.0.1 route.
+fn detect_tun_interface() -> Option<String> {
+    let output = Command::new("netstat")
+        .args(["-rn", "-f", "inet"])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    for line in text.lines() {
+        // auto_route creates aggregated routes (1/8, 2/7, etc.) via 172.19.0.1
+        if line.contains("172.19.0.1") {
+            return line.split_whitespace().last().map(|s| s.to_string());
+        }
+    }
+    None
+}
+
+/// Detect the Tailscale interface and IP from the 100.64/10 route.
+fn detect_tailscale_interface() -> Option<(String, String)> {
+    let output = Command::new("netstat")
+        .args(["-rn", "-f", "inet"])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    for line in text.lines() {
+        if line.contains("100.64/10") {
+            let iface = line.split_whitespace().last()?;
+            // Get IP from the interface
+            let if_output = Command::new("ifconfig")
+                .arg(iface)
+                .output()
+                .ok()?;
+            let if_text = String::from_utf8_lossy(&if_output.stdout);
+            for if_line in if_text.lines() {
+                let trimmed = if_line.trim();
+                if trimmed.starts_with("inet ") {
+                    let ip = trimmed.split_whitespace().nth(1)?;
+                    return Some((iface.to_string(), ip.to_string()));
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Build pf rules for gateway mode:
-/// - rdr: redirect forwarded TCP traffic to sing-box redirect inbound
+/// - route-to: force forwarded traffic from LAN clients into sing-box TUN
+/// - nat: SNAT Tailscale traffic to local Tailscale IP for return routing
 /// - scrub: clamp MSS to fit TUN MTU
-fn build_pf_rules(mtu: u16) -> String {
+fn build_pf_rules(
+    mtu: u16,
+    mac_ip: &str,
+    tun_iface: &str,
+    ts: Option<(&str, &str)>, // (tailscale_iface, tailscale_ip)
+) -> String {
     let max_mss = mtu.saturating_sub(40);
-    // pf requires: scrub before rdr
     let mut rules = String::new();
-    // 1. Scrub (normalization) — clamp MSS
+
+    // 1. Scrub — clamp MSS for LAN clients
     rules.push_str(&format!("scrub on en0 max-mss {}\n", max_mss));
-    // 2. Table of private/reserved ranges to exclude from redirect
-    rules.push_str("table <private> const { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 }\n");
-    // 3. Redirect DNS (UDP 53) from LAN clients to sing-box's fake-ip DNS via TUN
-    //    198.18.0.2 is routed through TUN and hijacked by sing-box dns_hijack
-    rules.push_str("rdr pass on en0 proto udp from any to any port 53 -> 198.18.0.2 port 53\n");
-    // 4. Redirect forwarded TCP from LAN clients to sing-box redirect port
-    //    Only match non-private destinations
+
+    // 2. Private address table
+    rules.push_str(
+        "table <private> const { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 }\n",
+    );
+
+    // 3. NAT — SNAT Tailscale traffic so remote nodes can reply
+    if let Some((ts_iface, ts_ip)) = ts {
+        rules.push_str(&format!(
+            "nat on {} from en0:network to 100.64.0.0/10 -> {}\n",
+            ts_iface, ts_ip
+        ));
+    }
+
+    // 4. Route-to — force forwarded non-private traffic into TUN
+    //    Excludes Mac's own IP to avoid disrupting local traffic.
+    //    LAN clients should set DNS to 198.18.0.2 (fake-ip) for proper routing.
     rules.push_str(&format!(
-        "rdr pass on en0 proto tcp from any to !<private> -> 127.0.0.1 port {}\n",
-        REDIRECT_PORT
+        "pass in quick on en0 route-to ({} 172.19.0.1) from !{} to !<private>\n",
+        tun_iface, mac_ip
     ));
+
     rules
 }
 
-/// Register our anchor in the main pf config so rdr/scrub rules take effect.
+/// Register our anchor in the main pf config so nat/scrub/filter rules take effect.
 /// pf requires strict ordering: options → scrub → nat/rdr → filter.
 fn register_pf_anchor() -> Result<(), String> {
     let output = Command::new("sudo")
@@ -91,10 +167,13 @@ fn register_pf_anchor() -> Result<(), String> {
     let current_rules = String::from_utf8_lossy(&output.stdout).to_string();
 
     let anchor_ref = format!("\"{}\"", PF_ANCHOR);
-    let has_rdr = current_nat.contains(&anchor_ref);
+    let has_nat = current_nat.contains(&format!("nat-anchor {}", anchor_ref));
     let has_scrub = current_rules.contains(&anchor_ref);
+    let has_anchor = current_rules
+        .lines()
+        .any(|l| l.trim().starts_with("anchor") && l.contains(&anchor_ref));
 
-    if has_rdr && has_scrub {
+    if has_nat && has_scrub && has_anchor {
         return Ok(());
     }
 
@@ -105,7 +184,9 @@ fn register_pf_anchor() -> Result<(), String> {
 
     for line in current_rules.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() { continue; }
+        if trimmed.is_empty() {
+            continue;
+        }
         if trimmed.starts_with("scrub") {
             scrub_lines.push(trimmed.to_string());
         } else {
@@ -129,22 +210,28 @@ fn register_pf_anchor() -> Result<(), String> {
         main_rules.push('\n');
     }
     if !has_scrub {
-        main_rules.push_str(&format!("scrub-anchor \"{}\" all fragment reassemble\n", PF_ANCHOR));
+        main_rules.push_str(&format!(
+            "scrub-anchor \"{}\" all fragment reassemble\n",
+            PF_ANCHOR
+        ));
     }
 
     // 2. NAT/RDR (translation)
+    if !has_nat {
+        main_rules.push_str(&format!("nat-anchor \"{}\" all\n", PF_ANCHOR));
+    }
     for line in &nat_lines {
         main_rules.push_str(line);
         main_rules.push('\n');
-    }
-    if !has_rdr {
-        main_rules.push_str(&format!("rdr-anchor \"{}\" all\n", PF_ANCHOR));
     }
 
     // 3. Filter
     for line in &filter_lines {
         main_rules.push_str(line);
         main_rules.push('\n');
+    }
+    if !has_anchor {
+        main_rules.push_str(&format!("anchor \"{}\" all\n", PF_ANCHOR));
     }
 
     let output = Command::new("sudo")
@@ -173,12 +260,21 @@ fn register_pf_anchor() -> Result<(), String> {
     Ok(())
 }
 
-/// Enable pf rules for gateway mode: redirect forwarded traffic + MSS clamping.
+/// Enable pf rules for gateway mode.
+/// Detects TUN, Tailscale interfaces and Mac IP dynamically.
 pub fn enable_pf_rules(mtu: u16) -> Result<(), String> {
-    // First register our anchor in the main pf config
     register_pf_anchor()?;
 
-    let rules = build_pf_rules(mtu);
+    let mac_ip = detect_en0_ip().ok_or("failed to detect en0 IP")?;
+    let tun_iface = detect_tun_interface().ok_or("failed to detect TUN interface")?;
+    let ts = detect_tailscale_interface();
+
+    let rules = build_pf_rules(
+        mtu,
+        &mac_ip,
+        &tun_iface,
+        ts.as_ref().map(|(i, ip)| (i.as_str(), ip.as_str())),
+    );
 
     let output = Command::new("sudo")
         .args(["-n", "pfctl", "-a", PF_ANCHOR, "-f", "-"])
@@ -207,7 +303,15 @@ pub fn enable_pf_rules(mtu: u16) -> Result<(), String> {
         .args(["-n", "pfctl", "-e"])
         .output();
 
-    eprintln!("[gateway] pf rules enabled (redirect port {}, max-mss {})", REDIRECT_PORT, mtu.saturating_sub(40));
+    eprintln!(
+        "[gateway] pf rules enabled (tun={}, mac={}, ts={}, max-mss={})",
+        tun_iface,
+        mac_ip,
+        ts.as_ref()
+            .map(|(i, ip)| format!("{}:{}", i, ip))
+            .unwrap_or_else(|| "none".to_string()),
+        mtu.saturating_sub(40)
+    );
     Ok(())
 }
 
@@ -226,7 +330,6 @@ pub fn disable_pf_rules() {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,23 +341,27 @@ mod tests {
     }
 
     #[test]
-    fn build_pf_rules_scrub_before_rdr() {
-        let rules = build_pf_rules(1280);
+    fn build_pf_rules_with_tailscale() {
+        let rules = build_pf_rules(1280, "192.168.31.159", "utun9", Some(("utun10", "100.93.14.146")));
+        // Correct ordering: scrub → nat → filter(route-to)
         let scrub_pos = rules.find("scrub").unwrap();
-        let rdr_pos = rules.find("rdr").unwrap();
-        assert!(scrub_pos < rdr_pos, "scrub must come before rdr");
+        let nat_pos = rules.find("nat on").unwrap();
+        let route_pos = rules.find("route-to").unwrap();
+        assert!(scrub_pos < nat_pos);
+        assert!(nat_pos < route_pos);
         assert!(rules.contains("max-mss 1240"));
-        assert!(rules.contains(&format!("port {}", REDIRECT_PORT)));
+        assert!(rules.contains("nat on utun10"));
+        assert!(rules.contains("-> 100.93.14.146"));
+        assert!(rules.contains("100.64.0.0/10"));
+        assert!(rules.contains("from !192.168.31.159"));
+        assert!(rules.contains("route-to (utun9 172.19.0.1)"));
     }
 
     #[test]
-    fn build_pf_rules_uses_single_rule_with_private_table() {
-        let rules = build_pf_rules(1500);
-        assert!(rules.contains("table <private>"));
-        assert!(rules.contains("!<private>"));
-        // DNS rdr + TCP rdr = 2 rdr rules
-        assert_eq!(rules.matches("rdr pass").count(), 2);
-        // DNS redirected to fake-ip address
-        assert!(rules.contains("198.18.0.2 port 53"));
+    fn build_pf_rules_without_tailscale() {
+        let rules = build_pf_rules(1500, "192.168.1.1", "utun5", None);
+        assert!(!rules.contains("nat on"));
+        assert!(rules.contains("route-to (utun5 172.19.0.1)"));
+        assert!(rules.contains("max-mss 1460"));
     }
 }

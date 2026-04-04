@@ -97,7 +97,9 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
 **Gateway Mode**
 
 - Transparent LAN gateway — other devices set this Mac as their gateway to proxy all traffic
-- Automatic IP forwarding, pf redirect rules, and DNS hijack for LAN clients
+- pf route-to forces forwarded traffic into sing-box TUN for full proxy processing
+- Fake-IP DNS (198.18.0.2) for zero-delay resolution and smart routing
+- Tailscale SNAT for LAN devices to access Tailscale nodes with correct return routing
 - TCP MSS clamping to avoid fragmentation when Tailscale forces lower MTU
 - One-toggle activation with automatic cleanup on exit
 

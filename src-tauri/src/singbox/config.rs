@@ -169,15 +169,6 @@ fn build_inbounds(settings: &AppSettings, listen: &str) -> Vec<Value> {
         inbounds.push(build_tun_inbound(settings));
     }
 
-    if settings.gateway_mode {
-        inbounds.push(json!({
-            "type": "redirect",
-            "tag": "redirect-in",
-            "listen": "::",
-            "listen_port": 7894
-        }));
-    }
-
     inbounds
 }
 
@@ -663,8 +654,12 @@ fn build_pre_match_route_rules(settings: &AppSettings) -> Vec<Value> {
         }),
     ];
     if settings.enhanced_mode {
+        let mut resolve_inbounds = vec!["tun-in"];
+        if settings.gateway_mode {
+            resolve_inbounds.push("redirect-in");
+        }
         rules.push(json!({
-            "inbound": ["tun-in"],
+            "inbound": resolve_inbounds,
             "action": "resolve",
             "strategy": "ipv4_only"
         }));
