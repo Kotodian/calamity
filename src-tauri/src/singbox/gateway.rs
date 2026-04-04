@@ -326,9 +326,9 @@ pub fn prevent_sleep() {
     if guard.is_some() {
         return;
     }
-    // pmset disablesleep 1 prevents ALL sleep including lid close
+    // pmset -a disablesleep 1 prevents ALL sleep on all power sources (AC + battery)
     let _ = Command::new("sudo")
-        .args(["-n", "pmset", "disablesleep", "1"])
+        .args(["-n", "pmset", "-a", "disablesleep", "1"])
         .output();
     // caffeinate as backup for non-root scenarios
     match Command::new("caffeinate")
@@ -352,9 +352,9 @@ pub fn allow_sleep() {
         eprintln!("[gateway] sleep prevention disabled");
     }
     *guard = None;
-    // Restore normal sleep behavior
+    // Restore normal sleep behavior on all power sources
     let _ = Command::new("sudo")
-        .args(["-n", "pmset", "disablesleep", "0"])
+        .args(["-n", "pmset", "-a", "disablesleep", "0"])
         .output();
 }
 
