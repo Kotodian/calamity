@@ -63,10 +63,10 @@ fn build_pf_rules(mtu: u16) -> String {
     rules.push_str(&format!("scrub on en0 max-mss {}\n", max_mss));
     // 2. Table of private/reserved ranges to exclude from redirect
     rules.push_str("table <private> const { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 }\n");
-    // 3. Redirect forwarded TCP from LAN clients to sing-box redirect port
-    //    Only match non-private destinations (single rule, not OR'd)
+    // 3. Redirect forwarded TCP+UDP from LAN clients to sing-box redirect port
+    //    Only match non-private destinations
     rules.push_str(&format!(
-        "rdr pass on en0 proto tcp from any to !<private> -> 127.0.0.1 port {}\n",
+        "rdr pass on en0 proto {{ tcp, udp }} from any to !<private> -> 127.0.0.1 port {}\n",
         REDIRECT_PORT
     ));
     rules
