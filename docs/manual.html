@@ -718,19 +718,32 @@
           Calamity 集成了 Tailscale Mesh VPN，可以直接在客户端内管理 Tailscale 网络设备和 Exit Node。
         </p>
 
-        <h3>获取 OAuth 凭证</h3>
+        <h3>1. 创建 ACL Tag</h3>
+        <p>OAuth client 必须绑定 tag 才能获取 auth key。需要先在 ACL 中定义 tag：</p>
         <ol class="steps">
-          <li>登录 <a href="https://login.tailscale.com/admin/settings/oauth" target="_blank" style="color: var(--accent)">Tailscale 管理后台</a>，进入 Settings → OAuth clients。</li>
+          <li>进入 <a href="https://login.tailscale.com/admin/acls" target="_blank" style="color: var(--accent)">Tailscale ACL 编辑器</a>（Settings → Access controls）。</li>
+          <li>在 <code>tagOwners</code> 中添加一个 tag，例如：
+            <pre style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto;"><code>"tagOwners": {
+  "tag:calamity": ["autogroup:admin"]
+}</code></pre>
+          </li>
+          <li>保存 ACL 配置。</li>
+        </ol>
+
+        <h3>2. 获取 OAuth 凭证</h3>
+        <ol class="steps">
+          <li>进入 <a href="https://login.tailscale.com/admin/settings/oauth" target="_blank" style="color: var(--accent)">Tailscale 管理后台</a>（Settings → OAuth clients）。</li>
           <li>点击 "Generate OAuth client"，勾选以下权限：
             <ul>
               <li><code>devices:read</code> — 读取设备列表</li>
               <li><code>routes:read</code> — 读取路由信息（用于 Exit Node 列表）</li>
             </ul>
           </li>
+          <li>在 Tags 中选择刚创建的 <code>tag:calamity</code>。</li>
           <li>生成后复制 <strong>Client ID</strong> 和 <strong>Client Secret</strong>（Secret 只显示一次，请妥善保存）。</li>
         </ol>
 
-        <h3>在 Calamity 中配置</h3>
+        <h3>3. 在 Calamity 中配置</h3>
         <ol class="steps">
           <li>进入 Tailscale 页面，将 OAuth Client ID 和 Secret 粘贴到对应输入框，点击"测试连接"验证。</li>
           <li>验证通过后点击"保存"，设备列表会自动加载，显示 Tailscale 网络中的所有设备。</li>
