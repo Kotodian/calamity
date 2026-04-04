@@ -379,6 +379,7 @@
           <a href="#subs">订阅管理</a>
           <a href="#dns">DNS 配置</a>
           <a href="#tun">TUN 模式</a>
+          <a href="#tailscale">Tailscale</a>
           <a href="#settings">设置</a>
           <a href="#logs">日志与排障</a>
         </nav>
@@ -540,6 +541,11 @@
         <h2>5. 规则集市场</h2>
         <p class="subtitle">一键安装社区规则集</p>
 
+        <div class="screenshot-wrap">
+          <img src="./screenshots/rulesets.png" alt="规则集市场" />
+          <div class="screenshot-caption">规则集市场 — 搜索并一键安装社区规则集</div>
+        </div>
+
         <p>
           规则集市场提供了大量预配置的规则集，可以快速添加常用站点和服务的路由规则，
           无需手动逐条配置。
@@ -560,6 +566,11 @@
       <section class="section" id="connections">
         <h2>6. 连接监控</h2>
         <p class="subtitle">实时查看活跃连接详情</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/connections.png" alt="连接页面" />
+          <div class="screenshot-caption">连接页面 — 实时连接列表、进程信息、流量统计</div>
+        </div>
 
         <p>
           连接页面实时展示所有通过 sing-box 代理的网络连接。你可以看到每条连接的目标地址、
@@ -618,6 +629,11 @@
       <section class="section" id="dns">
         <h2>8. DNS 配置</h2>
         <p class="subtitle">管理 DNS 服务器和分流规则</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/dns.png" alt="DNS 页面" />
+          <div class="screenshot-caption">DNS 页面 — DNS 服务器管理与分流规则配置</div>
+        </div>
 
         <p>
           DNS 页面分为"配置"和"DNS 规则"两个标签页。配置页管理 DNS 模式和上游服务器，
@@ -688,9 +704,40 @@
         <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <!-- ════ 10. 设置 ════ -->
+      <!-- ════ 10. Tailscale ════ -->
+      <section class="section" id="tailscale">
+        <h2>10. Tailscale 集成</h2>
+        <p class="subtitle">Mesh VPN 设备管理</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/tailscale.png" alt="Tailscale 页面" />
+          <div class="screenshot-caption">Tailscale 页面 — OAuth 授权、设备列表、Exit Node 切换</div>
+        </div>
+
+        <p>
+          Calamity 集成了 Tailscale Mesh VPN，可以直接在客户端内管理 Tailscale 网络设备和 Exit Node。
+        </p>
+
+        <h3>配置步骤</h3>
+        <ol class="steps">
+          <li>进入 Tailscale 页面，输入 OAuth Client ID 和 Secret 完成授权。</li>
+          <li>授权成功后，设备列表会自动加载，显示所有 Tailscale 网络中的设备。</li>
+          <li>点击设备可以将其设为 Exit Node，所有 Tailscale 流量将通过该设备路由。</li>
+          <li>Calamity 会自动将 Tailscale 的路由和 DNS 规则注入 sing-box 配置中。</li>
+        </ol>
+
+        <div class="callout info">
+          <p>
+            Tailscale 的 100.64.0.0/10 网段流量会自动通过专用出口路由，不受其他规则影响。
+          </p>
+        </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 11. 设置 ════ -->
       <section class="section" id="settings">
-        <h2>10. 设置</h2>
+        <h2>11. 设置</h2>
         <p class="subtitle">全局配置选项</p>
 
         <div class="screenshot-wrap">
@@ -714,9 +761,9 @@
         <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <!-- ════ 11. 日志与排障 ════ -->
+      <!-- ════ 12. 日志与排障 ════ -->
       <section class="section" id="logs">
-        <h2>11. 日志与排障</h2>
+        <h2>12. 日志与排障</h2>
         <p class="subtitle">诊断连接问题</p>
 
         <div class="screenshot-wrap">
