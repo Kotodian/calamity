@@ -58,6 +58,12 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
     <td align="center"><strong>Subscriptions</strong> — Node subscription management</td>
     <td align="center"><strong>Tray</strong> — Compact quick-access window</td>
   </tr>
+    <tr>
+    <td><img src="./docs/screenshots/tailscale.png" alt="Tailscale" width="550" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Tailscale</strong> — Tailscale management</td>
+  </tr>
 </table>
 
 ## Features

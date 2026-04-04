@@ -6,14 +6,21 @@
     <title>Calamity 操作手册</title>
     <style>
       :root {
-        color-scheme: light;
-        --bg: #f4f1ea;
-        --surface: rgba(255, 255, 255, 0.9);
-        --text: #1c1d1f;
-        --muted: #5d5f66;
-        --accent: #af5d28;
-        --accent-soft: rgba(175, 93, 40, 0.1);
-        --border: rgba(28, 29, 31, 0.1);
+        color-scheme: dark;
+        --bg: #0e0f11;
+        --surface: rgba(22, 24, 28, 0.92);
+        --surface-hover: rgba(30, 32, 38, 0.95);
+        --text: #e8e6e3;
+        --muted: #8b8d94;
+        --accent: #e94560;
+        --accent-soft: rgba(233, 69, 96, 0.12);
+        --accent-glow: rgba(233, 69, 96, 0.25);
+        --green: #22c55e;
+        --green-soft: rgba(34, 197, 94, 0.12);
+        --border: rgba(255, 255, 255, 0.06);
+        --border-hover: rgba(255, 255, 255, 0.12);
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+        --radius: 20px;
       }
 
       * {
@@ -22,34 +29,46 @@
 
       body {
         margin: 0;
-        font-family: "SF Pro Display", "PingFang SC", "Segoe UI", sans-serif;
+        font-family: -apple-system, "SF Pro Display", "PingFang SC",
+          "Segoe UI", sans-serif;
         color: var(--text);
-        background:
-          radial-gradient(circle at top right, rgba(175, 93, 40, 0.16), transparent 26%),
-          radial-gradient(circle at top left, rgba(18, 116, 85, 0.12), transparent 24%),
-          linear-gradient(180deg, #fbfaf7 0%, var(--bg) 100%);
+        background: var(--bg);
+        background-image: radial-gradient(
+            circle at 20% 0%,
+            rgba(233, 69, 96, 0.08),
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at 80% 100%,
+            rgba(99, 102, 241, 0.06),
+            transparent 40%
+          );
+        min-height: 100vh;
       }
 
       a {
-        color: inherit;
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
       }
 
       .shell {
-        width: min(1040px, calc(100% - 32px));
+        width: min(980px, calc(100% - 40px));
         margin: 0 auto;
-        padding: 40px 0 64px;
+        padding: 48px 0 80px;
       }
 
-      .hero,
-      .section {
-        border: 1px solid var(--border);
-        border-radius: 26px;
-        background: var(--surface);
-        box-shadow: 0 20px 54px rgba(28, 29, 31, 0.08);
-      }
-
+      /* ── Hero ─────────────────────────────── */
       .hero {
-        padding: 36px;
+        padding: 40px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        box-shadow: var(--shadow);
       }
 
       .crumb {
@@ -61,233 +80,684 @@
         font-size: 14px;
       }
 
+      .crumb a {
+        color: var(--muted);
+      }
+
+      .crumb a:hover {
+        color: var(--accent);
+      }
+
       .tag {
         display: inline-flex;
-        padding: 6px 12px;
+        padding: 6px 14px;
         border-radius: 999px;
         background: var(--accent-soft);
         color: var(--accent);
         font-size: 13px;
         font-weight: 700;
+        letter-spacing: 0.04em;
       }
 
       h1 {
-        margin: 16px 0 10px;
-        font-size: clamp(34px, 7vw, 58px);
-        line-height: 1.04;
+        margin: 18px 0 12px;
+        font-size: clamp(32px, 6vw, 52px);
+        line-height: 1.1;
+        background: linear-gradient(135deg, #fff 40%, var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
       }
 
-      .hero p {
+      .hero > p {
         margin: 0;
         color: var(--muted);
         font-size: 17px;
         line-height: 1.75;
+        max-width: 680px;
       }
 
       .toc {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-top: 24px;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+        margin-top: 28px;
       }
 
       .toc a {
-        padding: 14px 16px;
-        border-radius: 18px;
+        display: block;
+        padding: 12px 16px;
+        border-radius: 14px;
         text-decoration: none;
         border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 160ms ease;
       }
 
       .toc a:hover {
-        border-color: rgba(175, 93, 40, 0.32);
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        text-decoration: none;
+        transform: translateY(-1px);
       }
 
+      /* ── Section ──────────────────────────── */
       .section {
-        margin-top: 24px;
-        padding: 28px 30px;
+        margin-top: 28px;
+        padding: 32px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
       }
 
       h2 {
-        margin: 0 0 14px;
-        font-size: 28px;
+        margin: 0 0 6px;
+        font-size: 26px;
+        color: #fff;
+      }
+
+      .section > .subtitle {
+        color: var(--muted);
+        font-size: 15px;
+        margin: 0 0 20px;
       }
 
       h3 {
-        margin: 22px 0 10px;
-        font-size: 20px;
+        margin: 28px 0 10px;
+        font-size: 19px;
+        color: #fff;
       }
 
       p,
       li {
         color: var(--muted);
-        line-height: 1.8;
+        line-height: 1.85;
+        font-size: 15px;
       }
 
       ul,
       ol {
-        margin: 0;
-        padding-left: 20px;
+        margin: 8px 0;
+        padding-left: 22px;
       }
 
+      li + li {
+        margin-top: 4px;
+      }
+
+      /* ── Screenshot ───────────────────────── */
+      .screenshot-wrap {
+        margin: 20px 0;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: #000;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      .screenshot-wrap img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .screenshot-caption {
+        padding: 10px 16px;
+        font-size: 13px;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.03);
+        border-top: 1px solid var(--border);
+        text-align: center;
+      }
+
+      /* ── Callout ──────────────────────────── */
       .callout {
-        margin-top: 16px;
-        padding: 16px 18px;
-        border-radius: 18px;
-        background: rgba(18, 116, 85, 0.08);
-        border: 1px solid rgba(18, 116, 85, 0.14);
+        margin: 18px 0;
+        padding: 16px 20px;
+        border-radius: 14px;
+        border: 1px solid rgba(34, 197, 94, 0.2);
+        background: var(--green-soft);
       }
 
+      .callout p {
+        margin: 0;
+        color: #a3e4ba;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .callout.warn {
+        border-color: rgba(251, 191, 36, 0.2);
+        background: rgba(251, 191, 36, 0.08);
+      }
+
+      .callout.warn p {
+        color: #fcd68c;
+      }
+
+      /* ── Code ─────────────────────────────── */
       code {
-        padding: 2px 6px;
+        padding: 2px 7px;
         border-radius: 6px;
-        background: rgba(28, 29, 31, 0.06);
-        font-family: "SFMono-Regular", "Cascadia Code", monospace;
-        font-size: 0.95em;
+        background: rgba(255, 255, 255, 0.06);
+        font-family: "SFMono-Regular", "Cascadia Code", "Fira Code", monospace;
+        font-size: 0.9em;
+        color: var(--accent);
+      }
+
+      /* ── Steps ────────────────────────────── */
+      .steps {
+        counter-reset: step;
+        list-style: none;
+        padding: 0;
+        margin: 16px 0;
+      }
+
+      .steps li {
+        counter-increment: step;
+        position: relative;
+        padding-left: 40px;
+        padding-bottom: 18px;
+        border-left: 2px solid var(--border);
+        margin-left: 14px;
+      }
+
+      .steps li:last-child {
+        border-left-color: transparent;
+        padding-bottom: 0;
+      }
+
+      .steps li::before {
+        content: counter(step);
+        position: absolute;
+        left: -13px;
+        top: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* ── Table ─────────────────────────────── */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 14px;
+      }
+
+      th, td {
+        padding: 10px 14px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+
+      th {
+        color: var(--text);
+        font-weight: 600;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      /* ── Back to top ───────────────────────── */
+      .back-top {
+        display: inline-block;
+        margin-top: 20px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .back-top:hover {
+        color: var(--accent);
+      }
+
+      /* ── Footer ────────────────────────────── */
+      .footer {
+        margin-top: 48px;
+        padding: 24px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        border-top: 1px solid var(--border);
+      }
+
+      .footer a {
+        color: var(--accent);
+      }
+
+      @media (max-width: 640px) {
+        .hero {
+          padding: 24px;
+        }
+        .section {
+          padding: 20px;
+        }
+        .toc {
+          grid-template-columns: repeat(2, 1fr);
+        }
       }
     </style>
   </head>
   <body>
-    <main class="shell">
+    <main class="shell" id="top">
+      <!-- ════ Hero ════ -->
       <section class="hero">
         <div class="crumb">
           <a href="./index.html">Calamity Docs</a>
           <span>/</span>
           <span>操作手册</span>
         </div>
-        <span class="tag">操作手册</span>
-        <h1>Calamity 中文使用说明</h1>
+        <span class="tag">操作指南</span>
+        <h1>Calamity 使用手册</h1>
         <p>
-          这份手册面向日常使用者，覆盖托盘操作、主界面功能、节点和规则管理、DNS、TUN
-          模式以及常见建议。内容按“先能用，再进阶”的顺序组织。
+          这份手册面向日常使用者，覆盖从安装启动到高级配置的完整操作流程。
+          内容按"先能用，再进阶"的顺序组织，每个章节均配有真实界面截图。
         </p>
         <nav class="toc">
           <a href="#startup">启动与界面</a>
-          <a href="#tray">托盘操作</a>
-          <a href="#nodes">节点与连接</a>
-          <a href="#rules">规则</a>
-          <a href="#dns">DNS</a>
+          <a href="#dashboard">仪表盘</a>
+          <a href="#nodes">节点管理</a>
+          <a href="#rules">规则配置</a>
+          <a href="#rulesets">规则集市场</a>
+          <a href="#connections">连接监控</a>
+          <a href="#subs">订阅管理</a>
+          <a href="#dns">DNS 配置</a>
           <a href="#tun">TUN 模式</a>
-          <a href="#subs">订阅</a>
+          <a href="#settings">设置</a>
           <a href="#logs">日志与排障</a>
         </nav>
       </section>
 
+      <!-- ════ 1. 启动与界面 ════ -->
       <section class="section" id="startup">
-        <h2>启动与界面</h2>
+        <h2>1. 启动与界面</h2>
+        <p class="subtitle">了解 Calamity 的基本结构</p>
+
         <p>
-          Calamity 由主窗口和托盘窗口组成。主窗口用于完整配置；托盘窗口用于快速开关、
-          查看状态和执行常用操作。
+          Calamity 由<strong>主窗口</strong>和<strong>托盘窗口</strong>两部分组成。
+          主窗口用于完整配置和监控，托盘窗口用于快速开关和状态查看。
         </p>
-        <ol>
-          <li>启动应用后，主窗口会自动加载当前设置并尝试启动 sing-box。</li>
-          <li>点击菜单栏图标可以展开托盘窗口。</li>
-          <li>关闭主窗口默认只是隐藏，不会退出应用。</li>
-          <li>使用托盘中的退出按钮，才会执行完整清理并退出。</li>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/dashboard-dark.png" alt="Calamity 仪表盘" />
+          <div class="screenshot-caption">Calamity 主窗口 — 仪表盘页面，显示连接状态、速率和带宽历史</div>
+        </div>
+
+        <h3>首次启动</h3>
+        <ol class="steps">
+          <li>从 <a href="https://github.com/Kotodian/calamity/releases">Releases</a> 下载最新 <code>.dmg</code> 安装包，拖拽到 Applications 文件夹。</li>
+          <li>首次打开时，macOS 可能会阻止运行。右键选择"打开"以绕过 Gatekeeper，或在终端执行 <code>xattr -cr /Applications/Calamity.app</code>。</li>
+          <li>启动后，主窗口会自动加载当前配置并尝试启动 sing-box 核心。</li>
+          <li>关闭主窗口只是隐藏，不会退出应用。需要在托盘中点击"退出"才会完整清理并退出。</li>
         </ol>
+
+        <h3>界面结构</h3>
+        <p>左侧边栏包含所有功能页面的入口：</p>
+
+        <table>
+          <thead>
+            <tr><th>页面</th><th>功能说明</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>仪表盘</td><td>总览连接状态、实时速率、流量统计和带宽历史图表</td></tr>
+            <tr><td>节点</td><td>管理代理节点和分组，切换活跃节点，测试延迟</td></tr>
+            <tr><td>规则</td><td>配置路由规则，定义流量匹配和出口策略</td></tr>
+            <tr><td>规则集</td><td>浏览和安装社区规则集</td></tr>
+            <tr><td>连接</td><td>实时查看所有活跃连接的详细信息</td></tr>
+            <tr><td>日志</td><td>查看 sing-box 核心和应用的运行日志</td></tr>
+            <tr><td>订阅</td><td>管理节点订阅源，支持自动更新</td></tr>
+            <tr><td>内网互联</td><td>Tailscale 集成，管理 Mesh VPN 设备和节点</td></tr>
+            <tr><td>DNS</td><td>配置 DNS 服务器、模式和分流规则</td></tr>
+            <tr><td>设置</td><td>语言、主题、代理端口、TUN 模式等全局配置</td></tr>
+          </tbody>
+        </table>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <section class="section" id="tray">
-        <h2>托盘操作</h2>
-        <h3>状态区</h3>
-        <p>托盘顶部会显示连接状态、当前节点、延迟和实时上下行速度。</p>
+      <!-- ════ 2. 仪表盘 ════ -->
+      <section class="section" id="dashboard">
+        <h2>2. 仪表盘</h2>
+        <p class="subtitle">总览连接状态和实时流量</p>
 
-        <h3>常用动作</h3>
+        <div class="screenshot-wrap">
+          <img src="./screenshots/dashboard-dark.png" alt="仪表盘页面" />
+          <div class="screenshot-caption">仪表盘 — 连接状态指示器、上传/下载速率、流量统计和带宽历史图表</div>
+        </div>
+
+        <p>仪表盘是打开应用后看到的第一个页面，提供以下关键信息：</p>
         <ul>
-          <li>切换系统代理开关</li>
-          <li>复制代理地址</li>
-          <li>切换语言</li>
-          <li>打开主面板</li>
-          <li>连接或断开代理</li>
-          <li>退出应用</li>
+          <li><strong>连接状态</strong> — 中央的电源按钮图标显示当前连接状态（已连接/已断开），下方显示"已保护"标识。</li>
+          <li><strong>实时速率</strong> — 上传和下载的实时速度，以 KB/s 或 MB/s 显示。</li>
+          <li><strong>流量统计</strong> — 当前会话的总流量消耗。</li>
+          <li><strong>连接数</strong> — 当前活跃的连接数量。</li>
+          <li><strong>内存占用</strong> — sing-box 核心的内存使用量。</li>
+          <li><strong>运行时长</strong> — 当前连接已持续的时间。</li>
+          <li><strong>带宽历史</strong> — 最近 5 分钟的上传和下载速率图表，直观展示流量变化趋势。</li>
         </ul>
 
-        <div class="callout">
-          <p>
-            当 TUN 模式开启时，系统代理会保持关闭状态；托盘中对应开关会被禁用，避免两套接管方式同时启用。
-          </p>
-        </div>
+        <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
+      <!-- ════ 3. 节点管理 ════ -->
       <section class="section" id="nodes">
-        <h2>节点与连接</h2>
+        <h2>3. 节点管理</h2>
+        <p class="subtitle">管理代理节点和分组</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/nodes.png" alt="节点页面" />
+          <div class="screenshot-caption">节点页面 — 展示代理节点列表、区域筛选、连接稳定性图表</div>
+        </div>
+
+        <h3>基本操作</h3>
+        <ol class="steps">
+          <li>在侧边栏点击"节点"进入节点管理页面。页面顶部会显示当前活跃节点名称。</li>
+          <li>使用 <code>Proxy</code> / <code>Test</code> 标签切换代理节点和测试节点视图。</li>
+          <li>使用区域筛选标签（All、HK、JP、US、SG、KR、DE、GB）快速过滤不同地区的节点。</li>
+          <li>点击任意节点卡片即可将其设为活跃节点，应用会自动重启 sing-box 并切换连接。</li>
+          <li>点击右上角"测试全部"按钮可对所有节点进行批量延迟测试。</li>
+        </ol>
+
+        <h3>节点分组</h3>
         <p>
-          节点页面用于管理代理节点和分组。当前活跃节点会影响实际连接状态，也会同步显示在托盘和侧边栏中。
+          节点支持按组组织管理。点击右上角的"新分组"按钮可以创建新的节点分组。
+          分组支持普通分组和 <code>urltest</code> 自动测速分组两种类型。
         </p>
-        <ul>
-          <li>节点可以按组组织，支持普通分组和 `urltest` 分组。</li>
-          <li>切换活跃节点后，应用会重启 sing-box 并同步最新连接状态。</li>
-          <li>如果当前没有活跃节点，即使 sing-box 正在运行，界面也会显示为未连接。</li>
-        </ul>
+
+        <h3>连接稳定性</h3>
+        <p>
+          页面下方的连接稳定性图表会展示当前活跃节点近期的延迟波动情况，
+          包括平均延迟和抖动值，帮助你判断节点质量。
+        </p>
+
+        <div class="callout">
+          <p>
+            如果切换节点后出现连接失败，检查节点是否仍然可用。可以先执行一次延迟测试确认节点存活。
+          </p>
+        </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
+      <!-- ════ 4. 规则配置 ════ -->
       <section class="section" id="rules">
-        <h2>规则</h2>
+        <h2>4. 规则配置</h2>
+        <p class="subtitle">定义流量路由策略</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/rules.png" alt="规则页面" />
+          <div class="screenshot-caption">规则页面 — 路由规则列表，支持 geoip、geosite、process-path、rule-set 等多种匹配类型</div>
+        </div>
+
+        <h3>规则概述</h3>
         <p>
-          规则页面用于定义域名、后缀、关键词等匹配条件，以及这些流量的出口策略。未命中的流量会落到 Final 出口。
+          规则页面用于定义流量的路由策略。每条规则包含匹配条件和出口选择，
+          流量按从上到下的顺序匹配，命中后走对应出口。未命中任何规则的流量会走"最终出口"。
         </p>
-        <ul>
-          <li>支持自定义顺序，越靠前的规则越先匹配。</li>
-          <li>支持为规则选择具体节点、`direct` 或 `reject`。</li>
-          <li>支持设置 Final 出口，用于处理未命中的流量。</li>
-          <li>托盘中的站点规则是规则系统的快捷入口，不是另一套独立规则。</li>
-        </ul>
+
+        <h3>操作步骤</h3>
+        <ol class="steps">
+          <li>点击右上角"添加规则"按钮新建路由规则。</li>
+          <li>设置规则的匹配类型：支持 <code>geoip</code>（按地理 IP）、<code>geosite</code>（按站点分类）、<code>process-path</code>（按进程路径）、<code>rule-set</code>（引用规则集）等。</li>
+          <li>选择规则的出口策略：可以指定某个代理节点、<code>直连</code> 或 <code>拒绝</code>。</li>
+          <li>使用每条规则右侧的开关来启用或禁用单条规则。</li>
+          <li>使用编辑按钮（粉色铅笔图标）修改规则，使用删除按钮（红色垃圾桶图标）删除规则。</li>
+        </ol>
+
+        <h3>最终出口</h3>
+        <p>
+          页面顶部的"最终出口"设置决定了未匹配到任何规则的流量走向。
+          可以设置为直连、某个代理节点或拒绝。
+        </p>
+
+        <div class="callout warn">
+          <p>
+            规则的排列顺序很重要 — 越靠前的规则优先级越高。如果两条规则都能匹配某个请求，排在前面的规则会生效。
+          </p>
+        </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
+      <!-- ════ 5. 规则集市场 ════ -->
+      <section class="section" id="rulesets">
+        <h2>5. 规则集市场</h2>
+        <p class="subtitle">一键安装社区规则集</p>
+
+        <p>
+          规则集市场提供了大量预配置的规则集，可以快速添加常用站点和服务的路由规则，
+          无需手动逐条配置。
+        </p>
+
+        <h3>使用方法</h3>
+        <ol class="steps">
+          <li>点击侧边栏"规则集"进入市场页面，当前可用规则集数量会显示在页面标题旁。</li>
+          <li>使用搜索框按名称搜索规则集（如 "Google"、"Twitter"、"Telegram" 等）。</li>
+          <li>找到需要的规则集后，点击下载图标即可一键安装到本地。</li>
+          <li>安装完成后，可以在规则页面中通过 <code>rule-set</code> 类型引用已安装的规则集。</li>
+        </ol>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 6. 连接监控 ════ -->
+      <section class="section" id="connections">
+        <h2>6. 连接监控</h2>
+        <p class="subtitle">实时查看活跃连接详情</p>
+
+        <p>
+          连接页面实时展示所有通过 sing-box 代理的网络连接。你可以看到每条连接的目标地址、
+          协议类型、匹配的规则、使用的出口节点以及数据传输量。
+        </p>
+
+        <h3>页面功能</h3>
+        <ul>
+          <li><strong>连接统计</strong> — 页面顶部显示总连接数，以及代理、直连、拒绝的分类统计。</li>
+          <li><strong>筛选标签</strong> — 可按"全部"、"代理"、"直连"、"拒绝"分类查看。</li>
+          <li><strong>搜索过滤</strong> — 支持按主机名或进程名搜索特定连接。</li>
+          <li><strong>连接详情</strong> — 每条连接显示目标 IP/域名、端口、协议（TCP/UDP）、匹配规则、出口节点、上下行流量。</li>
+          <li><strong>关闭连接</strong> — 点击连接右侧的 × 按钮可以主动断开单条连接。</li>
+          <li><strong>全部清空</strong> — 右上角的"全部清空"按钮可以一次断开所有连接。</li>
+        </ul>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 7. 订阅管理 ════ -->
+      <section class="section" id="subs">
+        <h2>7. 订阅管理</h2>
+        <p class="subtitle">添加和更新节点订阅源</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/subscriptions.png" alt="订阅页面" />
+          <div class="screenshot-caption">订阅页面 — 添加订阅地址、管理订阅状态、手动更新节点</div>
+        </div>
+
+        <h3>添加订阅</h3>
+        <ol class="steps">
+          <li>在页面顶部的输入框中粘贴订阅地址（URL）。</li>
+          <li>在右侧的"名称"输入框中为订阅起一个便于识别的名字。</li>
+          <li>点击粉色"添加"按钮完成添加。</li>
+        </ol>
+
+        <h3>管理订阅</h3>
+        <ul>
+          <li><strong>启用/禁用</strong> — 使用订阅名称右侧的开关控制订阅是否生效。</li>
+          <li><strong>手动更新</strong> — 点击"立即更新"按钮手动拉取最新节点列表。</li>
+          <li><strong>全部更新</strong> — 点击右上角"全部更新"一次性更新所有订阅。</li>
+          <li><strong>自动更新</strong> — 每个订阅可以独立设置自动更新间隔（如 12h、24h）。</li>
+          <li><strong>订阅信息</strong> — 显示节点数量、上次更新时间等信息。</li>
+        </ul>
+
+        <div class="callout">
+          <p>
+            更新订阅后，建议检查当前活跃节点是否仍然存在于更新后的节点列表中。如果节点被移除，需要重新选择活跃节点。
+          </p>
+        </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 8. DNS 配置 ════ -->
       <section class="section" id="dns">
-        <h2>DNS</h2>
+        <h2>8. DNS 配置</h2>
+        <p class="subtitle">管理 DNS 服务器和分流规则</p>
+
         <p>
-          DNS 页面用于管理上游 DNS 服务器、匹配规则和最终服务器。它会直接影响解析路径和 Fake-IP 行为。
+          DNS 页面分为"配置"和"DNS 规则"两个标签页。配置页管理 DNS 模式和上游服务器，
+          规则页管理域名级别的 DNS 分流。
         </p>
-        <ul>
-          <li>可以配置 UDP、DoH、DoT 等常见解析方式。</li>
-          <li>可以为特定域名、后缀或关键词指定服务器。</li>
-          <li>当 TUN 模式开启时，运行时会强制使用 Fake-IP。</li>
-        </ul>
+
+        <h3>DNS 模式</h3>
+        <p>
+          页面顶部可选择 DNS 模式。当 TUN 模式开启时，会强制使用 <code>Fake-IP</code> 模式，
+          范围为 <code>198.18.0.0/15</code>。
+        </p>
+
+        <h3>DNS 服务器管理</h3>
+        <ol class="steps">
+          <li>点击"添加服务器"按钮新增 DNS 上游。</li>
+          <li>支持 UDP、DoH（<code>https://</code>）、DoT 等多种协议。</li>
+          <li>为每个 DNS 服务器指定出口节点 — 可以选择直连或通过代理查询。</li>
+          <li>使用左侧开关启用或禁用单个 DNS 服务器。</li>
+          <li>点击红色垃圾桶图标删除不需要的服务器。</li>
+        </ol>
+
+        <div class="callout warn">
+          <p>
+            DNS 配置直接影响域名解析路径。如果配置不当可能导致无法正常上网。
+            建议至少保留一个可靠的 DNS 服务器（如 Cloudflare 的 1.1.1.1 或 AliDNS）。
+          </p>
+        </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
+      <!-- ════ 9. TUN 模式 ════ -->
       <section class="section" id="tun">
-        <h2>TUN 模式</h2>
+        <h2>9. TUN 模式</h2>
+        <p class="subtitle">系统级流量接管</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/settings.png" alt="设置页面 - TUN 模式" />
+          <div class="screenshot-caption">设置页面 — 增强模式（TUN）开关和状态指示</div>
+        </div>
+
         <p>
-          TUN 模式用于接管系统层流量。当前实现主要面向 macOS，并且需要管理员权限才能启动。
+          TUN 模式通过创建虚拟网络接口来接管系统层所有流量，比系统代理覆盖范围更广。
+          适用于需要让所有应用（包括不支持代理设置的应用）都走代理的场景。
         </p>
-        <ol>
-          <li>在设置页开启 TUN 模式。</li>
-          <li>按提示完成管理员授权。</li>
-          <li>应用会以带权限的方式启动 sing-box，并接管 TUN 流量。</li>
-          <li>退出应用时会尝试完整停止该进程，释放 TUN 接口。</li>
+
+        <h3>启用步骤</h3>
+        <ol class="steps">
+          <li>进入"设置"页面，找到"增强模式"选项。</li>
+          <li>开启增强模式开关（TUN 模式会接管系统全部流量，需要 root 权限）。</li>
+          <li>首次启用时需要完成管理员授权，输入系统密码。</li>
+          <li>启用成功后会显示"TUN 模式已启用"和"已启用免密 TUN"状态。</li>
+        </ol>
+
+        <div class="callout warn">
+          <p>
+            开启 TUN 模式后，系统代理会自动关闭。如果只需要浏览器和特定程序走代理，
+            优先使用系统代理模式；如果需要完整接管系统流量再启用 TUN。
+          </p>
+        </div>
+
+        <h3>退出行为</h3>
+        <p>
+          退出应用时，Calamity 会自动停止 sing-box 进程并释放 TUN 接口，
+          确保系统网络恢复正常状态。
+        </p>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 10. 设置 ════ -->
+      <section class="section" id="settings">
+        <h2>10. 设置</h2>
+        <p class="subtitle">全局配置选项</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/settings.png" alt="设置页面" />
+          <div class="screenshot-caption">设置页面 — 语言、主题、开机启动、代理模式、TUN 配置</div>
+        </div>
+
+        <h3>外观设置</h3>
+        <ul>
+          <li><strong>语言</strong> — 支持跟随系统、简体中文和 English 三个选项。</li>
+          <li><strong>主题</strong> — 支持浅色和深色两种主题，可跟随系统设置。</li>
+        </ul>
+
+        <h3>通用设置</h3>
+        <ul>
+          <li><strong>开机启动</strong> — 登录时自动启动 Calamity。</li>
+          <li><strong>系统代理</strong> — 启用后 TUN 模式关闭时，系统代理会保持关闭状态。</li>
+          <li><strong>增强模式</strong> — 即 TUN 模式，接管系统全部流量（需要 root 权限）。</li>
+        </ul>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 11. 日志与排障 ════ -->
+      <section class="section" id="logs">
+        <h2>11. 日志与排障</h2>
+        <p class="subtitle">诊断连接问题</p>
+
+        <div class="screenshot-wrap">
+          <img src="./screenshots/logs.png" alt="日志页面" />
+          <div class="screenshot-caption">日志页面 — 按级别筛选日志，支持全部、调试、信息、警告、错误分类</div>
+        </div>
+
+        <h3>日志功能</h3>
+        <ul>
+          <li><strong>级别筛选</strong> — 支持按"全部"、"调试"、"信息"、"警告"、"错误"分类查看。</li>
+          <li><strong>搜索过滤</strong> — 使用搜索框过滤包含特定关键词的日志。</li>
+          <li><strong>自动滚动</strong> — 页面底部可开启自动滚动，实时跟踪最新日志。</li>
+          <li><strong>清空日志</strong> — 右上角"清空"按钮可清除所有日志记录。</li>
+        </ul>
+
+        <h3>常见排障步骤</h3>
+        <ol class="steps">
+          <li>确认 sing-box 核心是否已成功启动 — 日志中应看到 <code>[calamity] connected to sing-box</code> 信息。</li>
+          <li>确认当前是否有活跃节点 — 如果没有选择节点，即使 sing-box 运行中也无法代理。</li>
+          <li>检查规则配置 — 确认"最终出口"和各条规则的出口是否符合预期。</li>
+          <li>检查 DNS 配置 — 确认 DNS 模式和上游服务器是否配置正确。</li>
+          <li>如使用 TUN 模式，确认管理员授权是否已通过，以及退出后 TUN 接口是否正常释放。</li>
         </ol>
 
         <div class="callout">
           <p>
-            如果你只想用浏览器或指定程序走代理，优先使用系统代理；如果希望更完整地接管系统流量，再启用 TUN。
+            如果遇到连接超时或不通的情况，可以尝试：切换节点 → 更新订阅 → 检查规则 → 查看日志中的错误信息。
           </p>
         </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <section class="section" id="subs">
-        <h2>订阅</h2>
+      <!-- ════ Footer ════ -->
+      <div class="footer">
         <p>
-          订阅页面用于添加、更新和启停订阅源。更新后节点列表会被刷新，相关状态也会同步到前端。
+          Calamity — 基于 <a href="https://sing-box.sagernet.org/">sing-box</a> 的现代 macOS 代理客户端
+          · <a href="https://github.com/Kotodian/calamity">GitHub</a>
+          · <a href="./index.html">文档首页</a>
         </p>
-        <ul>
-          <li>支持手动更新单个订阅或全部订阅。</li>
-          <li>支持自动更新间隔。</li>
-          <li>订阅修改后建议确认活跃节点是否仍然存在。</li>
-        </ul>
-      </section>
-
-      <section class="section" id="logs">
-        <h2>日志与排障</h2>
-        <p>日志页面用于查看 sing-box 和应用侧错误。排障时建议按以下顺序检查：</p>
-        <ol>
-          <li>确认 sing-box 是否已成功启动。</li>
-          <li>确认当前是否有活跃节点。</li>
-          <li>确认规则 Final 出口和节点出口是否符合预期。</li>
-          <li>确认 DNS 模式是否与当前场景匹配。</li>
-          <li>使用 TUN 时，确认管理员授权和退出清理是否正常。</li>
-        </ol>
-      </section>
+      </div>
     </main>
   </body>
 </html>
