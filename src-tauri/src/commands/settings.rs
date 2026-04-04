@@ -249,6 +249,7 @@ pub async fn install_tun_sudoers(app: AppHandle) -> Result<bool, String> {
     paths.push("/usr/bin/kill".to_string());
     paths.push("/usr/sbin/sysctl".to_string());
     paths.push("/sbin/pfctl".to_string());
+    paths.push("/usr/bin/pmset".to_string());
 
     let sudoers_line = format!(
         "{user} ALL=(root) NOPASSWD: {cmds}\n",

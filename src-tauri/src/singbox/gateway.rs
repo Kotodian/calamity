@@ -320,14 +320,19 @@ pub fn enable_pf_rules(mtu: u16, tailscale_ip: Option<&str>) -> Result<(), Strin
     Ok(())
 }
 
-/// Prevent system sleep while gateway mode is active.
+/// Prevent system sleep (including lid close) while gateway mode is active.
 pub fn prevent_sleep() {
     let mut guard = CAFFEINATE.lock().unwrap();
     if guard.is_some() {
         return;
     }
+    // pmset disablesleep 1 prevents ALL sleep including lid close
+    let _ = Command::new("sudo")
+        .args(["-n", "pmset", "disablesleep", "1"])
+        .output();
+    // caffeinate as backup for non-root scenarios
     match Command::new("caffeinate")
-        .args(["-s"]) // prevent system sleep (display can still sleep)
+        .args(["-dims"]) // display + idle + disk + system sleep
         .spawn()
     {
         Ok(child) => {
@@ -347,6 +352,10 @@ pub fn allow_sleep() {
         eprintln!("[gateway] sleep prevention disabled");
     }
     *guard = None;
+    // Restore normal sleep behavior
+    let _ = Command::new("sudo")
+        .args(["-n", "pmset", "disablesleep", "0"])
+        .output();
 }
 
 /// Remove all gateway pf rules.
