@@ -718,17 +718,35 @@
           Calamity 集成了 Tailscale Mesh VPN，可以直接在客户端内管理 Tailscale 网络设备和 Exit Node。
         </p>
 
-        <h3>配置步骤</h3>
+        <h3>获取 OAuth 凭证</h3>
         <ol class="steps">
-          <li>进入 Tailscale 页面，输入 OAuth Client ID 和 Secret 完成授权。</li>
-          <li>授权成功后，设备列表会自动加载，显示所有 Tailscale 网络中的设备。</li>
-          <li>点击设备可以将其设为 Exit Node，所有 Tailscale 流量将通过该设备路由。</li>
+          <li>登录 <a href="https://login.tailscale.com/admin/settings/oauth" target="_blank" style="color: var(--accent)">Tailscale 管理后台</a>，进入 Settings → OAuth clients。</li>
+          <li>点击 "Generate OAuth client"，勾选以下权限：
+            <ul>
+              <li><code>devices:read</code> — 读取设备列表</li>
+              <li><code>routes:read</code> — 读取路由信息（用于 Exit Node 列表）</li>
+            </ul>
+          </li>
+          <li>生成后复制 <strong>Client ID</strong> 和 <strong>Client Secret</strong>（Secret 只显示一次，请妥善保存）。</li>
+        </ol>
+
+        <h3>在 Calamity 中配置</h3>
+        <ol class="steps">
+          <li>进入 Tailscale 页面，将 OAuth Client ID 和 Secret 粘贴到对应输入框，点击"测试连接"验证。</li>
+          <li>验证通过后点击"保存"，设备列表会自动加载，显示 Tailscale 网络中的所有设备。</li>
+          <li>点击设备右侧的"设为 Exit Node"按钮，该设备会成为流量出口。</li>
           <li>Calamity 会自动将 Tailscale 的路由和 DNS 规则注入 sing-box 配置中。</li>
         </ol>
 
         <div class="callout info">
           <p>
             Tailscale 的 100.64.0.0/10 网段流量会自动通过专用出口路由，不受其他规则影响。
+          </p>
+        </div>
+
+        <div class="callout warn">
+          <p>
+            OAuth Secret 仅在创建时显示一次。如果丢失需要重新生成新的 OAuth client。
           </p>
         </div>
 
