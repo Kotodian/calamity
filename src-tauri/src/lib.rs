@@ -257,6 +257,8 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 // Clear system proxy on exit
                 crate::commands::settings::clear_system_proxy_on_exit();
+                // Disable IP forwarding if gateway mode was active
+                crate::commands::settings::cleanup_gateway_on_exit();
                 // Use synchronous cleanup to avoid async deadlock during shutdown
                 let process = app.state::<Arc<SingboxProcess>>();
                 process.stop_sync();

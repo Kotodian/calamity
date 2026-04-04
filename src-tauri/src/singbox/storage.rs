@@ -46,7 +46,7 @@ impl Default for TunConfig {
     fn default() -> Self {
         Self {
             stack: "system".to_string(),
-            mtu: 9000,
+            mtu: 1500,
             auto_route: true,
             strict_route: false,
             dns_hijack: vec!["198.18.0.2:53".to_string()],
@@ -70,6 +70,8 @@ pub struct AppSettings {
     pub enhanced_mode: bool,
     pub tun_config: TunConfig,
     pub allow_lan: bool,
+    #[serde(default)]
+    pub gateway_mode: bool,
     pub http_port: u16,
     pub socks_port: u16,
     pub mixed_port: u16,
@@ -93,6 +95,7 @@ impl Default for AppSettings {
             enhanced_mode: false,
             tun_config: TunConfig::default(),
             allow_lan: false,
+            gateway_mode: false,
             http_port: 7890,
             socks_port: 7891,
             mixed_port: 7893,
@@ -156,5 +159,32 @@ mod tests {
         assert_eq!(settings.socks_port, 1080);
         assert_eq!(settings.mixed_port, 7890);
         assert_eq!(settings.log_level, "debug");
+    }
+
+    #[test]
+    fn old_settings_json_defaults_gateway_mode_to_false() {
+        let json = r#"{
+            "theme": "dark",
+            "singboxPath": "sing-box",
+            "autoStart": false,
+            "systemProxy": true,
+            "enhancedMode": false,
+            "tunConfig": {
+                "stack": "system",
+                "mtu": 9000,
+                "autoRoute": true,
+                "strictRoute": false,
+                "dnsHijack": ["198.18.0.2:53"]
+            },
+            "allowLan": false,
+            "httpPort": 7890,
+            "socksPort": 7891,
+            "mixedPort": 7893,
+            "logLevel": "info"
+        }"#;
+
+        let settings: AppSettings =
+            serde_json::from_str(json).expect("old settings should still deserialize");
+        assert!(!settings.gateway_mode);
     }
 }

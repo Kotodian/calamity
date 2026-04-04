@@ -51,7 +51,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         ...updates,
         tunConfig: updates.tunConfig ? { ...current.tunConfig, ...updates.tunConfig } : current.tunConfig,
       };
-      if (nextSettings.enhancedMode) {
+      if (nextSettings.enhancedMode || nextSettings.gatewayMode) {
         nextSettings.systemProxy = false;
       }
       set({ settings: nextSettings });

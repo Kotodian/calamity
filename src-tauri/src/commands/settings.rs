@@ -1,9 +1,14 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::AutoLaunchManager;
 
+use crate::singbox::gateway;
 use crate::singbox::process::SingboxProcess;
 use crate::singbox::storage::{self, AppSettings};
+
+/// Tracks whether we enabled IP forwarding so we can restore on exit.
+static GATEWAY_IP_FWD_ENABLED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +66,25 @@ pub async fn update_settings(
         }
     }
 
+    // Handle gateway mode IP forwarding + MSS clamping
+    if settings.gateway_mode && !GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
+        if let Err(e) = gateway::enable_ip_forwarding() {
+            eprintln!("[gateway] failed to enable IP forwarding: {}", e);
+        } else {
+            GATEWAY_IP_FWD_ENABLED.store(true, Ordering::Relaxed);
+        }
+        // Clamp MSS when TUN MTU < 1500 to avoid fragmentation from LAN clients
+        if settings.tun_config.mtu < 1500 {
+            if let Err(e) = gateway::enable_mss_clamp(settings.tun_config.mtu) {
+                eprintln!("[gateway] failed to enable MSS clamp: {}", e);
+            }
+        }
+    } else if !settings.gateway_mode && GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
+        gateway::disable_ip_forwarding();
+        gateway::disable_mss_clamp();
+        GATEWAY_IP_FWD_ENABLED.store(false, Ordering::Relaxed);
+    }
+
     // Reload or restart sing-box depending on what changed
     let new_key = restart_key(&settings);
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
@@ -91,7 +115,7 @@ pub async fn update_settings(
 
 fn restart_key(s: &AppSettings) -> String {
     format!(
-        "{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+        "{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
         s.mixed_port,
         s.http_port,
         s.socks_port,
@@ -103,6 +127,7 @@ fn restart_key(s: &AppSettings) -> String {
         s.tun_config.auto_route,
         s.tun_config.strict_route,
         s.tun_config.dns_hijack.join(","),
+        s.gateway_mode,
     )
 }
 
@@ -118,7 +143,7 @@ fn merge_settings_updates(
     }
 
     let mut settings: AppSettings = serde_json::from_value(json).map_err(|e| e.to_string())?;
-    if settings.enhanced_mode {
+    if settings.enhanced_mode || settings.gateway_mode {
         settings.system_proxy = false;
     }
 
@@ -231,6 +256,8 @@ pub async fn install_tun_sudoers(app: AppHandle) -> Result<bool, String> {
     }
     paths.push("/bin/kill".to_string());
     paths.push("/usr/bin/kill".to_string());
+    paths.push("/usr/sbin/sysctl".to_string());
+    paths.push("/sbin/pfctl".to_string());
 
     let sudoers_line = format!(
         "{user} ALL=(root) NOPASSWD: {cmds}\n",
@@ -326,6 +353,13 @@ pub fn clear_system_proxy_on_exit() {
     clear_system_proxy();
 }
 
+pub fn cleanup_gateway_on_exit() {
+    if GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
+        gateway::disable_ip_forwarding();
+        gateway::disable_mss_clamp();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{merge_settings_updates, restart_key};
@@ -345,7 +379,7 @@ mod tests {
     fn restart_key_changes_when_tun_config_changes() {
         let mut settings = AppSettings::default();
         let base = restart_key(&settings);
-        settings.tun_config.mtu = 1500;
+        settings.tun_config.mtu = 1280;
 
         assert_ne!(base, restart_key(&settings));
     }
@@ -372,6 +406,27 @@ mod tests {
         .expect("settings merge should succeed");
 
         assert!(merged.enhanced_mode);
+        assert!(!merged.system_proxy);
+    }
+
+    #[test]
+    fn restart_key_changes_when_gateway_mode_changes() {
+        let mut settings = AppSettings::default();
+        let base = restart_key(&settings);
+        settings.gateway_mode = true;
+        assert_ne!(base, restart_key(&settings));
+    }
+
+    #[test]
+    fn gateway_mode_forces_system_proxy_off() {
+        let current = AppSettings::default();
+        let merged = merge_settings_updates(
+            &current,
+            &json!({ "gatewayMode": true }),
+        )
+        .expect("settings merge should succeed");
+
+        assert!(merged.gateway_mode);
         assert!(!merged.system_proxy);
     }
 }

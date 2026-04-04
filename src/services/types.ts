@@ -266,6 +266,7 @@ export interface AppSettings {
   enhancedMode: boolean;
   tunConfig: TunConfig;
   allowLan: boolean;
+  gatewayMode: boolean;
   httpPort: number;
   socksPort: number;
   mixedPort: number;

@@ -9,6 +9,26 @@ use super::tailscale_config;
 use super::tailscale_storage;
 
 pub fn generate_config(settings: &AppSettings) -> Value {
+    // Gateway mode forces TUN + allow_lan + auto_route + extended DNS hijack
+    let effective = if settings.gateway_mode {
+        let mut s = settings.clone();
+        s.enhanced_mode = true;
+        s.allow_lan = true;
+        s.tun_config.auto_route = true;
+        if !s.tun_config.dns_hijack.iter().any(|h| h.starts_with("0.0.0.0:")) {
+            s.tun_config.dns_hijack.push("0.0.0.0:53".to_string());
+        }
+        // Tailscale requires MTU 1280; force it when Tailscale is active
+        let ts = tailscale_storage::load_tailscale_settings();
+        if ts.enabled {
+            s.tun_config.mtu = 1280;
+        }
+        s
+    } else {
+        settings.clone()
+    };
+    let settings = &effective;
+
     let listen = if settings.allow_lan {
         "0.0.0.0"
     } else {
@@ -1187,5 +1207,29 @@ mod tests {
         let (auto_servers, auto_rules) = build_auto_dns_entries(&dns, &rules_data, &all_node_tags, None);
         assert!(auto_servers.is_empty());
         assert!(auto_rules.is_empty());
+    }
+
+    #[test]
+    fn gateway_mode_forces_tun_and_lan_and_dns_hijack() {
+        let mut settings = storage::AppSettings::default();
+        settings.gateway_mode = true;
+        // gateway_mode should work even if user hasn't manually enabled these
+        settings.enhanced_mode = false;
+        settings.allow_lan = false;
+
+        let config = generate_config(&settings);
+
+        // Should have TUN inbound
+        let inbounds = config["inbounds"].as_array().unwrap();
+        let has_tun = inbounds.iter().any(|i| i["type"] == "tun");
+        assert!(has_tun, "gateway mode should force TUN inbound");
+
+        // Listen should be 0.0.0.0 (LAN accessible)
+        let mixed = inbounds.iter().find(|i| i["tag"] == "mixed-in").unwrap();
+        assert_eq!(mixed["listen"], "0.0.0.0");
+
+        // TUN should have auto_route enabled
+        let tun = inbounds.iter().find(|i| i["type"] == "tun").unwrap();
+        assert_eq!(tun["auto_route"], true);
     }
 }

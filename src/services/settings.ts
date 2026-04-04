@@ -24,6 +24,7 @@ let mockSettings: AppSettings = {
     dnsHijack: ["198.18.0.2:53"],
   },
   allowLan: false,
+  gatewayMode: false,
   httpPort: 7890,
   socksPort: 7891,
   mixedPort: 7893,

@@ -292,6 +292,22 @@ export function SettingsPage() {
             </div>
             <Switch checked={settings.allowLan} onCheckedChange={(v) => updateSettings({ allowLan: v })} />
           </div>
+          <Separator className="bg-white/[0.04]" />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{t("settings.gatewayMode")}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.gatewayModeDescription")}</p>
+            </div>
+            <Switch
+              checked={settings.gatewayMode}
+              onCheckedChange={(v) => updateSettings({ gatewayMode: v })}
+            />
+          </div>
+          {settings.gatewayMode && (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <p className="text-xs text-emerald-400">{t("settings.gatewayModeActive")}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
