@@ -36,15 +36,15 @@ export function ConnectionsPage() {
     return unsub;
   }, [fetchRecords, fetchStats, subscribe]);
 
-  // Load app icons once
+  // Load app icons once, keyed by .app path prefix for fuzzy matching
   useEffect(() => {
     (async () => {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const apps = await invoke<{ executablePath: string; icon: string }[]>("list_apps");
+        const apps = await invoke<{ appPath: string; icon: string }[]>("list_apps");
         const map = new Map<string, string>();
         for (const app of apps) {
-          if (app.icon) map.set(app.executablePath, app.icon);
+          if (app.icon) map.set(app.appPath, app.icon);
         }
         setAppIcons(map);
       } catch {
@@ -174,9 +174,13 @@ export function ConnectionsPage() {
                 <span className="ml-auto shrink-0 flex items-center gap-2">
                   {r.process && (
                     <span className="flex items-center gap-1 text-muted-foreground/50">
-                      {r.processPath && appIcons.get(r.processPath) && (
-                        <img src={`data:image/png;base64,${appIcons.get(r.processPath)}`} className="h-3 w-3" alt="" />
-                      )}
+                      {(() => {
+                        if (!r.processPath) return null;
+                        // Match processPath to .app bundle: extract "/path/Foo.app" prefix
+                        const appMatch = r.processPath.match(/^(\/.*?\.app)\//);
+                        const icon = appMatch ? appIcons.get(appMatch[1]) : undefined;
+                        return icon ? <img src={`data:image/png;base64,${icon}`} className="h-3 w-3" alt="" /> : null;
+                      })()}
                       {r.process}
                     </span>
                   )}

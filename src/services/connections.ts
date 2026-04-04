@@ -158,8 +158,9 @@ function mapConnection(raw: RawConnection): ConnectionRecord {
     outbound = "reject";
   }
 
-  // Extract process name from processPath
-  const processPath = raw.metadata.processPath ?? "";
+  // Extract process name from processPath — strip trailing " (username)" suffix
+  const rawProcessPath = raw.metadata.processPath ?? "";
+  const processPath = rawProcessPath.replace(/\s+\([^)]+\)$/, "");
   const process = processPath ? processPath.split("/").pop() : undefined;
 
   return {
