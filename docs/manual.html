@@ -747,15 +747,28 @@
           Calamity 会自动检测 Tailscale 接口并配置 SNAT 规则，确保远端节点能正确回包。
         </p>
 
+        <h3>为什么 DNS 必须设为 198.18.0.2？</h3>
+        <p>
+          sing-box 的 Fake-IP 机制只对经过 TUN 接口的 DNS 查询生效。客户端将 DNS 设为 <code>198.18.0.2</code> 后，
+          DNS 查询会通过 pf route-to 规则进入 TUN，sing-box 拦截后返回 Fake-IP 地址，后续流量也走 TUN 由 sing-box 代理。
+          如果 DNS 设为 Mac 的局域网 IP，DNS 查询不经过 TUN，sing-box 无法介入，流量将无法被正确代理。
+        </p>
+
+        <h3>防休眠</h3>
+        <p>
+          网关模式启用后，Calamity 会自动阻止系统休眠（包括合盖休眠），确保局域网设备的网络不会因 Mac 休眠而中断。
+          关闭网关模式或退出时会自动恢复正常休眠行为。
+        </p>
+
         <div class="callout info">
           <p>
-            网关模式同时代理本机和局域网设备的流量。关闭网关模式或退出 Calamity 时，IP 转发和 pf 规则会自动清理。
+            网关模式同时代理本机和局域网设备的流量。关闭网关模式或退出 Calamity 时，IP 转发、pf 规则和防休眠设置会自动清理。
           </p>
         </div>
 
         <div class="callout warn">
           <p>
-            首次开启前需要重新安装 sudoers 权限，确保 sysctl 和 pfctl 命令包含在免密列表中。
+            首次开启前需要重新安装 sudoers 权限，确保 sysctl、pfctl 和 pmset 命令包含在免密列表中。
           </p>
         </div>
 
