@@ -18,12 +18,12 @@ on:
       draft:
         description: Create the GitHub release as a draft
         required: true
-        default: true
+        default: false
         type: boolean
       prerelease:
         description: Mark the GitHub release as a prerelease
         required: true
-        default: false
+        default: true
         type: boolean
 
 permissions:
