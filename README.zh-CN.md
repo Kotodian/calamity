@@ -73,6 +73,16 @@
 - 可配置 stack、MTU、auto-route、strict-route、DNS 劫持
 - 退出时自动清理 Fake-IP 并释放 TUN 接口
 
+**网关模式**
+
+- 透明局域网网关 — 其他设备将 Mac 设为网关即可代理所有流量
+- pf route-to 强制转发流量进入 sing-box TUN 进行完整代理处理
+- Fake-IP DNS（198.18.0.2）实现零延迟域名解析和智能分流
+- Tailscale SNAT — 局域网设备可访问 Tailscale 节点，自动处理回程路由
+- TCP MSS 钳位，Tailscale 降低 MTU 时避免分片
+- 合盖防休眠，确保网关持续运行
+- 一键开关，退出时自动清理
+
 **订阅管理**
 
 - 多订阅管理，支持自动更新
@@ -106,9 +116,37 @@
 > xattr -cr /Applications/Calamity.app
 > ```
 
+## 技术栈
+
+| 层级 | 技术 |
+|:---|:---|
+| 前端 | React 19, TypeScript 6, Vite 8, Tailwind CSS 4 |
+| 状态管理 | Zustand |
+| UI 组件 | shadcn/ui (Radix UI) |
+| 图表 | Recharts |
+| 国际化 | i18next |
+| 桌面框架 | Tauri 2 |
+| 后端 | Rust 2021, Tokio |
+| 代理核心 | sing-box (sidecar) |
+| 测试 | Vitest, React Testing Library |
+
 ## 开发
 
+### 前置条件
+
+- macOS
+- Node.js 20+
+- Rust 工具链
+- Tauri CLI (`cargo install tauri-cli`)
+- `sing-box` 可执行文件在 `PATH` 中
+
+### 快速开始
+
 ```bash
+# 克隆仓库
+git clone https://github.com/Kotodian/calamity.git
+cd calamity
+
 # 安装依赖
 npm install
 
@@ -122,9 +160,44 @@ npm run tauri dev
 npm run build
 
 # 测试
-npm test
-cargo test --manifest-path src-tauri/Cargo.toml
+npm test                                          # 前端 (Vitest)
+cargo test --manifest-path src-tauri/Cargo.toml   # 后端 (Rust)
 ```
+
+### 项目结构
+
+```
+calamity/
+├── src/                    # React/TypeScript 前端
+│   ├── pages/              # 仪表盘、节点、规则、DNS、设置等页面
+│   ├── tray/               # 托盘窗口组件
+│   ├── stores/             # Zustand 状态管理
+│   ├── services/           # Tauri 命令适配器
+│   ├── components/         # 共享 UI 组件 (shadcn/ui)
+│   ├── i18n/               # 中英双语翻译
+│   └── lib/                # 工具函数
+├── src-tauri/              # Tauri + Rust 后端
+│   └── src/
+│       ├── commands/       # 14 个 Tauri 命令模块
+│       └── singbox/        # sing-box 配置、进程、存储、API
+├── docs/                   # 文档与截图
+├── tailscale/              # Tailscale 集成资源
+├── index.html              # 主窗口入口
+└── tray.html               # 托盘窗口入口
+```
+
+## 路线图
+
+- [x] TUN 模式与 Fake-IP
+- [x] Tailscale 原生集成
+- [x] 规则集市场
+- [x] DNS 自动分流规则生成
+- [x] 并发订阅拉取
+- [x] 网关模式（透明局域网代理）
+- [ ] 配置热重载
+- [ ] 版本化发布
+- [ ] CLI 工具 (`calamity start/stop/restart/status`)
+- [ ] MCP Server 集成，AI 辅助代理控制
 
 ## 致谢
 
