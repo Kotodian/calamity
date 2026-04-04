@@ -57,10 +57,11 @@ pub fn disable_ip_forwarding() {
 /// - scrub: clamp MSS to fit TUN MTU
 fn build_pf_rules(mtu: u16) -> String {
     let max_mss = mtu.saturating_sub(40);
-    // Redirect forwarded TCP from LAN clients to sing-box redirect port.
-    // "pass" skips further rdr evaluation for matched packets.
-    // We exclude traffic destined to private/LAN addresses to avoid redirecting local traffic.
+    // pf requires: scrub before rdr
     let mut rules = String::new();
+    // 1. Scrub (normalization) — clamp MSS
+    rules.push_str(&format!("scrub on en0 max-mss {}\n", max_mss));
+    // 2. Redirect forwarded TCP from LAN clients to sing-box redirect port
     rules.push_str(&format!(
         "rdr pass on en0 proto tcp from any to !10.0.0.0/8 -> 127.0.0.1 port {}\n",
         REDIRECT_PORT
@@ -73,12 +74,112 @@ fn build_pf_rules(mtu: u16) -> String {
         "rdr pass on en0 proto tcp from any to !192.168.0.0/16 -> 127.0.0.1 port {}\n",
         REDIRECT_PORT
     ));
-    rules.push_str(&format!("scrub on en0 max-mss {}\n", max_mss));
     rules
+}
+
+/// Register our anchor in the main pf config so rdr/scrub rules take effect.
+/// pf requires strict ordering: options → scrub → nat/rdr → filter.
+fn register_pf_anchor() -> Result<(), String> {
+    let output = Command::new("sudo")
+        .args(["-n", "pfctl", "-s", "nat"])
+        .output()
+        .map_err(|e| format!("failed to read pf nat rules: {}", e))?;
+    let current_nat = String::from_utf8_lossy(&output.stdout).to_string();
+
+    let output = Command::new("sudo")
+        .args(["-n", "pfctl", "-s", "rules"])
+        .output()
+        .map_err(|e| format!("failed to read pf rules: {}", e))?;
+    let current_rules = String::from_utf8_lossy(&output.stdout).to_string();
+
+    let anchor_ref = format!("\"{}\"", PF_ANCHOR);
+    let has_rdr = current_nat.contains(&anchor_ref);
+    let has_scrub = current_rules.contains(&anchor_ref);
+
+    if has_rdr && has_scrub {
+        return Ok(());
+    }
+
+    // Collect existing rules by category to maintain pf ordering
+    let mut scrub_lines = Vec::new();
+    let mut nat_lines = Vec::new();
+    let mut filter_lines = Vec::new();
+
+    for line in current_rules.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() { continue; }
+        if trimmed.starts_with("scrub") {
+            scrub_lines.push(trimmed.to_string());
+        } else {
+            filter_lines.push(trimmed.to_string());
+        }
+    }
+
+    for line in current_nat.lines() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            nat_lines.push(trimmed.to_string());
+        }
+    }
+
+    // Build main config in correct order: scrub → nat/rdr → filter
+    let mut main_rules = String::new();
+
+    // 1. Scrub (normalization)
+    for line in &scrub_lines {
+        main_rules.push_str(line);
+        main_rules.push('\n');
+    }
+    if !has_scrub {
+        main_rules.push_str(&format!("scrub-anchor \"{}\" all fragment reassemble\n", PF_ANCHOR));
+    }
+
+    // 2. NAT/RDR (translation)
+    for line in &nat_lines {
+        main_rules.push_str(line);
+        main_rules.push('\n');
+    }
+    if !has_rdr {
+        main_rules.push_str(&format!("rdr-anchor \"{}\" all\n", PF_ANCHOR));
+    }
+
+    // 3. Filter
+    for line in &filter_lines {
+        main_rules.push_str(line);
+        main_rules.push('\n');
+    }
+
+    let output = Command::new("sudo")
+        .args(["-n", "pfctl", "-f", "-"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            if let Some(ref mut stdin) = child.stdin {
+                stdin.write_all(main_rules.as_bytes())?;
+            }
+            child.wait_with_output()
+        })
+        .map_err(|e| format!("failed to register pf anchor: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "pfctl anchor registration failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    eprintln!("[gateway] pf anchor registered");
+    Ok(())
 }
 
 /// Enable pf rules for gateway mode: redirect forwarded traffic + MSS clamping.
 pub fn enable_pf_rules(mtu: u16) -> Result<(), String> {
+    // First register our anchor in the main pf config
+    register_pf_anchor()?;
+
     let rules = build_pf_rules(mtu);
 
     let output = Command::new("sudo")
@@ -147,11 +248,13 @@ mod tests {
     }
 
     #[test]
-    fn build_pf_rules_contains_redirect_and_scrub() {
+    fn build_pf_rules_scrub_before_rdr() {
         let rules = build_pf_rules(1280);
-        assert!(rules.contains("rdr pass on en0 proto tcp"));
-        assert!(rules.contains(&format!("port {}", REDIRECT_PORT)));
+        let scrub_pos = rules.find("scrub").unwrap();
+        let rdr_pos = rules.find("rdr").unwrap();
+        assert!(scrub_pos < rdr_pos, "scrub must come before rdr");
         assert!(rules.contains("max-mss 1240"));
+        assert!(rules.contains(&format!("port {}", REDIRECT_PORT)));
     }
 
     #[test]
