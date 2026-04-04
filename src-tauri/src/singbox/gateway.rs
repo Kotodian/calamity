@@ -1,6 +1,10 @@
 use std::process::Command;
+use std::sync::Mutex;
 
 const PF_ANCHOR: &str = "com.calamity.gateway";
+
+/// Holds the caffeinate process that prevents system sleep during gateway mode.
+static CAFFEINATE: Mutex<Option<std::process::Child>> = Mutex::new(None);
 
 /// Read the current value of net.inet.ip.forwarding.
 fn get_ip_forwarding() -> bool {
@@ -303,6 +307,35 @@ pub fn enable_pf_rules(mtu: u16, tailscale_ip: Option<&str>) -> Result<(), Strin
         mtu.saturating_sub(40)
     );
     Ok(())
+}
+
+/// Prevent system sleep while gateway mode is active.
+pub fn prevent_sleep() {
+    let mut guard = CAFFEINATE.lock().unwrap();
+    if guard.is_some() {
+        return;
+    }
+    match Command::new("caffeinate")
+        .args(["-s"]) // prevent system sleep (display can still sleep)
+        .spawn()
+    {
+        Ok(child) => {
+            eprintln!("[gateway] sleep prevention enabled (pid={})", child.id());
+            *guard = Some(child);
+        }
+        Err(e) => eprintln!("[gateway] failed to start caffeinate: {}", e),
+    }
+}
+
+/// Allow system sleep again.
+pub fn allow_sleep() {
+    let mut guard = CAFFEINATE.lock().unwrap();
+    if let Some(ref mut child) = *guard {
+        let _ = child.kill();
+        let _ = child.wait();
+        eprintln!("[gateway] sleep prevention disabled");
+    }
+    *guard = None;
 }
 
 /// Remove all gateway pf rules.

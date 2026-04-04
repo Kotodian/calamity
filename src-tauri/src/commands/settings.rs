@@ -72,6 +72,7 @@ pub async fn update_settings(
     } else if !settings.gateway_mode && GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
         gateway::disable_ip_forwarding();
         gateway::disable_pf_rules();
+        gateway::allow_sleep();
         GATEWAY_IP_FWD_ENABLED.store(false, Ordering::Relaxed);
     }
 
@@ -340,7 +341,8 @@ pub fn apply_system_proxy_on_start(settings: &AppSettings) {
 }
 
 
-/// Apply gateway mode rules (IP forwarding + pf). Called on connect and settings change.
+/// Apply gateway mode rules (IP forwarding + pf + sleep prevention).
+/// Called on connect and settings change.
 pub fn apply_gateway_rules(settings: &AppSettings) {
     if let Err(e) = gateway::enable_ip_forwarding() {
         eprintln!("[gateway] failed to enable IP forwarding: {}", e);
@@ -350,6 +352,7 @@ pub fn apply_gateway_rules(settings: &AppSettings) {
     if let Err(e) = gateway::enable_pf_rules(settings.tun_config.mtu, None) {
         eprintln!("[gateway] failed to enable pf rules: {}", e);
     }
+    gateway::prevent_sleep();
 }
 
 pub fn clear_system_proxy_on_exit() {
@@ -360,6 +363,7 @@ pub fn cleanup_gateway_on_exit() {
     if GATEWAY_IP_FWD_ENABLED.load(Ordering::Relaxed) {
         gateway::disable_ip_forwarding();
         gateway::disable_pf_rules();
+        gateway::allow_sleep();
     }
 }
 
