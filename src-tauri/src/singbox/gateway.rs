@@ -63,10 +63,11 @@ fn build_pf_rules(mtu: u16) -> String {
     rules.push_str(&format!("scrub on en0 max-mss {}\n", max_mss));
     // 2. Table of private/reserved ranges to exclude from redirect
     rules.push_str("table <private> const { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8 }\n");
-    // 3. Redirect forwarded TCP from LAN clients to sing-box redirect port
+    // 3. Redirect DNS (UDP 53) from LAN clients to sing-box's fake-ip DNS via TUN
+    //    198.18.0.2 is routed through TUN and hijacked by sing-box dns_hijack
+    rules.push_str("rdr pass on en0 proto udp from any to any port 53 -> 198.18.0.2 port 53\n");
+    // 4. Redirect forwarded TCP from LAN clients to sing-box redirect port
     //    Only match non-private destinations
-    //    Note: UDP is not supported by sing-box redirect inbound on macOS.
-    //    DNS UDP is handled by sing-box's dns_hijack (0.0.0.0:53).
     rules.push_str(&format!(
         "rdr pass on en0 proto tcp from any to !<private> -> 127.0.0.1 port {}\n",
         REDIRECT_PORT
@@ -251,7 +252,9 @@ mod tests {
         let rules = build_pf_rules(1500);
         assert!(rules.contains("table <private>"));
         assert!(rules.contains("!<private>"));
-        // Should be exactly one rdr rule, not multiple OR'd rules
-        assert_eq!(rules.matches("rdr pass").count(), 1);
+        // DNS rdr + TCP rdr = 2 rdr rules
+        assert_eq!(rules.matches("rdr pass").count(), 2);
+        // DNS redirected to fake-ip address
+        assert!(rules.contains("198.18.0.2 port 53"));
     }
 }
