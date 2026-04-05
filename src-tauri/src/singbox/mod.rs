@@ -1,18 +1,4 @@
-pub mod clash_api;
-pub mod clash_parse;
-pub mod config_io;
-pub mod config;
-pub mod dns_storage;
-pub mod nodes_storage;
-pub mod outbounds;
-pub mod process;
-pub mod rules_storage;
-pub mod storage;
-pub mod subscription_fetch;
-pub mod subscriptions_storage;
-pub mod tailscale_api;
-pub mod tailscale_config;
-pub mod ruleset_market;
-pub mod tailscale_storage;
-pub mod gateway;
-pub mod bgp;
+// Re-export all modules from calamity-core so that
+// `crate::singbox::storage`, `crate::singbox::process`, etc.
+// continue to work throughout src-tauri/src/commands/*.
+pub use calamity_core::singbox::*;

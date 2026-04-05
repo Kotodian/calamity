@@ -1,6 +1,6 @@
 [package]
 name = "calamity"
-version = "0.2.18-beta"
+version = "0.3.0-beta"
 description = "A macOS proxy client based on SingBox"
 authors = ["you"]
 edition = "2021"
@@ -25,10 +25,8 @@ log = "0.4"
 libc = "0.2"
 base64 = "0.22"
 chrono = "0.4"
-urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 tauri-plugin-dialog = "2"
-serde_yaml = "0.9"
 tokio-util = "0.7"
 plist = "1"
-rustybgp-packet = { git = "https://github.com/osrg/rustybgp" }
+calamity-core = { path = "../crates/calamity-core", features = ["macos"] }

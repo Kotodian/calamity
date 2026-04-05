@@ -2,11 +2,20 @@ use std::sync::Arc;
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
-use crate::commands::settings::TunRuntimeStatus;
-
 use super::clash_api::ClashApi;
 use super::config;
 use super::storage::AppSettings;
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunRuntimeStatus {
+    pub running: bool,
+    pub mode: String,
+    pub target_enhanced_mode: bool,
+    pub requires_admin: bool,
+    pub last_error: Option<String>,
+    pub effective_dns_mode: Option<String>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RunMode {
@@ -997,7 +1006,8 @@ mod tests {
         let attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let attempts_for_check = attempts.clone();
 
-        let matched = tauri::async_runtime::block_on(super::wait_for_condition(
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let matched = rt.block_on(super::wait_for_condition(
             move || {
                 let attempts_for_check = attempts_for_check.clone();
                 async move { attempts_for_check.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= 2 }
@@ -1012,7 +1022,8 @@ mod tests {
 
     #[test]
     fn wait_for_condition_returns_false_after_timeout() {
-        let matched = tauri::async_runtime::block_on(super::wait_for_condition(
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let matched = rt.block_on(super::wait_for_condition(
             || async { false },
             3,
             std::time::Duration::from_millis(0),

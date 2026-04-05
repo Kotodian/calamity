@@ -10,16 +10,7 @@ use crate::singbox::storage::{self, AppSettings};
 /// Tracks whether we enabled IP forwarding so we can restore on exit.
 static GATEWAY_IP_FWD_ENABLED: AtomicBool = AtomicBool::new(false);
 
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TunRuntimeStatus {
-    pub running: bool,
-    pub mode: String,
-    pub target_enhanced_mode: bool,
-    pub requires_admin: bool,
-    pub last_error: Option<String>,
-    pub effective_dns_mode: Option<String>,
-}
+pub use crate::singbox::process::TunRuntimeStatus;
 
 #[tauri::command]
 pub async fn get_settings() -> Result<AppSettings, String> {
