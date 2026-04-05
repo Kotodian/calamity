@@ -53,14 +53,12 @@ jobs:
         run: npm ci
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
         with:
           targets: ${{ matrix.target }}
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
       - name: Download sing-box sidecar
         run: |
@@ -75,7 +73,7 @@ jobs:
         run: npm test
 
       - name: Run Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --workspace
 
       - name: Generate changelog
         id: changelog

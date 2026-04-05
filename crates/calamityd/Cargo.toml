@@ -3,6 +3,9 @@ name = "calamityd"
 version = "0.3.0-beta"
 edition = "2024"
 description = "Calamity proxy daemon for Linux"
+license = "MIT"
+homepage = "https://github.com/Kotodian/calamity"
+repository = "https://github.com/Kotodian/calamity"
 
 [[bin]]
 name = "calamityd"
@@ -13,3 +16,22 @@ calamity-core = { path = "../calamity-core", features = ["linux"] }
 tokio = { version = "1", features = ["full"] }
 serde_json = "1"
 log = "0.4"
+
+[package.metadata.deb]
+maintainer = "Kotodian <kotodian@users.noreply.github.com>"
+section = "net"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["target/release/calamityd", "usr/bin/", "755"],
+    ["target/release/calamity", "usr/bin/", "755"],
+    ["../../packaging/systemd/calamityd.service", "usr/lib/systemd/system/", "644"],
+]
+conf-files = ["/etc/calamity/"]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/calamityd", dest = "/usr/bin/calamityd", mode = "755" },
+    { source = "target/release/calamity", dest = "/usr/bin/calamity", mode = "755" },
+    { source = "../../packaging/systemd/calamityd.service", dest = "/usr/lib/systemd/system/calamityd.service", mode = "644" },
+]

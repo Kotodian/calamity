@@ -1,0 +1,21 @@
+# Maintainer: Kotodian <kotodian@users.noreply.github.com>
+pkgname=calamity
+pkgver=0.3.0_beta
+pkgrel=1
+pkgdesc="A modern proxy client powered by sing-box"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Kotodian/calamity"
+license=('MIT')
+depends=('nftables')
+optdepends=('tailscale: Tailscale integration and BGP rule sync')
+backup=('etc/calamity/settings.json')
+source=("${pkgname}-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    install -Dm755 "calamityd" "${pkgdir}/usr/bin/calamityd"
+    install -Dm755 "calamity" "${pkgdir}/usr/bin/calamity"
+    install -Dm755 "sing-box" "${pkgdir}/usr/lib/calamity/sing-box"
+    install -Dm644 "calamityd.service" "${pkgdir}/usr/lib/systemd/system/calamityd.service"
+    install -dm755 "${pkgdir}/etc/calamity"
+}
