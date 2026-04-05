@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Monitor, Smartphone, Server, LogOut, Settings2, Loader2,
-  RefreshCw, Check, Power,
+  RefreshCw, Check, Power, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +81,7 @@ function DeviceCard({
 
 export function TailnetPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { settings, devices, loading, fetchSettings, saveSettings, fetchDevices, setExitNode } = useTailnetStore();
 
   const [oauthId, setOauthId] = useState("");
@@ -275,6 +277,24 @@ export function TailnetPage() {
       {!hasOAuth && (
         <p className="text-xs text-muted-foreground text-center py-4">{t("tailnet.noOAuth")}</p>
       )}
+
+      {/* BGP Rule Sync */}
+      <div className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5 animate-slide-up" style={{ animationDelay: "240ms" }}>
+        <button
+          type="button"
+          onClick={() => navigate("/tailnet/bgp-sync")}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2">
+            <RefreshCw className="h-4 w-4 text-primary" />
+            <div>
+              <h3 className="text-sm font-medium">{t("sidebar.bgpSync")}</h3>
+              <p className="text-xs text-muted-foreground">{t("bgpSync.subtitle")}</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </div>
     </div>
   );
 }

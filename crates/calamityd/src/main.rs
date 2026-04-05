@@ -567,32 +567,72 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             }
         }
         Command::BgpPullRules { peer_addr } => {
+            use calamity_core::singbox::{
+                dns_storage, nodes_storage,
+                subscription_fetch::parse_v2ray_uri,
+            };
+
             let local_ip = match calamity_core::platform::get_tailscale_ip() {
                 Some(ip) => ip,
                 None => return Response::Error("Tailscale IP not found".to_string()),
             };
-            match fsm::pull_rules(&peer_addr, local_ip.octets()).await {
-                Ok(result) => {
-                    let local = rules_storage::load_rules();
-                    let diff = compute_simple_diff(&local, &result.remote_rules);
-                    Response::Ok(serde_json::to_value(&diff).unwrap_or_default())
+            let result = match fsm::pull_rules(&peer_addr, local_ip.octets()).await {
+                Ok(r) => r,
+                Err(e) => return Response::Error(e),
+            };
+
+            // Apply rules
+            if let Err(e) = rules_storage::save_rules(&result.remote_rules) {
+                return Response::Error(format!("save rules: {e}"));
+            }
+            let rules_count = result.remote_rules.rules.len();
+
+            // Apply DNS
+            let dns_count = if let Some(dns) = &result.remote_dns {
+                let count = dns.servers.len();
+                if let Err(e) = dns_storage::save_dns_settings(dns) {
+                    return Response::Error(format!("save dns: {e}"));
                 }
-                Err(e) => Response::Error(e),
-            }
-        }
-        Command::BgpApplyRules { rules } => {
-            match serde_json::from_value::<rules_storage::RulesData>(rules) {
-                Ok(data) => match rules_storage::save_rules(&data) {
-                    Ok(()) => {
-                        let s = state.lock().await;
-                        let settings = storage::load_settings();
-                        let _ = s.process.reload(&settings).await;
-                        Response::Ok(serde_json::json!("ok"))
+                count
+            } else {
+                0
+            };
+
+            // Apply nodes from URIs
+            let mut nodes_data = nodes_storage::load_nodes();
+            let mut added_nodes = 0u32;
+            for uri in &result.node_uris {
+                if let Some(node) = parse_v2ray_uri(uri) {
+                    // Skip if node with same name already exists
+                    let exists = nodes_data.groups.iter().any(|g| g.nodes.iter().any(|n| n.name == node.name));
+                    if !exists {
+                        if let Some(group) = nodes_data.groups.first_mut() {
+                            group.nodes.push(node);
+                            added_nodes += 1;
+                        }
                     }
-                    Err(e) => Response::Error(e),
-                },
-                Err(e) => Response::Error(format!("invalid rules data: {e}")),
+                }
             }
+            if added_nodes > 0 {
+                if let Err(e) = nodes_storage::save_nodes(&nodes_data) {
+                    return Response::Error(format!("save nodes: {e}"));
+                }
+            }
+
+            // Reload sing-box
+            let s = state.lock().await;
+            let settings = storage::load_settings();
+            let _ = s.process.reload(&settings).await;
+
+            Response::Ok(serde_json::json!({
+                "rules": rules_count,
+                "dnsServers": dns_count,
+                "nodesAdded": added_nodes,
+            }))
+        }
+        Command::BgpApplyRules { .. } => {
+            // Pull now auto-applies, this is kept for backward compat
+            Response::Ok(serde_json::json!("use bgp pull instead"))
         }
         Command::BgpDiscoverPeers => {
             // Try local Tailscale API first (Linux with tailscaled installed)

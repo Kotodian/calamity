@@ -61,9 +61,9 @@ export default function App() {
           <Route path="connections" element={<ConnectionsPage />} />
           <Route path="logs" element={<LogsPage />} />
           <Route path="tailnet" element={<TailnetPage />} />
+          <Route path="tailnet/bgp-sync" element={<BgpSyncPage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="dns" element={<DnsPage />} />
-          <Route path="bgp-sync" element={<BgpSyncPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

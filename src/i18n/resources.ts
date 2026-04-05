@@ -288,6 +288,7 @@ export const resources = {
       },
       bgpSync: {
         title: "Rule Sync",
+        subtitle: "Sync rules, DNS and nodes between Calamity instances via BGP",
         enabled: "Enable Rule Sync",
         enabledDesc: "Start BGP speaker on Tailscale network to allow rule synchronization",
         peers: "Peers",
@@ -635,6 +636,7 @@ export const resources = {
       },
       bgpSync: {
         title: "规则同步",
+        subtitle: "通过 BGP 在 Calamity 实例间同步规则、DNS 和节点",
         enabled: "启用规则同步",
         enabledDesc: "在 Tailscale 网络上启动 BGP 服务，允许与其他 Calamity 实例同步规则",
         peers: "节点",
