@@ -89,15 +89,20 @@ jobs:
           cp "target/${{ matrix.target }}/release/calamity" target/release/
           cp "target/${{ matrix.target }}/release/calamityd" target/release/
           cd crates/calamityd
-          cargo deb --no-build -o "../../calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb"
+          # Use --no-strip and --variant for cross builds to avoid host dpkg-shlibdeps issues
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            cargo deb --no-build --no-strip --target ${{ matrix.target }} \
+              -o "../../calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb"
+          else
+            cargo deb --no-build -o "../../calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb"
+          fi
           cd ../..
           echo "DEB=calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb" >> $GITHUB_ENV
 
       - name: Build rpm package
         run: |
           cargo install cargo-generate-rpm --locked || true
-          # generate-rpm reads assets relative to Cargo.toml dir
-          # binaries are already in target/release/ from deb step
+          # Binaries are already in target/release/ from deb step
           cd crates/calamityd
           cargo generate-rpm -o "../../calamity-${{ env.VERSION }}.${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'x86_64' || 'aarch64' }}.rpm"
           cd ../..
