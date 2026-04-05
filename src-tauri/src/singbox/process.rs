@@ -230,6 +230,10 @@ impl SingboxProcess {
     /// Hot-reload config by writing new config and sending SIGHUP to sing-box process.
     /// Works for both managed (normal) and privileged (TUN) processes.
     pub async fn reload(&self, settings: &AppSettings) -> Result<(), String> {
+        self.reload_with_timeout(settings, std::time::Duration::from_secs(5)).await
+    }
+
+    pub async fn reload_with_timeout(&self, settings: &AppSettings, timeout: std::time::Duration) -> Result<(), String> {
         // If sing-box isn't running, nothing to reload
         if !self.api.health_check().await.unwrap_or(false) {
             return Ok(());
@@ -281,9 +285,10 @@ impl SingboxProcess {
             return Ok(());
         }
 
-        // Wait for Clash API to recover after SIGHUP (up to 5s)
-        eprintln!("[singbox] config reloaded, waiting for Clash API...");
-        for _ in 0..50 {
+        // Wait for Clash API to recover after SIGHUP
+        let iterations = (timeout.as_millis() / 100) as usize;
+        eprintln!("[singbox] config reloaded, waiting for Clash API (timeout {}s)...", timeout.as_secs());
+        for _ in 0..iterations {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             if self.api.health_check().await.unwrap_or(false) {
                 eprintln!("[singbox] Clash API recovered after reload");
@@ -293,7 +298,7 @@ impl SingboxProcess {
         }
 
         self.restarting.store(false, std::sync::atomic::Ordering::Relaxed);
-        eprintln!("[singbox] warning: Clash API not responding 5s after reload");
+        eprintln!("[singbox] warning: Clash API not responding {}s after reload", timeout.as_secs());
         Ok(())
     }
 

@@ -435,7 +435,9 @@ export function RulesPage() {
                   <SelectTrigger className="bg-muted/30 border-white/[0.06]"><SelectValue placeholder={t("rules.downloadVia")} /></SelectTrigger>
                   <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                     <SelectItem value="direct">DIRECT</SelectItem>
-                    <SelectItem value="proxy">Proxy</SelectItem>
+                    {groups.map((g) => (
+                      <SelectItem key={g.name} value={g.name}>{g.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

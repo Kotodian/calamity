@@ -36,6 +36,7 @@ export function RuleSetMarketPage() {
   const [selectedEntry, setSelectedEntry] = useState<{ name: string; url: string } | null>(null);
   const [outbound, setOutbound] = useState<OutboundType>("proxy");
   const [outboundNode, setOutboundNode] = useState("");
+  const [downloadDetour, setDownloadDetour] = useState("direct");
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function RuleSetMarketPage() {
     setSelectedEntry(entry);
     setOutbound("proxy");
     setOutboundNode("");
+    setDownloadDetour("direct");
     setDialogOpen(true);
   }
 
@@ -62,7 +64,7 @@ export function RuleSetMarketPage() {
         outbound,
         outboundNode: outbound === "proxy" && outboundNode ? outboundNode : undefined,
         ruleSetUrl: selectedEntry.url,
-        downloadDetour: "direct",
+        downloadDetour,
       });
       toast.success(t("ruleSetMarket.added", { name: selectedEntry.name }));
       setDialogOpen(false);
@@ -166,6 +168,17 @@ export function RuleSetMarketPage() {
                 </SelectContent>
               </Select>
             )}
+            <Select value={downloadDetour} onValueChange={setDownloadDetour}>
+              <SelectTrigger className="bg-muted/30 border-white/[0.06]">
+                <SelectValue placeholder={t("rules.downloadVia")} />
+              </SelectTrigger>
+              <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
+                <SelectItem value="direct">DIRECT</SelectItem>
+                {groups.map((g) => (
+                  <SelectItem key={g.name} value={g.name}>{g.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button

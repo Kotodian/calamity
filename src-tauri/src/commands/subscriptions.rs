@@ -328,7 +328,7 @@ fn merge_imported_rules(
 async fn restart_singbox(app: &AppHandle) {
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     let settings = storage::load_settings();
-    match process.reload(&settings).await {
+    match process.reload_with_timeout(&settings, std::time::Duration::from_secs(30)).await {
         Ok(()) => {
             eprintln!("[subscriptions] sing-box reloaded successfully");
             let _ = app.emit("singbox-restarted", ());
