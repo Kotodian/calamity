@@ -35,12 +35,6 @@ async fn main() {
 
     let process = SingboxProcess::new(singbox_path);
 
-    // Start sing-box
-    if let Err(e) = process.start(&settings).await {
-        eprintln!("[calamityd] failed to start sing-box: {e}");
-        // Continue anyway — user can start via CLI later
-    }
-
     // Start BGP speaker if Tailscale is available
     let bgp_speaker = if bgp_storage::load_bgp_settings().enabled {
         if let Some(ip) = calamity_core::platform::get_tailscale_ip() {
