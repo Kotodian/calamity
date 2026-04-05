@@ -595,17 +595,24 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             }
         }
         Command::BgpDiscoverPeers => {
-            let mut ts_settings = tailscale_storage::load_tailscale_settings();
-            match tailscale_api::fetch_devices(&mut ts_settings).await {
-                Ok(devices) => {
-                    let peers: Vec<serde_json::Value> = devices
-                        .into_iter()
-                        .filter(|d| !d.is_self && d.hostname.to_lowercase().contains("calamity"))
-                        .map(|d| serde_json::json!({"name": d.name, "hostname": d.hostname, "address": d.ip}))
-                        .collect();
-                    Response::Ok(serde_json::json!(peers))
+            // Try local Tailscale API first (Linux with tailscaled installed)
+            match discover_via_local_tailscale().await {
+                Ok(peers) => Response::Ok(serde_json::json!(peers)),
+                Err(_) => {
+                    // Fall back to OAuth API
+                    let mut ts_settings = tailscale_storage::load_tailscale_settings();
+                    match tailscale_api::fetch_devices(&mut ts_settings).await {
+                        Ok(devices) => {
+                            let peers: Vec<serde_json::Value> = devices
+                                .into_iter()
+                                .filter(|d| !d.is_self && d.hostname.to_lowercase().contains("calamity"))
+                                .map(|d| serde_json::json!({"name": d.name, "hostname": d.hostname, "address": d.ip}))
+                                .collect();
+                            Response::Ok(serde_json::json!(peers))
+                        }
+                        Err(e) => Response::Error(e),
+                    }
                 }
-                Err(e) => Response::Error(e),
             }
         }
         Command::TailscaleStatus => {
@@ -652,6 +659,61 @@ fn sd_notify(addr: &str, msg: &str) -> Result<(), String> {
     let socket = UnixDatagram::unbound().map_err(|e| e.to_string())?;
     socket.send_to(msg.as_bytes(), addr).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// Discover peers via local Tailscale daemon socket (/var/run/tailscale/tailscaled.sock).
+async fn discover_via_local_tailscale() -> Result<Vec<serde_json::Value>, String> {
+    use tokio::net::UnixStream;
+    use tokio::io::{AsyncWriteExt, AsyncReadExt};
+
+    let sock_path = "/var/run/tailscale/tailscaled.sock";
+    let mut stream = UnixStream::connect(sock_path)
+        .await
+        .map_err(|e| format!("connect to tailscaled: {e}"))?;
+
+    // HTTP request over Unix socket
+    let request = "GET /localapi/v0/status HTTP/1.0\r\nHost: local-tailscaled.sock\r\n\r\n";
+    stream.write_all(request.as_bytes()).await.map_err(|e| format!("write: {e}"))?;
+
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).await.map_err(|e| format!("read: {e}"))?;
+    let text = String::from_utf8_lossy(&response);
+
+    // Skip HTTP headers
+    let body = text.split("\r\n\r\n").nth(1)
+        .ok_or("no HTTP body")?;
+
+    let status: serde_json::Value = serde_json::from_str(body)
+        .map_err(|e| format!("parse status: {e}"))?;
+
+    let self_ip = status["TailscaleIPs"].as_array()
+        .and_then(|ips| ips.first())
+        .and_then(|ip| ip.as_str())
+        .unwrap_or("");
+
+    let mut peers = Vec::new();
+    if let Some(peer_map) = status["Peer"].as_object() {
+        for (_key, peer) in peer_map {
+            let hostname = peer["HostName"].as_str().unwrap_or("");
+            let dns_name = peer["DNSName"].as_str().unwrap_or("");
+            let online = peer["Online"].as_bool().unwrap_or(false);
+            let ip = peer["TailscaleIPs"].as_array()
+                .and_then(|ips| ips.first())
+                .and_then(|ip| ip.as_str())
+                .unwrap_or("");
+
+            if online && !ip.is_empty() && ip != self_ip {
+                let display_name = dns_name.split('.').next().unwrap_or(hostname);
+                peers.push(serde_json::json!({
+                    "name": display_name,
+                    "hostname": hostname,
+                    "address": ip,
+                }));
+            }
+        }
+    }
+
+    Ok(peers)
 }
 
 async fn wait_for_sigterm() {
