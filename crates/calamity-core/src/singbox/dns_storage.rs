@@ -71,14 +71,6 @@ impl Default for DnsSettings {
             servers: vec![
                 DnsServerConfig {
                     id: None,
-                    name: "Cloudflare".to_string(),
-                    address: "https://1.1.1.1/dns-query".to_string(),
-                    enabled: false,
-                    detour: None,
-                    domain_resolver: None,
-                },
-                DnsServerConfig {
-                    id: None,
                     name: "AliDNS".to_string(),
                     address: "https://dns.alidns.com/dns-query".to_string(),
                     enabled: true,
@@ -102,29 +94,7 @@ impl Default for DnsSettings {
                     domain_resolver: None,
                 },
             ],
-            rules: vec![
-                DnsRuleConfig {
-                    id: None,
-                    match_type: "rule_set".to_string(),
-                    match_value: "geosite-cn".to_string(),
-                    server: "AliDNS".to_string(),
-                    enabled: true,
-                },
-                DnsRuleConfig {
-                    id: None,
-                    match_type: "rule_set".to_string(),
-                    match_value: "geosite-geolocation-!cn".to_string(),
-                    server: "Cloudflare".to_string(),
-                    enabled: true,
-                },
-                DnsRuleConfig {
-                    id: None,
-                    match_type: "domain-suffix".to_string(),
-                    match_value: ".ts.net".to_string(),
-                    server: "Tailscale".to_string(),
-                    enabled: true,
-                },
-            ],
+            rules: vec![],
         }
     }
 }
