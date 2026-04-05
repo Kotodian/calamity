@@ -17,20 +17,13 @@ struct DaemonState {
     bgp_speaker: Option<speaker::BgpSpeaker>,
 }
 
-fn data_dir() -> PathBuf {
-    PathBuf::from("/etc/calamity")
-}
-
 #[tokio::main]
 async fn main() {
     eprintln!("[calamityd] starting v{}", env!("CARGO_PKG_VERSION"));
 
-    // Ensure config directory exists
-    let config_dir = data_dir();
-    if let Err(e) = std::fs::create_dir_all(&config_dir) {
-        eprintln!("[calamityd] failed to create config dir {}: {e}", config_dir.display());
-        std::process::exit(1);
-    }
+    // app_data_dir() auto-detects: root → /etc/calamity, user → ~/.config/calamity
+    let config_dir = storage::app_data_dir();
+    eprintln!("[calamityd] config dir: {}", config_dir.display());
 
     // Load settings and create process
     let settings = storage::load_settings();

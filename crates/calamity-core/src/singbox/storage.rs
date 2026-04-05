@@ -3,10 +3,32 @@ use std::fs;
 use std::path::PathBuf;
 
 pub fn app_data_dir() -> PathBuf {
-    let base = dirs::data_dir().expect("no data dir");
-    let dir = base.join("com.calamity.app");
+    let dir = platform_data_dir();
     fs::create_dir_all(&dir).expect("failed to create app data dir");
     dir
+}
+
+fn platform_data_dir() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        dirs::data_dir().expect("no data dir").join("com.calamity.app")
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Running as root (daemon via systemd) → /etc/calamity
+        // Running as user → ~/.config/calamity
+        if unsafe { libc::geteuid() } == 0 {
+            PathBuf::from("/etc/calamity")
+        } else {
+            dirs::config_dir()
+                .expect("no config dir")
+                .join("calamity")
+        }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        dirs::data_dir().expect("no data dir").join("calamity")
+    }
 }
 
 pub fn singbox_config_path() -> PathBuf {
