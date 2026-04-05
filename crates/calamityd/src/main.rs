@@ -475,7 +475,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             use calamity_core::singbox::dns_storage::{self, DnsServerConfig};
             let mut dns = dns_storage::load_dns_settings();
             dns.servers.push(DnsServerConfig {
-                id: name.clone(),
+                id: None,
                 name: name.clone(),
                 address,
                 enabled: true,
@@ -491,7 +491,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             use calamity_core::singbox::dns_storage;
             let mut dns = dns_storage::load_dns_settings();
             let before = dns.servers.len();
-            dns.servers.retain(|s| s.id != id && s.name != id);
+            dns.servers.retain(|s| s.name != id);
             if dns.servers.len() == before {
                 return Response::Error(format!("DNS server '{id}' not found"));
             }
@@ -504,7 +504,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             use calamity_core::singbox::dns_storage::{self, DnsRuleConfig};
             let mut dns = dns_storage::load_dns_settings();
             dns.rules.push(DnsRuleConfig {
-                id: match_value.clone(),
+                id: None,
                 match_type,
                 match_value: match_value.clone(),
                 server,
@@ -519,7 +519,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             use calamity_core::singbox::dns_storage;
             let mut dns = dns_storage::load_dns_settings();
             let before = dns.rules.len();
-            dns.rules.retain(|r| r.id != id);
+            dns.rules.retain(|r| r.match_value != id);
             if dns.rules.len() == before {
                 return Response::Error(format!("DNS rule '{id}' not found"));
             }

@@ -32,7 +32,9 @@ pub struct DnsSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsServerConfig {
-    pub id: String,
+    /// Legacy field, kept for backward compat with old dns.json. Use `name` as identifier.
+    #[serde(default, skip_serializing)]
+    pub id: Option<String>,
     pub name: String,
     pub address: String,
     pub enabled: bool,
@@ -49,7 +51,8 @@ pub struct DnsServerConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsRuleConfig {
-    pub id: String,
+    #[serde(default, skip_serializing)]
+    pub id: Option<String>,
     pub match_type: String,
     pub match_value: String,
     pub server: String,
@@ -64,7 +67,7 @@ impl Default for DnsSettings {
             final_server: "dns-direct".to_string(),
             servers: vec![
                 DnsServerConfig {
-                    id: "dns-proxy".to_string(),
+                    id: None,
                     name: "Cloudflare".to_string(),
                     address: "https://1.1.1.1/dns-query".to_string(),
                     enabled: false,
@@ -72,23 +75,23 @@ impl Default for DnsSettings {
                     domain_resolver: None,
                 },
                 DnsServerConfig {
-                    id: "dns-direct".to_string(),
+                    id: None,
                     name: "AliDNS".to_string(),
                     address: "https://dns.alidns.com/dns-query".to_string(),
                     enabled: true,
                     detour: None,
-                    domain_resolver: Some("dns-resolver".to_string()),
+                    domain_resolver: Some("Bootstrap".to_string()),
                 },
                 DnsServerConfig {
-                    id: "dns-resolver".to_string(),
-                    name: "Bootstrap (223.5.5.5)".to_string(),
+                    id: None,
+                    name: "Bootstrap".to_string(),
                     address: "223.5.5.5".to_string(),
                     enabled: true,
                     detour: None,
                     domain_resolver: None,
                 },
                 DnsServerConfig {
-                    id: "tailscale".to_string(),
+                    id: None,
                     name: "Tailscale".to_string(),
                     address: "100.100.100.100".to_string(),
                     enabled: true,
@@ -98,24 +101,24 @@ impl Default for DnsSettings {
             ],
             rules: vec![
                 DnsRuleConfig {
-                    id: "cn-rule".to_string(),
+                    id: None,
                     match_type: "rule_set".to_string(),
                     match_value: "geosite-cn".to_string(),
-                    server: "dns-direct".to_string(),
+                    server: "AliDNS".to_string(),
                     enabled: true,
                 },
                 DnsRuleConfig {
-                    id: "not-cn-rule".to_string(),
+                    id: None,
                     match_type: "rule_set".to_string(),
                     match_value: "geosite-geolocation-!cn".to_string(),
-                    server: "dns-proxy".to_string(),
+                    server: "Cloudflare".to_string(),
                     enabled: true,
                 },
                 DnsRuleConfig {
-                    id: "ts-rule".to_string(),
+                    id: None,
                     match_type: "domain-suffix".to_string(),
                     match_value: ".ts.net".to_string(),
-                    server: "tailscale".to_string(),
+                    server: "Tailscale".to_string(),
                     enabled: true,
                 },
             ],

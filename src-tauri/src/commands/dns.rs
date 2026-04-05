@@ -62,7 +62,7 @@ pub async fn update_dns_server(
 #[tauri::command]
 pub async fn delete_dns_server(app: AppHandle, id: String) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
-    settings.servers.retain(|s| s.id != id);
+    settings.servers.retain(|s| s.name != id && s.id.as_deref() != Some(&id));
     settings.rules.retain(|r| r.server != id);
     dns_storage::save_dns_settings(&settings)?;
     restart_singbox(&app).await;
@@ -81,7 +81,7 @@ pub async fn add_dns_rule(app: AppHandle, rule: DnsRuleConfig) -> Result<DnsSett
 #[tauri::command]
 pub async fn delete_dns_rule(app: AppHandle, id: String) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
-    settings.rules.retain(|r| r.id != id);
+    settings.rules.retain(|r| r.match_value != id && r.id.as_deref() != Some(&id));
     dns_storage::save_dns_settings(&settings)?;
     restart_singbox(&app).await;
     Ok(settings)

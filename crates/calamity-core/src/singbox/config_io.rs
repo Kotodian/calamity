@@ -654,7 +654,7 @@ fn parse_dns_server(server: &Value) -> Option<DnsServerConfig> {
         .map(String::from);
 
     Some(DnsServerConfig {
-        id: tag.to_string(),
+        id: None,
         name: tag.to_string(),
         address,
         enabled: true,
@@ -680,7 +680,7 @@ fn parse_dns_rule(rule: &Value) -> Option<DnsRuleConfig> {
     };
 
     Some(DnsRuleConfig {
-        id: Uuid::new_v4().to_string(),
+        id: None,
         match_type: match_type.to_string(),
         match_value,
         server: server.to_string(),
@@ -967,7 +967,7 @@ mod tests {
         });
 
         let parsed = parse_dns_server(&server).expect("should parse HTTPS DNS");
-        assert_eq!(parsed.id, "dns-google");
+        assert_eq!(parsed.name, "dns-google");
         assert_eq!(parsed.address, "https://dns.google/dns-query");
         assert_eq!(parsed.domain_resolver, Some("dns-bootstrap".to_string()));
     }

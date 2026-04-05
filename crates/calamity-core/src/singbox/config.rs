@@ -8,6 +8,11 @@ use super::storage::{self, AppSettings};
 use super::tailscale_config;
 use super::tailscale_storage;
 
+/// Get the tag/identifier for a DNS server. Uses `id` if present (old data), else `name`.
+fn dns_server_tag(s: &DnsServerConfig) -> &str {
+    s.id.as_deref().unwrap_or(&s.name)
+}
+
 pub fn generate_config(settings: &AppSettings) -> Value {
     // Gateway mode forces TUN + allow_lan + auto_route + extended DNS hijack
     let effective = if settings.gateway_mode {
@@ -50,7 +55,7 @@ pub fn generate_config(settings: &AppSettings) -> Value {
                 && !s.address.starts_with("tls://")
         })
         .or_else(|| dns_settings.servers.iter().find(|s| s.enabled))
-        .map(|s| s.id.clone())
+        .map(|s| dns_server_tag(s).to_string())
         .unwrap_or_else(|| "dns-resolver".to_string());
 
     // Build outbounds from nodes
@@ -275,7 +280,7 @@ fn build_dns_server(server: &DnsServerConfig) -> Value {
 
         json!({
             "type": "https",
-            "tag": server.id,
+            "tag": dns_server_tag(server),
             "server": host,
             "server_port": port,
             "path": path
@@ -284,7 +289,7 @@ fn build_dns_server(server: &DnsServerConfig) -> Value {
         let host = &addr[6..];
         json!({
             "type": "tls",
-            "tag": server.id,
+            "tag": dns_server_tag(server),
             "server": host,
             "server_port": 853
         })
@@ -292,7 +297,7 @@ fn build_dns_server(server: &DnsServerConfig) -> Value {
         // Plain IP → UDP
         json!({
             "type": "udp",
-            "tag": server.id,
+            "tag": dns_server_tag(server),
             "server": addr
         })
     };
@@ -922,7 +927,7 @@ mod tests {
         let dns = DnsSettings {
             servers: vec![
                 DnsServerConfig {
-                    id: "dns-proxy".to_string(),
+                    id: None,
                     name: "CF".to_string(),
                     address: "https://1.1.1.1/dns-query".to_string(),
                     enabled: true,
@@ -930,7 +935,7 @@ mod tests {
                     domain_resolver: None,
                 },
                 DnsServerConfig {
-                    id: "dns-direct".to_string(),
+                    id: None,
                     name: "Ali".to_string(),
                     address: "223.5.5.5".to_string(),
                     enabled: true,
@@ -1068,7 +1073,7 @@ mod tests {
     fn auto_dns_skips_rules_with_existing_manual_dns_rule() {
         let mut dns = DnsSettings::default();
         dns.rules = vec![DnsRuleConfig {
-            id: "manual-1".to_string(),
+            id: None,
             match_type: "rule_set".to_string(),
             match_value: "geosite-geolocation-!cn".to_string(),
             server: "dns-proxy".to_string(),
