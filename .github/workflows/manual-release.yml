@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: Release tag to create, for example v0.1.0
+        description: Release tag to create, for example v0.3.0-beta
         required: true
         type: string
       release_name:
@@ -12,7 +12,7 @@ on:
         required: false
         type: string
       release_notes:
-        description: Optional release notes shown on GitHub Releases
+        description: Optional release notes (leave empty for auto-changelog)
         required: false
         type: string
       draft:
@@ -29,90 +29,213 @@ on:
 permissions:
   contents: write
 
+env:
+  SINGBOX_VERSION: "1.13.4"
+
 jobs:
-  manual-release:
-    name: Build ${{ matrix.target }}
+  # ── macOS GUI ──────────────────────────────────────────
+  macos:
+    name: macOS (aarch64)
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - aarch64-apple-darwin
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install frontend dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-darwin
 
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
 
       - name: Download sing-box sidecar
         run: |
-          SINGBOX_VERSION="1.13.4"
           mkdir -p src-tauri/binaries
           curl -sL "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-darwin-arm64.tar.gz" -o /tmp/sing-box.tar.gz
           tar -xzf /tmp/sing-box.tar.gz -C /tmp
           cp "/tmp/sing-box-${SINGBOX_VERSION}-darwin-arm64/sing-box" src-tauri/binaries/sing-box-aarch64-apple-darwin
           chmod +x src-tauri/binaries/sing-box-aarch64-apple-darwin
 
-      - name: Run frontend tests
-        run: npm test
-
-      - name: Run Rust tests
-        run: cargo test --workspace
-
-      - name: Generate changelog
-        id: changelog
+      - name: Run tests
         run: |
-          # Find the previous tag
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ inputs.tag_name }}$" | head -1)
-          if [ -z "$PREV_TAG" ]; then
-            # No previous tag, use all commits
-            LOG=$(git log --pretty=format:"- %s" --no-merges HEAD)
-          else
-            LOG=$(git log --pretty=format:"- %s" --no-merges "${PREV_TAG}..HEAD")
-          fi
-          # Filter out chore commits, keep feat/fix/refactor etc
-          CHANGELOG=$(echo "$LOG" | grep -v "^- chore" || echo "$LOG")
-          # Write to file to preserve newlines
-          echo "$CHANGELOG" > /tmp/changelog.md
+          npm test
+          cargo test --workspace
 
-      - name: Build and upload Tauri release artifacts
+      - name: Build and upload Tauri artifacts
         uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.tag_name }}
           releaseName: ${{ inputs.release_name != '' && inputs.release_name || inputs.tag_name }}
-          releaseBody: ${{ inputs.release_notes != '' && inputs.release_notes || '' }}
+          releaseBody: "Building..."
           releaseDraft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           uploadWorkflowArtifacts: true
-          args: --target ${{ matrix.target }}
+          args: --target aarch64-apple-darwin
 
-      - name: Update release notes from changelog
-        if: inputs.release_notes == ''
+  # ── Linux CLI + Daemon ─────────────────────────────────
+  linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch: amd64
+            singbox_arch: linux-amd64
+          - target: aarch64-unknown-linux-gnu
+            arch: arm64
+            singbox_arch: linux-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Download sing-box
+        run: |
+          curl -sL "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-${{ matrix.singbox_arch }}.tar.gz" -o /tmp/sing-box.tar.gz
+          tar -xzf /tmp/sing-box.tar.gz -C /tmp
+          mkdir -p packaging/bin
+          cp "/tmp/sing-box-${SINGBOX_VERSION}-${{ matrix.singbox_arch }}/sing-box" packaging/bin/sing-box
+          chmod +x packaging/bin/sing-box
+
+      - name: Build CLI and daemon
+        run: |
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          fi
+          cargo build --release -p calamity-cli -p calamityd --target ${{ matrix.target }}
+
+      - name: Run tests (native only)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo test -p calamity-core --features linux
+
+      - name: Prepare artifacts
+        run: |
+          VERSION="${{ inputs.tag_name }}"
+          VERSION="${VERSION#v}"
+          STAGING="calamity-${VERSION}-linux-${{ matrix.arch }}"
+          mkdir -p "$STAGING"
+          cp "target/${{ matrix.target }}/release/calamity" "$STAGING/"
+          cp "target/${{ matrix.target }}/release/calamityd" "$STAGING/"
+          cp packaging/bin/sing-box "$STAGING/"
+          cp packaging/systemd/calamityd.service "$STAGING/"
+          tar czf "${STAGING}.tar.gz" "$STAGING"
+          echo "TARBALL=${STAGING}.tar.gz" >> $GITHUB_ENV
+          echo "STAGING=${STAGING}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Build deb package
+        run: |
+          cargo install cargo-deb --locked || true
+          mkdir -p target/release
+          cp "target/${{ matrix.target }}/release/calamity" target/release/
+          cp "target/${{ matrix.target }}/release/calamityd" target/release/
+          cd crates/calamityd
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            cargo deb --no-build --no-strip --target ${{ matrix.target }} \
+              -o "../../calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb"
+          else
+            cargo deb --no-build -o "../../calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb"
+          fi
+          cd ../..
+          echo "DEB=calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb" >> $GITHUB_ENV
+
+      - name: Build rpm package
+        run: |
+          cargo install cargo-generate-rpm --locked || true
+          cd crates/calamityd
+          cargo generate-rpm -o "../../calamity-${{ env.VERSION }}.${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'x86_64' || 'aarch64' }}.rpm"
+          cd ../..
+          RPM_ARCH=${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'x86_64' || 'aarch64' }}
+          echo "RPM=calamity-${{ env.VERSION }}.${RPM_ARCH}.rpm" >> $GITHUB_ENV
+
+      - name: Build pacman package
+        run: |
+          PKG_ARCH=${{ matrix.arch == 'amd64' && 'x86_64' || 'aarch64' }}
+          PKG_VERSION=$(echo "${{ env.VERSION }}" | tr '-' '_')
+          PKG_FILE="calamity-${PKG_VERSION}-1-${PKG_ARCH}.pkg.tar.zst"
+
+          mkdir -p pkg_root/usr/bin
+          mkdir -p pkg_root/usr/lib/calamity
+          mkdir -p pkg_root/usr/lib/systemd/system
+          mkdir -p pkg_root/etc/calamity
+
+          cp "${{ env.STAGING }}/calamity" pkg_root/usr/bin/
+          cp "${{ env.STAGING }}/calamityd" pkg_root/usr/bin/
+          cp "${{ env.STAGING }}/sing-box" pkg_root/usr/lib/calamity/
+          cp "${{ env.STAGING }}/calamityd.service" pkg_root/usr/lib/systemd/system/
+
+          cat > pkg_root/.PKGINFO <<EOF
+          pkgname = calamity
+          pkgver = ${PKG_VERSION}-1
+          pkgdesc = A modern proxy client powered by sing-box
+          url = https://github.com/Kotodian/calamity
+          arch = ${PKG_ARCH}
+          license = MIT
+          depend = nftables
+          EOF
+
+          cd pkg_root
+          tar --zstd -cf "../${PKG_FILE}" .PKGINFO usr etc
+          cd ..
+          echo "PACMAN=${PKG_FILE}" >> $GITHUB_ENV
+
+      - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Only update if release body is empty (don't overwrite manually written notes)
-          EXISTING=$(gh release view "${{ inputs.tag_name }}" --json body --jq '.body' 2>/dev/null || echo "")
-          if [ -z "$EXISTING" ] || [ "$EXISTING" = "null" ]; then
-            gh release edit "${{ inputs.tag_name }}" --notes-file /tmp/changelog.md
+          gh release upload "${{ inputs.tag_name }}" \
+            "${{ env.TARBALL }}" \
+            "${{ env.DEB }}" \
+            "${{ env.RPM }}" \
+            "${{ env.PACMAN }}" \
+            --clobber
+
+  # ── Finalize release notes ─────────────────────────────
+  finalize:
+    name: Update release notes
+    needs: [macos, linux]
+    runs-on: ubuntu-latest
+    if: always() && needs.macos.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            # Use manually provided notes
+            echo "${{ inputs.release_notes }}" > /tmp/notes.md
           else
-            echo "Release already has notes, skipping changelog update"
+            # Auto-generate changelog
+            PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ inputs.tag_name }}$" | head -1)
+            if [ -z "$PREV_TAG" ]; then
+              LOG=$(git log --pretty=format:"- %s" --no-merges HEAD)
+            else
+              LOG=$(git log --pretty=format:"- %s" --no-merges "${PREV_TAG}..HEAD")
+            fi
+            CHANGELOG=$(echo "$LOG" | grep -v "^- chore" || echo "$LOG")
+            echo "$CHANGELOG" > /tmp/notes.md
           fi
+          gh release edit "${{ inputs.tag_name }}" --notes-file /tmp/notes.md
