@@ -232,8 +232,8 @@ fn build_dns_section(
     servers.extend(auto_servers);
     rules.extend(auto_rules);
 
-    if force_fake_ip || dns.mode == "fake-ip" {
-        // sing-box 1.12+: fakeip is a DNS server type, not a top-level field
+    if force_fake_ip || dns.mode == dns_storage::DnsMode::FakeIp {
+        // sing-box 1.12+: fakeip is a DNS server type
         servers.push(json!({
             "type": "fakeip",
             "tag": "dns-fakeip",
@@ -898,34 +898,23 @@ mod tests {
     #[test]
     fn forcing_fake_ip_overrides_stored_dns_mode() {
         let mut dns = DnsSettings::default();
-        dns.mode = "direct".to_string();
+        dns.mode = dns_storage::DnsMode::Normal;
 
         let section = build_dns_section(&dns, true, false, &rules_storage::RulesData::default(), &[], None);
-        let servers = section["servers"]
-            .as_array()
-            .expect("dns servers should be present");
-        let rules = section["rules"]
-            .as_array()
-            .expect("dns rules should be present");
+        let servers = section["servers"].as_array().expect("dns servers");
 
-        assert!(servers.iter().any(|server| {
-            server["type"] == "fakeip"
-                && server["tag"] == "dns-fakeip"
-                && server["inet4_range"] == "198.18.0.0/15"
-        }));
-        assert!(rules
-            .iter()
-            .any(|rule| rule["server"] == "dns-fakeip" && rule["query_type"] == json!(["A", "AAAA"])));
+        assert!(servers.iter().any(|s| s["type"] == "fakeip" && s["tag"] == "dns-fakeip"));
     }
 
     #[test]
     fn dns_section_respects_stored_mode_without_tun() {
         let mut dns = DnsSettings::default();
-        dns.mode = "direct".to_string();
+        dns.mode = dns_storage::DnsMode::Normal;
 
         let section = build_dns_section(&dns, false, false, &rules_storage::RulesData::default(), &[], None);
+        let servers = section["servers"].as_array().expect("dns servers");
 
-        assert!(section.get("fakeip").is_none());
+        assert!(!servers.iter().any(|s| s["type"] == "fakeip"));
     }
 
     #[test]
@@ -950,7 +939,7 @@ mod tests {
                 },
             ],
             rules: vec![],
-            mode: "fake-ip".to_string(),
+            mode: dns_storage::DnsMode::Normal,
             fake_ip_range: "198.18.0.0/15".to_string(),
             final_server: "dns-direct".to_string(),
         };

@@ -4,10 +4,24 @@ use super::storage::{read_json, write_json};
 
 const DNS_FILE: &str = "dns.json";
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DnsMode {
+    Normal,
+    FakeIp,
+}
+
+impl Default for DnsMode {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DnsSettings {
-    pub mode: String,
+    #[serde(default)]
+    pub mode: DnsMode,
     pub fake_ip_range: String,
     #[serde(rename = "final")]
     pub final_server: String,
@@ -45,7 +59,7 @@ pub struct DnsRuleConfig {
 impl Default for DnsSettings {
     fn default() -> Self {
         Self {
-            mode: "redir-host".to_string(),
+            mode: DnsMode::Normal,
             fake_ip_range: "198.18.0.0/15".to_string(),
             final_server: "dns-direct".to_string(),
             servers: vec![

@@ -19,7 +19,8 @@ pub async fn update_dns_config(
 ) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
     if let Some(m) = mode {
-        settings.mode = m;
+        settings.mode = serde_json::from_value(serde_json::Value::String(m))
+            .unwrap_or_default();
     }
     if let Some(f) = final_server {
         settings.final_server = f;

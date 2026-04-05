@@ -220,7 +220,7 @@ fn import_singbox_native(json: &Value) -> Result<ImportResult, String> {
             .to_string();
 
         DnsSettings {
-            mode: "redir-host".to_string(),
+            mode: dns_storage::DnsMode::Normal,
             fake_ip_range: "198.18.0.0/15".to_string(),
             final_server,
             servers,
