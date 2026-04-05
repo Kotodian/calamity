@@ -1,4 +1,3 @@
-use std::net::Ipv4Addr;
 use std::process::Command;
 use std::sync::Mutex;
 
@@ -417,26 +416,6 @@ pub fn clear_system_proxy() {
     }
 }
 
-// --- Tailscale IP Detection ---
-
-pub fn get_tailscale_ip() -> Option<Ipv4Addr> {
-    let output = Command::new("ifconfig").output().ok()?;
-    let text = String::from_utf8_lossy(&output.stdout);
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("inet ") {
-            if let Some(ip_str) = trimmed.split_whitespace().nth(1) {
-                if let Ok(ip) = ip_str.parse::<Ipv4Addr>() {
-                    let octets = ip.octets();
-                    if octets[0] == 100 && (64..=127).contains(&octets[1]) {
-                        return Some(ip);
-                    }
-                }
-            }
-        }
-    }
-    None
-}
 
 #[cfg(test)]
 mod tests {

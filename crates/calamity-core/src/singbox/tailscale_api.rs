@@ -252,6 +252,31 @@ pub async fn fetch_devices(
     Ok(devices)
 }
 
+/// Get the Tailscale IP of the current device via OAuth API.
+pub async fn get_self_ip(settings: &mut TailscaleSettings) -> Option<std::net::Ipv4Addr> {
+    let token = get_oauth_token(settings).await.ok()?;
+    let tailnet = if settings.tailnet.is_empty() { "-" } else { &settings.tailnet };
+    let url = format!(
+        "https://api.tailscale.com/api/v2/tailnet/{}/devices",
+        tailnet
+    );
+    let resp = reqwest::Client::new()
+        .get(&url)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .ok()?;
+    let api_resp: ApiDevicesResponse = resp.json().await.ok()?;
+
+    for device in api_resp.devices {
+        let mapped = map_api_device(device, &settings.hostname);
+        if mapped.is_self && !mapped.ip.is_empty() {
+            return mapped.ip.parse().ok();
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

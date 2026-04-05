@@ -147,10 +147,13 @@ pub fn clear_system_proxy() {
 }
 
 pub fn get_tailscale_ip() -> Option<Ipv4Addr> {
-    #[cfg(target_os = "macos")]
-    { macos::get_tailscale_ip() }
-    #[cfg(target_os = "linux")]
-    { linux::get_tailscale_ip() }
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    { None }
+    for iface in if_addrs::get_if_addrs().ok()? {
+        if let std::net::IpAddr::V4(ip) = iface.ip() {
+            let octets = ip.octets();
+            if octets[0] == 100 && (64..=127).contains(&octets[1]) {
+                return Some(ip);
+            }
+        }
+    }
+    None
 }

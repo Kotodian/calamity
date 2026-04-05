@@ -49,6 +49,7 @@ pub fn build_tailscale_config(
         "state_directory": state_dir.to_string_lossy(),
         "hostname": settings.hostname,
         "accept_routes": settings.accept_routes,
+        "system_interface": true,
     });
 
     if !settings.auth_key.is_empty() {
