@@ -55,6 +55,25 @@ pub fn run() {
 
             // Don't auto-start sing-box; user clicks connect to start
 
+            // Auto-start BGP speaker if enabled
+            {
+                let bgp_settings = crate::singbox::bgp::storage::load_bgp_settings();
+                if bgp_settings.enabled {
+                    if let Some(ip) = calamity_core::platform::get_tailscale_ip() {
+                        let app_handle_bgp = app.handle().clone();
+                        tauri::async_runtime::spawn(async move {
+                            match crate::singbox::bgp::speaker::BgpSpeaker::start(ip).await {
+                                Ok(speaker) => {
+                                    app_handle_bgp.manage(Arc::new(tokio::sync::Mutex::new(Some(speaker))));
+                                    eprintln!("[bgp] speaker auto-started on {ip}:17900");
+                                }
+                                Err(e) => eprintln!("[bgp] auto-start failed: {e}"),
+                            }
+                        });
+                    }
+                }
+            }
+
             // Auto-update subscriptions
             let app_handle_subs = app.handle().clone();
             tauri::async_runtime::spawn(async move {
