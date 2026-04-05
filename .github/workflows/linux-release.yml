@@ -84,20 +84,22 @@ jobs:
       - name: Build deb package
         run: |
           cargo install cargo-deb --locked || true
-          # cargo-deb needs the binaries in target/release
+          # Copy cross-compiled binaries to target/release/ for packaging tools
           mkdir -p target/release
           cp "target/${{ matrix.target }}/release/calamity" target/release/
           cp "target/${{ matrix.target }}/release/calamityd" target/release/
           cd crates/calamityd
-          cargo deb --no-build --target ${{ matrix.target }} -o "../../calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb"
+          cargo deb --no-build -o "../../calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb"
           cd ../..
           echo "DEB=calamity_${{ env.VERSION }}_${{ matrix.arch }}.deb" >> $GITHUB_ENV
 
       - name: Build rpm package
         run: |
           cargo install cargo-generate-rpm --locked || true
+          # generate-rpm reads assets relative to Cargo.toml dir
+          # binaries are already in target/release/ from deb step
           cd crates/calamityd
-          cargo generate-rpm --target ${{ matrix.target }} -o "../../calamity-${{ env.VERSION }}.${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'x86_64' || 'aarch64' }}.rpm"
+          cargo generate-rpm -o "../../calamity-${{ env.VERSION }}.${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'x86_64' || 'aarch64' }}.rpm"
           cd ../..
           RPM_ARCH=${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'x86_64' || 'aarch64' }}
           echo "RPM=calamity-${{ env.VERSION }}.${RPM_ARCH}.rpm" >> $GITHUB_ENV

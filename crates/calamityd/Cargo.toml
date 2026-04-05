@@ -31,7 +31,7 @@ conf-files = ["/etc/calamity/"]
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/calamityd", dest = "/usr/bin/calamityd", mode = "755" },
-    { source = "target/release/calamity", dest = "/usr/bin/calamity", mode = "755" },
+    { source = "../../target/release/calamityd", dest = "/usr/bin/calamityd", mode = "755" },
+    { source = "../../target/release/calamity", dest = "/usr/bin/calamity", mode = "755" },
     { source = "../../packaging/systemd/calamityd.service", dest = "/usr/lib/systemd/system/calamityd.service", mode = "644" },
 ]
