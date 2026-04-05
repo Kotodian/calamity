@@ -202,6 +202,7 @@ jobs:
           mkdir -p target/release
           cp "target/${{ matrix.target }}/release/calamity" target/release/
           cp "target/${{ matrix.target }}/release/calamityd" target/release/
+          cp packaging/bin/sing-box target/release/
           cd crates/calamityd
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             cargo deb --no-build --no-strip --target ${{ matrix.target }} \

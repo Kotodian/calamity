@@ -27,6 +27,7 @@ depends = "$auto"
 assets = [
     ["target/release/calamityd", "usr/bin/", "755"],
     ["target/release/calamity", "usr/bin/", "755"],
+    ["target/release/sing-box", "usr/lib/calamity/", "755"],
     ["../../packaging/systemd/calamityd.service", "usr/lib/systemd/system/", "644"],
 ]
 conf-files = ["/etc/calamity/"]
@@ -35,5 +36,6 @@ conf-files = ["/etc/calamity/"]
 assets = [
     { source = "../../target/release/calamityd", dest = "/usr/bin/calamityd", mode = "755" },
     { source = "../../target/release/calamity", dest = "/usr/bin/calamity", mode = "755" },
+    { source = "../../target/release/sing-box", dest = "/usr/lib/calamity/sing-box", mode = "755" },
     { source = "../../packaging/systemd/calamityd.service", dest = "/usr/lib/systemd/system/calamityd.service", mode = "644" },
 ]
