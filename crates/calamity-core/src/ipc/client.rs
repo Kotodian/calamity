@@ -64,9 +64,9 @@ mod tests {
         let call_count = std::sync::Arc::new(AtomicU32::new(0));
         let count_clone = call_count.clone();
 
-        let server = IpcServer::start(&socket_path, Box::new(move |req| {
+        let server = IpcServer::start(&socket_path, crate::ipc::server::handler_fn(move |req| {
             let count = count_clone.clone();
-            Box::pin(async move {
+            async move {
                 count.fetch_add(1, Ordering::Relaxed);
                 match req.command {
                     Command::Status => Response::Ok(serde_json::json!({
@@ -76,7 +76,7 @@ mod tests {
                     Command::Stop => Response::Ok(serde_json::json!("stopped")),
                     _ => Response::Error("not implemented".to_string()),
                 }
-            })
+            }
         }))
         .await
         .unwrap();

@@ -78,9 +78,9 @@ async fn main() {
     let socket_path = PathBuf::from("/run/calamity/calamity.sock");
     let handler_state = state.clone();
 
-    let server = IpcServer::start(&socket_path, Box::new(move |req| {
+    let server = IpcServer::start(&socket_path, calamity_core::ipc::server::handler_fn(move |req| {
         let state = handler_state.clone();
-        Box::pin(async move { handle_command(state, req.command).await })
+        async move { handle_command(state, req.command).await }
     }))
     .await
     .unwrap_or_else(|e| {

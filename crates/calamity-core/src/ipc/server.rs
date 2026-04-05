@@ -1,16 +1,16 @@
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::Arc;
 use tokio::net::UnixListener;
 use tokio::sync::watch;
 
 use super::framing::{read_frame, write_frame};
 use super::protocol::{Request, Response};
 
-/// Handler function type: takes a Request, returns a Response.
-pub type Handler = Box<
-    dyn Fn(Request) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync,
->;
+/// Handler: takes a Request, returns a pinned future of Response.
+pub type Handler =
+    Arc<dyn Fn(Request) -> Pin<Box<dyn Future<Output = Response> + Send>> + Send + Sync>;
 
 pub struct IpcServer {
     socket_path: PathBuf,
@@ -19,7 +19,6 @@ pub struct IpcServer {
 
 impl IpcServer {
     /// Start the IPC server listening on the given Unix socket path.
-    /// The handler is called for each incoming request.
     pub async fn start<P: AsRef<Path>>(
         socket_path: P,
         handler: Handler,
@@ -41,7 +40,6 @@ impl IpcServer {
         eprintln!("[ipc] listening on {}", socket_path.display());
 
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let handler = std::sync::Arc::new(handler);
 
         let path_for_cleanup = socket_path.clone();
         let mut rx = shutdown_rx;
@@ -54,7 +52,7 @@ impl IpcServer {
                             Ok((stream, _addr)) => {
                                 let handler = handler.clone();
                                 tokio::spawn(async move {
-                                    if let Err(e) = handle_connection(stream, &*handler).await {
+                                    if let Err(e) = handle_connection(stream, &handler).await {
                                         eprintln!("[ipc] connection error: {e}");
                                     }
                                 });
@@ -105,7 +103,7 @@ async fn handle_connection(
     loop {
         let frame = read_frame(&mut reader).await?;
         let Some(payload) = frame else {
-            break; // client disconnected
+            break;
         };
 
         let request: Request = serde_json::from_slice(&payload)
@@ -120,6 +118,15 @@ async fn handle_connection(
     }
 
     Ok(())
+}
+
+/// Helper to create a Handler from an async closure.
+pub fn handler_fn<F, Fut>(f: F) -> Handler
+where
+    F: Fn(Request) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Response> + Send + 'static,
+{
+    Arc::new(move |req| Box::pin(f(req)))
 }
 
 /// Get the default socket path for the current platform.

@@ -1,6 +1,8 @@
-#[cfg(feature = "macos")]
+// Both modules are always compiled when their feature is enabled.
+// Dispatch functions below use target_os to select the right impl at compile time.
+#[cfg(any(feature = "macos", target_os = "macos"))]
 pub mod macos;
-#[cfg(feature = "linux")]
+#[cfg(any(feature = "linux", target_os = "linux"))]
 pub mod linux;
 
 use std::net::Ipv4Addr;
