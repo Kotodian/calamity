@@ -50,6 +50,8 @@ pub enum Command {
 
     // DNS
     GetDnsServers,
+    SetDnsMode { mode: String },
+    SetFakeIpRange { range: String },
     AddDnsServer { name: String, address: String, detour: Option<String>, domain_resolver: Option<String> },
     RemoveDnsServer { id: String },
     AddDnsRule { match_type: String, match_value: String, server: String },

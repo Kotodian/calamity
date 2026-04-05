@@ -242,10 +242,26 @@ enum ConfigAction {
     },
 }
 
+#[derive(Clone, ValueEnum)]
+enum DnsModeArg {
+    Normal,
+    FakeIp,
+}
+
 #[derive(Subcommand)]
 enum DnsAction {
     /// List DNS servers and rules
     List,
+    /// Set DNS mode
+    SetMode {
+        /// DNS mode
+        mode: DnsModeArg,
+    },
+    /// Set fake-ip range (only effective in fake-ip mode)
+    SetFakeIpRange {
+        /// CIDR range (e.g. 198.18.0.0/15)
+        range: String,
+    },
     /// Add a DNS server
     AddServer {
         /// Server name
@@ -431,6 +447,13 @@ fn cli_to_command(cmd: CliCommand) -> Command {
         },
         CliCommand::Dns { action } => match action {
             DnsAction::List => Command::GetDnsServers,
+            DnsAction::SetMode { mode } => Command::SetDnsMode {
+                mode: match mode {
+                    DnsModeArg::Normal => "normal",
+                    DnsModeArg::FakeIp => "fake-ip",
+                }.to_string(),
+            },
+            DnsAction::SetFakeIpRange { range } => Command::SetFakeIpRange { range },
             DnsAction::AddServer { name, address, detour, domain_resolver } => {
                 Command::AddDnsServer { name, address, detour, domain_resolver }
             }

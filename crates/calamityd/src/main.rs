@@ -447,6 +447,30 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             let dns = calamity_core::singbox::dns_storage::load_dns_settings();
             Response::Ok(serde_json::to_value(&dns).unwrap_or_default())
         }
+        Command::SetDnsMode { mode } => {
+            use calamity_core::singbox::dns_storage;
+            let mut dns = dns_storage::load_dns_settings();
+            dns.mode = serde_json::from_value(serde_json::Value::String(mode.clone()))
+                .unwrap_or_default();
+            match dns_storage::save_dns_settings(&dns) {
+                Ok(()) => {
+                    let s = state.lock().await;
+                    let settings = storage::load_settings();
+                    let _ = s.process.reload(&settings).await;
+                    Response::Ok(serde_json::json!({"mode": mode}))
+                }
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::SetFakeIpRange { range } => {
+            use calamity_core::singbox::dns_storage;
+            let mut dns = dns_storage::load_dns_settings();
+            dns.fake_ip_range = range.clone();
+            match dns_storage::save_dns_settings(&dns) {
+                Ok(()) => Response::Ok(serde_json::json!({"fakeIpRange": range})),
+                Err(e) => Response::Error(e),
+            }
+        }
         Command::AddDnsServer { name, address, detour, domain_resolver } => {
             use calamity_core::singbox::dns_storage::{self, DnsServerConfig};
             let mut dns = dns_storage::load_dns_settings();
