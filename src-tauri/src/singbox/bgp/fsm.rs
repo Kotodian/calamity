@@ -316,12 +316,13 @@ pub async fn serve_rules(mut stream: TcpStream, local_router_id: [u8; 4]) -> Res
     eprintln!("[bgp] session established with {peer_addr} (serving)");
 
     let rules_data = crate::singbox::rules_storage::load_rules();
-    let entries = codec::encode_rules_data(&rules_data);
+    let syncable = codec::filter_syncable_rules(&rules_data);
+    let entries = codec::encode_rules_data(&syncable);
 
     stream.write_all(&build_update(&entries)).await.map_err(|e| format!("send UPDATE: {e}"))?;
     stream.write_all(&build_update(&[])).await.map_err(|e| format!("send end-of-rib: {e}"))?;
 
-    eprintln!("[bgp] sent {} rules to {peer_addr}", rules_data.rules.len());
+    eprintln!("[bgp] sent {} rules to {peer_addr} ({} process rules filtered)", syncable.rules.len(), rules_data.rules.len() - syncable.rules.len());
 
     let _ = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let mut buf = [0u8; 1];

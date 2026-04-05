@@ -21,6 +21,24 @@ const FIELD_FINAL_OUTBOUND: u8 = 20;
 const FIELD_FINAL_OUTBOUND_NODE: u8 = 21;
 const FIELD_UPDATE_INTERVAL: u8 = 22;
 
+/// Process-level match types that are machine-specific and should not be synced via BGP.
+const PROCESS_MATCH_TYPES: &[&str] = &["process-name", "process-path", "process-path-regex"];
+
+/// Filter out process-level rules that are machine-specific and shouldn't be synced.
+pub fn filter_syncable_rules(data: &RulesData) -> RulesData {
+    RulesData {
+        rules: data
+            .rules
+            .iter()
+            .filter(|r| !PROCESS_MATCH_TYPES.contains(&r.match_type.as_str()))
+            .cloned()
+            .collect(),
+        final_outbound: data.final_outbound.clone(),
+        final_outbound_node: data.final_outbound_node.clone(),
+        update_interval: data.update_interval,
+    }
+}
+
 // --- TLV helpers ---
 
 fn write_tlv_str(buf: &mut Vec<u8>, field_type: u8, value: &str) {
@@ -330,6 +348,69 @@ mod tests {
     fn decode_truncated_tlv_fails() {
         let result = decode_rule(&[1, 0]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn filter_excludes_process_rules() {
+        let data = RulesData {
+            rules: vec![
+                sample_rule(), // domain-suffix → should be kept
+                RouteRuleConfig {
+                    id: "proc-1".to_string(),
+                    name: "Chrome".to_string(),
+                    enabled: true,
+                    match_type: "process-name".to_string(),
+                    match_value: "Google Chrome".to_string(),
+                    outbound: "proxy".to_string(),
+                    outbound_node: None,
+                    rule_set_url: None,
+                    rule_set_local_path: None,
+                    download_detour: None,
+                    invert: false,
+                    order: 1,
+                },
+                RouteRuleConfig {
+                    id: "proc-2".to_string(),
+                    name: "Safari Path".to_string(),
+                    enabled: true,
+                    match_type: "process-path".to_string(),
+                    match_value: "/Applications/Safari.app".to_string(),
+                    outbound: "direct".to_string(),
+                    outbound_node: None,
+                    rule_set_url: None,
+                    rule_set_local_path: None,
+                    download_detour: None,
+                    invert: false,
+                    order: 2,
+                },
+                RouteRuleConfig {
+                    id: "proc-3".to_string(),
+                    name: "Regex".to_string(),
+                    enabled: true,
+                    match_type: "process-path-regex".to_string(),
+                    match_value: ".*firefox.*".to_string(),
+                    outbound: "proxy".to_string(),
+                    outbound_node: None,
+                    rule_set_url: None,
+                    rule_set_local_path: None,
+                    download_detour: None,
+                    invert: false,
+                    order: 3,
+                },
+                sample_rule_with_ruleset(), // geosite → should be kept
+            ],
+            final_outbound: "proxy".to_string(),
+            final_outbound_node: None,
+            update_interval: 86400,
+        };
+
+        let filtered = filter_syncable_rules(&data);
+        assert_eq!(filtered.rules.len(), 2);
+        assert_eq!(filtered.rules[0].id, "rule-1");
+        assert_eq!(filtered.rules[1].id, "rule-2");
+        // Metadata preserved
+        assert_eq!(filtered.final_outbound, "proxy");
+        assert_eq!(filtered.update_interval, 86400);
     }
 
     #[test]
