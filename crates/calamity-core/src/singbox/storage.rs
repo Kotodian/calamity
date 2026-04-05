@@ -137,6 +137,26 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     write_json(SETTINGS_FILE, settings)
 }
 
+// --- Daemon runtime state (persisted across restarts) ---
+
+const STATE_FILE: &str = "state.json";
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DaemonState {
+    /// Whether sing-box should be running. Set by start/stop commands.
+    #[serde(default)]
+    pub running: bool,
+}
+
+pub fn load_daemon_state() -> DaemonState {
+    read_json(STATE_FILE)
+}
+
+pub fn save_daemon_state(state: &DaemonState) -> Result<(), String> {
+    write_json(STATE_FILE, state)
+}
+
 #[cfg(test)]
 mod tests {
     use super::AppSettings;

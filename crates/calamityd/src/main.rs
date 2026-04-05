@@ -12,7 +12,7 @@ use calamity_core::singbox::{
 use tokio::sync::Mutex;
 
 /// Daemon state shared between IPC handler and signal handlers.
-struct DaemonState {
+struct AppState {
     process: SingboxProcess,
     bgp_speaker: Option<speaker::BgpSpeaker>,
 }
@@ -35,6 +35,15 @@ async fn main() {
 
     let process = SingboxProcess::new(singbox_path);
 
+    // Restore previous running state
+    let daemon_state = storage::load_daemon_state();
+    if daemon_state.running {
+        eprintln!("[calamityd] restoring previous running state");
+        if let Err(e) = process.start(&settings).await {
+            eprintln!("[calamityd] failed to restore sing-box: {e}");
+        }
+    }
+
     // Start BGP speaker if Tailscale is available
     let bgp_speaker = if bgp_storage::load_bgp_settings().enabled {
         if let Some(ip) = calamity_core::platform::get_tailscale_ip() {
@@ -56,10 +65,11 @@ async fn main() {
         None
     };
 
-    let state = Arc::new(Mutex::new(DaemonState {
+    let state = Arc::new(Mutex::new(AppState {
         process,
         bgp_speaker,
     }));
+
 
     // Start IPC server
     let socket_path = PathBuf::from("/run/calamity/calamity.sock");
@@ -109,19 +119,23 @@ async fn main() {
     eprintln!("[calamityd] stopped");
 }
 
-async fn handle_command(state: Arc<Mutex<DaemonState>>, cmd: Command) -> Response {
+async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
     match cmd {
         Command::Start => {
             let mut s = state.lock().await;
             let settings = storage::load_settings();
             match s.process.start(&settings).await {
-                Ok(()) => Response::Ok(serde_json::json!("started")),
+                Ok(()) => {
+                    let _ = storage::save_daemon_state(&storage::DaemonState { running: true });
+                    Response::Ok(serde_json::json!("started"))
+                }
                 Err(e) => Response::Error(e),
             }
         }
         Command::Stop => {
             let mut s = state.lock().await;
             s.process.stop().await;
+            let _ = storage::save_daemon_state(&storage::DaemonState { running: false });
             Response::Ok(serde_json::json!("stopped"))
         }
         Command::Restart => {
