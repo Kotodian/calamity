@@ -132,96 +132,16 @@ fn merge_settings_updates(
     Ok(settings)
 }
 
-/// Get active network services (e.g. "Wi-Fi", "Ethernet").
-/// Returns all services that have an IP address assigned.
-fn get_active_network_services() -> Vec<String> {
-    let output = match std::process::Command::new("networksetup")
-        .args(["-listallnetworkservices"])
-        .output()
-    {
-        Ok(o) if o.status.success() => o,
-        _ => return vec![],
-    };
-
-    let text = String::from_utf8_lossy(&output.stdout);
-    let mut services = Vec::new();
-
-    for line in text.lines().skip(1) {
-        // Skip disabled services (prefixed with *)
-        let name = line.trim();
-        if name.is_empty() || name.starts_with('*') {
-            continue;
-        }
-        // Check if this service has an IP (is active)
-        if let Ok(info) = std::process::Command::new("networksetup")
-            .args(["-getinfo", name])
-            .output()
-        {
-            let info_text = String::from_utf8_lossy(&info.stdout);
-            // Has a real IP address (not empty or "none")
-            let has_ip = info_text
-                .lines()
-                .any(|l| l.starts_with("IP address:") && !l.contains("none") && l.len() > 12);
-            if has_ip {
-                services.push(name.to_string());
-            }
-        }
-    }
-    services
-}
-
 pub fn set_system_proxy_ports(http_port: u16, socks_port: u16) {
-    set_system_proxy(http_port, socks_port);
+    calamity_core::platform::set_system_proxy(http_port, socks_port);
 }
 
 fn set_system_proxy(http_port: u16, socks_port: u16) {
-    let services = get_active_network_services();
-    if services.is_empty() {
-        eprintln!("[system-proxy] no active network services found");
-        return;
-    }
-
-    let http_str = http_port.to_string();
-    let socks_str = socks_port.to_string();
-
-    for service in &services {
-        eprintln!("[system-proxy] setting proxy on: {}", service);
-        let cmds: Vec<Vec<&str>> = vec![
-            vec!["-setwebproxy", service, "127.0.0.1", &http_str],
-            vec!["-setwebproxystate", service, "on"],
-            vec!["-setsecurewebproxy", service, "127.0.0.1", &http_str],
-            vec!["-setsecurewebproxystate", service, "on"],
-            vec!["-setsocksfirewallproxy", service, "127.0.0.1", &socks_str],
-            vec!["-setsocksfirewallproxystate", service, "on"],
-        ];
-        for args in &cmds {
-            let _ = std::process::Command::new("networksetup")
-                .args(args)
-                .output();
-        }
-    }
+    calamity_core::platform::set_system_proxy(http_port, socks_port);
 }
 
 fn clear_system_proxy() {
-    let services = get_active_network_services();
-    if services.is_empty() {
-        eprintln!("[system-proxy] no active network services found");
-        return;
-    }
-
-    for service in &services {
-        eprintln!("[system-proxy] clearing proxy on: {}", service);
-        let cmds: Vec<Vec<&str>> = vec![
-            vec!["-setwebproxystate", service, "off"],
-            vec!["-setsecurewebproxystate", service, "off"],
-            vec!["-setsocksfirewallproxystate", service, "off"],
-        ];
-        for args in &cmds {
-            let _ = std::process::Command::new("networksetup")
-                .args(args)
-                .output();
-        }
-    }
+    calamity_core::platform::clear_system_proxy();
 }
 
 #[tauri::command]

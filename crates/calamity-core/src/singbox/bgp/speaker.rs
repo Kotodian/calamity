@@ -60,22 +60,7 @@ impl BgpSpeaker {
 }
 
 /// Find local Tailscale IP (100.64-127.x.x.x CGNAT range).
+/// Delegates to platform-specific implementation.
 pub fn get_tailscale_ip() -> Option<Ipv4Addr> {
-    let output = std::process::Command::new("ifconfig").output().ok()?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("inet ") {
-            let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if let Some(ip_str) = parts.get(1) {
-                if let Ok(ip) = ip_str.parse::<Ipv4Addr>() {
-                    let octets = ip.octets();
-                    if octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127 {
-                        return Some(ip);
-                    }
-                }
-            }
-        }
-    }
-    None
+    crate::platform::get_tailscale_ip()
 }
