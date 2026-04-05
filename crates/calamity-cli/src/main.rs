@@ -101,18 +101,21 @@ enum NodeAction {
 enum RuleAction {
     /// List all rules
     List,
-    /// Add a rule (auto-fills rule-set URL for geosite/geoip)
+    /// Add a rule (auto-fills rule-set URL for geosite/geoip if --url not given)
     Add {
-        /// Match type (e.g. domain-suffix, geosite, geoip)
+        /// Match type (e.g. domain-suffix, geosite, geoip, rule-set)
         #[arg(name = "type")]
         match_type: String,
-        /// Match value (e.g. cn, google, 1.1.1.1)
+        /// Match value (e.g. cn, google.com, 1.1.1.1)
         value: String,
         /// Outbound (proxy, direct, reject)
         outbound: String,
         /// Specific node name for this rule's outbound
         #[arg(long)]
         node: Option<String>,
+        /// Custom rule-set URL (.srs file)
+        #[arg(long)]
+        url: Option<String>,
     },
     /// Remove a rule by ID
     Remove {
@@ -210,9 +213,10 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                 value,
                 outbound,
                 node,
+                url,
             } => {
-                // Auto-fill rule-set URL for geosite/geoip
-                let rule_set_url = match match_type.as_str() {
+                // Use provided URL, or auto-fill for geosite/geoip
+                let rule_set_url = url.or_else(|| match match_type.as_str() {
                     "geosite" => Some(format!(
                         "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-{}.srs",
                         value
@@ -222,7 +226,7 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                         value
                     )),
                     _ => None,
-                };
+                });
                 let download_detour = if rule_set_url.is_some() {
                     Some("proxy".to_string())
                 } else {
