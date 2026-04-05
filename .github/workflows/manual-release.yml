@@ -33,9 +33,58 @@ env:
   SINGBOX_VERSION: "1.13.4"
 
 jobs:
+  # ── Create release first ───────────────────────────────
+  create-release:
+    name: Create release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.release_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            echo "${{ inputs.release_notes }}" > /tmp/notes.md
+          else
+            PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ inputs.tag_name }}$" | head -1)
+            if [ -z "$PREV_TAG" ]; then
+              LOG=$(git log --pretty=format:"- %s" --no-merges HEAD)
+            else
+              LOG=$(git log --pretty=format:"- %s" --no-merges "${PREV_TAG}..HEAD")
+            fi
+            echo "$LOG" | grep -v "^- chore" > /tmp/notes.md || echo "$LOG" > /tmp/notes.md
+          fi
+
+      - name: Create or update release
+        id: create
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete existing release if any (to avoid duplicates)
+          gh release delete "${{ inputs.tag_name }}" --yes 2>/dev/null || true
+
+          ARGS="--notes-file /tmp/notes.md"
+          if [ "${{ inputs.prerelease }}" = "true" ]; then ARGS="$ARGS --prerelease"; fi
+          if [ "${{ inputs.draft }}" = "true" ]; then ARGS="$ARGS --draft"; fi
+
+          TITLE="${{ inputs.release_name }}"
+          if [ -z "$TITLE" ]; then TITLE="${{ inputs.tag_name }}"; fi
+
+          gh release create "${{ inputs.tag_name }}" \
+            --title "$TITLE" \
+            $ARGS
+
+          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases/tags/${{ inputs.tag_name }} --jq '.id')
+          echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
+
   # ── macOS GUI ──────────────────────────────────────────
   macos:
     name: macOS (aarch64)
+    needs: create-release
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,22 +115,22 @@ jobs:
           npm test
           cargo test --workspace
 
-      - name: Build and upload Tauri artifacts
-        uses: tauri-apps/tauri-action@v0.5
+      - name: Build Tauri app
+        run: npm run tauri build -- --target aarch64-apple-darwin
+
+      - name: Upload macOS artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ inputs.tag_name }}
-          releaseName: ${{ inputs.release_name != '' && inputs.release_name || inputs.tag_name }}
-          releaseBody: "Building..."
-          releaseDraft: ${{ inputs.draft }}
-          prerelease: ${{ inputs.prerelease }}
-          uploadWorkflowArtifacts: true
-          args: --target aarch64-apple-darwin
+        run: |
+          gh release upload "${{ inputs.tag_name }}" \
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz \
+            --clobber
 
   # ── Linux CLI + Daemon ─────────────────────────────────
   linux:
     name: Linux (${{ matrix.arch }})
+    needs: create-release
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -208,34 +257,3 @@ jobs:
             "${{ env.RPM }}" \
             "${{ env.PACMAN }}" \
             --clobber
-
-  # ── Finalize release notes ─────────────────────────────
-  finalize:
-    name: Update release notes
-    needs: [macos, linux]
-    runs-on: ubuntu-latest
-    if: always() && needs.macos.result == 'success'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Update release notes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -n "${{ inputs.release_notes }}" ]; then
-            # Use manually provided notes
-            echo "${{ inputs.release_notes }}" > /tmp/notes.md
-          else
-            # Auto-generate changelog
-            PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${{ inputs.tag_name }}$" | head -1)
-            if [ -z "$PREV_TAG" ]; then
-              LOG=$(git log --pretty=format:"- %s" --no-merges HEAD)
-            else
-              LOG=$(git log --pretty=format:"- %s" --no-merges "${PREV_TAG}..HEAD")
-            fi
-            CHANGELOG=$(echo "$LOG" | grep -v "^- chore" || echo "$LOG")
-            echo "$CHANGELOG" > /tmp/notes.md
-          fi
-          gh release edit "${{ inputs.tag_name }}" --notes-file /tmp/notes.md
