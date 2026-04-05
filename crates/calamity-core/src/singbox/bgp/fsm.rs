@@ -226,7 +226,7 @@ async fn read_message(stream: &mut TcpStream) -> Result<(u8, Vec<u8>), String> {
 
 /// Pull rules from a remote Calamity peer.
 pub async fn pull_rules(peer_addr: &str, local_router_id: [u8; 4]) -> Result<PullResult, String> {
-    let addr: std::net::SocketAddr = format!("{peer_addr}:179")
+    let addr: std::net::SocketAddr = format!("{peer_addr}:17900")
         .parse()
         .map_err(|e| format!("invalid address: {e}"))?;
 

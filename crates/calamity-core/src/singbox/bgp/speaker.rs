@@ -13,7 +13,7 @@ impl BgpSpeaker {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
         let router_id = tailscale_ip.octets();
-        let bind_addr = format!("{tailscale_ip}:179");
+        let bind_addr = format!("{tailscale_ip}:17900");
 
         let listener = TcpListener::bind(&bind_addr)
             .await
