@@ -5,7 +5,7 @@
 </h1>
 
 <h3 align="center">
-A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.sagernet.org/">sing-box</a>
+A modern, feature-rich macOS & Linux proxy client powered by <a href="https://sing-box.sagernet.org/">sing-box</a>
 </h3>
 
 <p align="center">
@@ -90,14 +90,14 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
 
 **TUN Mode**
 
-- Native macOS TUN inbound with administrator privilege handling
+- Native TUN inbound with administrator privilege handling (macOS) / root (Linux)
 - Configurable stack, MTU, auto-route, strict-route, and DNS hijack settings
 - Automatic Fake-IP enforcement and graceful cleanup on exit
 
 **Gateway Mode**
 
-- Transparent LAN gateway — other devices set this Mac as their gateway to proxy all traffic
-- pf route-to forces forwarded traffic into sing-box TUN for full proxy processing
+- Transparent LAN gateway — other devices set this machine as their gateway to proxy all traffic
+- Platform-native packet redirection: pf route-to (macOS), nftables (Linux)
 - Fake-IP DNS (198.18.0.2) for zero-delay resolution and smart routing
 - Tailscale SNAT for LAN devices to access Tailscale nodes with correct return routing
 - TCP MSS clamping to avoid fragmentation when Tailscale forces lower MTU
@@ -131,6 +131,27 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
 - Bilingual interface: English & Simplified Chinese
 - Drag-and-drop rule and node reordering
 
+**CLI & Daemon (Linux)**
+
+- Headless daemon (`calamityd`) — runs as a systemd service, no GUI required
+- Full-featured CLI (`calamity`) — manage everything from the terminal
+- IPC over Unix domain socket for fast, secure local communication
+- Commands: `start`, `stop`, `restart`, `status`, `mode`, `node`, `rule`, `sub`, `config`, `bgp`, `tailscale`
+
+```bash
+# Switch proxy mode
+calamity mode rule
+
+# Select a node
+calamity node select "Japan-Tokyo-01"
+
+# Update all subscriptions
+calamity sub update --all
+
+# Show real-time status
+calamity status
+```
+
 ## Install
 
 ### System Requirements
@@ -138,19 +159,41 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
 | OS | Architecture | Minimum Version |
 |:---|:---|:---|
 | macOS | Apple Silicon (aarch64) | macOS 10.15+ |
+| Linux | x86_64 / aarch64 | Kernel 5.4+, systemd 245+ |
 
 ### Download
 
-Go to [**Releases**](https://github.com/Kotodian/calamity/releases) to download the latest `.dmg` installer.
+Go to [**Releases**](https://github.com/Kotodian/calamity/releases) to download the latest release.
 
-| Channel | Description | Link |
+#### macOS
+
+| Format | Description | Link |
 |:---|:---|:---|
-| Beta | Latest beta with newest features | [GitHub Releases](https://github.com/Kotodian/calamity/releases) |
+| `.dmg` | macOS GUI installer | [GitHub Releases](https://github.com/Kotodian/calamity/releases) |
 
 > **Note**: After installation, macOS may block the app. Right-click the app and select "Open" to bypass Gatekeeper, or run:
 > ```bash
 > xattr -cr /Applications/Calamity.app
 > ```
+
+#### Linux
+
+| Format | Architecture | Install Command |
+|:---|:---|:---|
+| `.deb` | x86_64 / aarch64 | `sudo dpkg -i calamity_*.deb` |
+| `.rpm` | x86_64 / aarch64 | `sudo rpm -i calamity-*.rpm` |
+| `.pkg.tar.zst` | x86_64 / aarch64 | `sudo pacman -U calamity-*.pkg.tar.zst` |
+| `.tar.gz` | x86_64 / aarch64 | Extract and place binaries in `PATH` |
+
+All Linux packages install two binaries: `calamityd` (headless daemon) and `calamity` (CLI), plus a systemd service unit.
+
+```bash
+# Enable and start the daemon
+sudo systemctl enable --now calamityd
+
+# Check status
+calamity status
+```
 
 ## Tech Stack
 
@@ -162,7 +205,8 @@ Go to [**Releases**](https://github.com/Kotodian/calamity/releases) to download 
 | Charts | Recharts |
 | i18n | i18next |
 | Desktop | Tauri 2 |
-| Backend | Rust 2021, Tokio |
+| Backend | Rust 2024, Tokio |
+| Shared Library | calamity-core (Cargo workspace) |
 | Proxy Core | sing-box (sidecar) |
 | Testing | Vitest, React Testing Library |
 
@@ -170,8 +214,8 @@ Go to [**Releases**](https://github.com/Kotodian/calamity/releases) to download 
 
 ### Prerequisites
 
-- macOS
-- Node.js 20+
+- macOS or Linux
+- Node.js 20+ (GUI builds only)
 - Rust toolchain
 - Tauri CLI (`cargo install tauri-cli`)
 - `sing-box` binary available in `PATH`
@@ -203,23 +247,30 @@ cargo test --manifest-path src-tauri/Cargo.toml   # Backend (Rust)
 ### Project Structure
 
 ```
-calamity/
-├── src/                    # React/TypeScript frontend
-│   ├── pages/              # Dashboard, Nodes, Rules, DNS, Settings, etc.
-│   ├── tray/               # Compact tray window widgets
-│   ├── stores/             # Zustand state management
-│   ├── services/           # Tauri command adapters
-│   ├── components/         # Shared UI components (shadcn/ui)
-│   ├── i18n/               # English & Chinese translations
-│   └── lib/                # Utilities (flags, URI parsing, etc.)
-├── src-tauri/              # Tauri + Rust backend
+calamity/                       # Cargo workspace root
+├── src/                        # React/TypeScript frontend
+│   ├── pages/                  # Dashboard, Nodes, Rules, DNS, Settings, etc.
+│   ├── tray/                   # Compact tray window widgets
+│   ├── stores/                 # Zustand state management
+│   ├── services/               # Tauri command adapters
+│   ├── components/             # Shared UI components (shadcn/ui)
+│   ├── i18n/                   # English & Chinese translations
+│   └── lib/                    # Utilities (flags, URI parsing, etc.)
+├── calamity-core/              # Shared Rust library (platform-agnostic logic)
 │   └── src/
-│       ├── commands/       # 15 Tauri command modules
-│       └── singbox/        # sing-box config, process, storage, APIs
-├── docs/                   # Documentation & screenshots
-├── tailscale/              # Tailscale integration resources
-├── index.html              # Main window entry
-└── tray.html               # Tray window entry
+│       ├── singbox/            # sing-box config, process, storage, APIs
+│       ├── platform/           # Platform abstraction (macOS pf/networksetup, Linux nftables/gsettings)
+│       └── ipc/                # Unix domain socket IPC
+├── src-tauri/                  # Tauri + Rust backend (macOS GUI)
+│   └── src/
+│       ├── commands/           # Tauri command modules
+│       └── ...
+├── src-daemon/                 # calamityd — headless Linux daemon
+├── src-cli/                    # calamity — CLI client
+├── docs/                       # Documentation & screenshots
+├── tailscale/                  # Tailscale integration resources
+├── index.html                  # Main window entry
+└── tray.html                   # Tray window entry
 ```
 
 ## Roadmap
@@ -234,7 +285,8 @@ calamity/
 - [ ] BGP rule sync Phase 2: auto-sync with persistent sessions
 - [ ] Config hot-reload
 - [ ] Versioned releases
-- [ ] CLI tool (`calamity start/stop/restart/status`)
+- [x] Cross-platform CLI & headless daemon (Linux)
+- [x] Linux support (deb, rpm, pacman, tarball — x86_64 & aarch64)
 - [ ] MCP Server integration for AI-assisted proxy control
 
 ## Contributing

@@ -383,6 +383,7 @@
           <a href="#bgp-sync">规则同步 (BGP)</a>
           <a href="#tailscale">Tailscale</a>
           <a href="#settings">设置</a>
+          <a href="#cli-daemon">CLI 与守护进程 (Linux)</a>
           <a href="#logs">日志与排障</a>
         </nav>
       </section>
@@ -901,9 +902,62 @@
         <a class="back-top" href="#top">↑ 返回顶部</a>
       </section>
 
-      <!-- ════ 13. 日志与排障 ════ -->
+      <!-- ════ 13. CLI 与守护进程 (Linux) ════ -->
+      <section class="section" id="cli-daemon">
+        <h2>13. CLI 与守护进程 (Linux)</h2>
+        <p class="subtitle">在 Linux 上通过命令行管理 Calamity</p>
+
+        <p>
+          从 v0.3.0-beta 起，Calamity 支持 Linux 平台。Linux 版本采用<strong>无界面守护进程 + CLI</strong> 架构：
+          <code>calamityd</code> 作为后台服务运行，<code>calamity</code> 命令行工具通过 Unix 域套接字与之通信。
+        </p>
+
+        <h3>安装方式</h3>
+        <p>提供 deb、rpm、pacman、tarball 四种格式，支持 x86_64 和 aarch64 架构。所有包均包含 <code>calamityd</code>、<code>calamity</code> 以及 systemd 服务单元。</p>
+
+        <h3>systemd 集成</h3>
+        <ul>
+          <li><strong>启用并启动</strong> — <code>sudo systemctl enable --now calamityd</code></li>
+          <li><strong>查看服务状态</strong> — <code>systemctl status calamityd</code></li>
+          <li><strong>查看日志</strong> — <code>journalctl -u calamityd -f</code></li>
+          <li><strong>重启服务</strong> — <code>sudo systemctl restart calamityd</code></li>
+        </ul>
+
+        <h3>CLI 命令概览</h3>
+        <p>CLI 通过 Unix 域套接字与守护进程通信，支持以下命令：</p>
+        <ul>
+          <li><strong>calamity start / stop / restart</strong> — 控制 sing-box 核心的启动与停止</li>
+          <li><strong>calamity status</strong> — 显示运行状态、流量统计、当前模式</li>
+          <li><strong>calamity mode [direct|rule|global]</strong> — 切换代理模式</li>
+          <li><strong>calamity node list / select</strong> — 查看和切换节点</li>
+          <li><strong>calamity rule list / add / remove</strong> — 管理路由规则</li>
+          <li><strong>calamity sub update [--all]</strong> — 更新订阅</li>
+          <li><strong>calamity config</strong> — 查看和修改配置</li>
+          <li><strong>calamity bgp</strong> — BGP 规则同步管理</li>
+          <li><strong>calamity tailscale</strong> — Tailscale 集成管理</li>
+        </ul>
+
+        <h3>Linux 网关模式</h3>
+        <p>
+          Linux 上的网关模式使用 <strong>nftables</strong> 进行流量重定向（macOS 上使用 pf）。
+          启用网关模式后，局域网内其他设备将本机设为网关即可代理所有流量。
+        </p>
+
+        <h3>平台抽象</h3>
+        <p>
+          核心逻辑位于 <code>calamity-core</code> 共享库中，通过平台抽象层适配不同操作系统：
+        </p>
+        <ul>
+          <li><strong>macOS</strong> — pf（包过滤）、networksetup（系统代理设置）</li>
+          <li><strong>Linux</strong> — nftables（包过滤）、gsettings（GNOME 代理设置）</li>
+        </ul>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 14. 日志与排障 ════ -->
       <section class="section" id="logs">
-        <h2>13. 日志与排障</h2>
+        <h2>14. 日志与排障</h2>
         <p class="subtitle">诊断连接问题</p>
 
         <div class="screenshot-wrap">
@@ -940,7 +994,7 @@
       <!-- ════ Footer ════ -->
       <div class="footer">
         <p>
-          Calamity — 基于 <a href="https://sing-box.sagernet.org/">sing-box</a> 的现代 macOS 代理客户端
+          Calamity — 基于 <a href="https://sing-box.sagernet.org/">sing-box</a> 的现代 macOS 和 Linux 代理客户端
           · <a href="https://github.com/Kotodian/calamity">GitHub</a>
           · <a href="./index.html">文档首页</a>
         </p>

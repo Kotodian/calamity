@@ -5,7 +5,7 @@
 </h1>
 
 <h3 align="center">
-基于 <a href="https://sing-box.sagernet.org/">sing-box</a> 的现代 macOS 代理客户端
+基于 <a href="https://sing-box.sagernet.org/">sing-box</a> 的现代 macOS 和 Linux 代理客户端
 </h3>
 
 <p align="center">
@@ -69,14 +69,14 @@
 
 **TUN 模式**
 
-- 原生 macOS TUN，自动处理管理员权限
+- 原生 TUN 支持，自动处理管理员权限（macOS）/ root 权限（Linux）
 - 可配置 stack、MTU、auto-route、strict-route、DNS 劫持
 - 退出时自动清理 Fake-IP 并释放 TUN 接口
 
 **网关模式**
 
-- 透明局域网网关 — 其他设备将 Mac 设为网关即可代理所有流量
-- pf route-to 强制转发流量进入 sing-box TUN 进行完整代理处理
+- 透明局域网网关 — 其他设备将本机设为网关即可代理所有流量
+- 平台原生流量重定向：pf route-to（macOS）、nftables（Linux）
 - Fake-IP DNS（198.18.0.2）实现零延迟域名解析和智能分流
 - Tailscale SNAT — 局域网设备可访问 Tailscale 节点，自动处理回程路由
 - TCP MSS 钳位，Tailscale 降低 MTU 时避免分片
@@ -111,18 +111,61 @@
 - 中英双语界面
 - 拖拽排序规则和节点
 
+**CLI 与守护进程（Linux）**
+
+- 无界面守护进程（`calamityd`）— 以 systemd 服务运行，无需 GUI
+- 功能完备的命令行工具（`calamity`）— 在终端管理所有功能
+- 通过 Unix 域套接字进行 IPC 通信，快速安全
+- 支持命令：`start`、`stop`、`restart`、`status`、`mode`、`node`、`rule`、`sub`、`config`、`bgp`、`tailscale`
+
+```bash
+# 切换代理模式
+calamity mode rule
+
+# 选择节点
+calamity node select "Japan-Tokyo-01"
+
+# 更新全部订阅
+calamity sub update --all
+
+# 查看实时状态
+calamity status
+```
+
 ## 安装
 
 | 系统 | 架构 | 最低版本 |
 |:---|:---|:---|
 | macOS | Apple Silicon (aarch64) | macOS 10.15+ |
+| Linux | x86_64 / aarch64 | 内核 5.4+，systemd 245+ |
 
-前往 [**Releases**](https://github.com/Kotodian/calamity/releases) 下载最新 `.dmg` 安装包。
+前往 [**Releases**](https://github.com/Kotodian/calamity/releases) 下载最新版本。
+
+#### macOS
 
 > **注意**：安装后 macOS 可能会阻止运行。右键选择"打开"以跳过 Gatekeeper，或执行：
 > ```bash
 > xattr -cr /Applications/Calamity.app
 > ```
+
+#### Linux
+
+| 格式 | 架构 | 安装命令 |
+|:---|:---|:---|
+| `.deb` | x86_64 / aarch64 | `sudo dpkg -i calamity_*.deb` |
+| `.rpm` | x86_64 / aarch64 | `sudo rpm -i calamity-*.rpm` |
+| `.pkg.tar.zst` | x86_64 / aarch64 | `sudo pacman -U calamity-*.pkg.tar.zst` |
+| `.tar.gz` | x86_64 / aarch64 | 解压后将可执行文件放入 `PATH` |
+
+所有 Linux 包均包含两个程序：`calamityd`（无界面守护进程）和 `calamity`（命令行工具），以及 systemd 服务单元。
+
+```bash
+# 启用并启动守护进程
+sudo systemctl enable --now calamityd
+
+# 查看状态
+calamity status
+```
 
 ## 技术栈
 
@@ -134,7 +177,8 @@
 | 图表 | Recharts |
 | 国际化 | i18next |
 | 桌面框架 | Tauri 2 |
-| 后端 | Rust 2021, Tokio |
+| 后端 | Rust 2024, Tokio |
+| 共享库 | calamity-core（Cargo 工作空间） |
 | 代理核心 | sing-box (sidecar) |
 | 测试 | Vitest, React Testing Library |
 
@@ -142,8 +186,8 @@
 
 ### 前置条件
 
-- macOS
-- Node.js 20+
+- macOS 或 Linux
+- Node.js 20+（仅 GUI 构建需要）
 - Rust 工具链
 - Tauri CLI (`cargo install tauri-cli`)
 - `sing-box` 可执行文件在 `PATH` 中
@@ -175,23 +219,30 @@ cargo test --manifest-path src-tauri/Cargo.toml   # 后端 (Rust)
 ### 项目结构
 
 ```
-calamity/
-├── src/                    # React/TypeScript 前端
-│   ├── pages/              # 仪表盘、节点、规则、DNS、设置等页面
-│   ├── tray/               # 托盘窗口组件
-│   ├── stores/             # Zustand 状态管理
-│   ├── services/           # Tauri 命令适配器
-│   ├── components/         # 共享 UI 组件 (shadcn/ui)
-│   ├── i18n/               # 中英双语翻译
-│   └── lib/                # 工具函数
-├── src-tauri/              # Tauri + Rust 后端
+calamity/                       # Cargo 工作空间根目录
+├── src/                        # React/TypeScript 前端
+│   ├── pages/                  # 仪表盘、节点、规则、DNS、设置等页面
+│   ├── tray/                   # 托盘窗口组件
+│   ├── stores/                 # Zustand 状态管理
+│   ├── services/               # Tauri 命令适配器
+│   ├── components/             # 共享 UI 组件 (shadcn/ui)
+│   ├── i18n/                   # 中英双语翻译
+│   └── lib/                    # 工具函数
+├── calamity-core/              # 共享 Rust 库（跨平台核心逻辑）
 │   └── src/
-│       ├── commands/       # 15 个 Tauri 命令模块
-│       └── singbox/        # sing-box 配置、进程、存储、API
-├── docs/                   # 文档与截图
-├── tailscale/              # Tailscale 集成资源
-├── index.html              # 主窗口入口
-└── tray.html               # 托盘窗口入口
+│       ├── singbox/            # sing-box 配置、进程、存储、API
+│       ├── platform/           # 平台抽象层（macOS pf/networksetup，Linux nftables/gsettings）
+│       └── ipc/                # Unix 域套接字 IPC
+├── src-tauri/                  # Tauri + Rust 后端（macOS GUI）
+│   └── src/
+│       ├── commands/           # Tauri 命令模块
+│       └── ...
+├── src-daemon/                 # calamityd — Linux 无界面守护进程
+├── src-cli/                    # calamity — 命令行客户端
+├── docs/                       # 文档与截图
+├── tailscale/                  # Tailscale 集成资源
+├── index.html                  # 主窗口入口
+└── tray.html                   # 托盘窗口入口
 ```
 
 ## 路线图
@@ -206,7 +257,8 @@ calamity/
 - [ ] BGP 规则同步第二阶段：持久会话自动同步
 - [ ] 配置热重载
 - [ ] 版本化发布
-- [ ] CLI 工具 (`calamity start/stop/restart/status`)
+- [x] 跨平台 CLI 与无界面守护进程（Linux）
+- [x] Linux 支持（deb、rpm、pacman、tarball — x86_64 和 aarch64）
 - [ ] MCP Server 集成，AI 辅助代理控制
 
 ## 致谢
