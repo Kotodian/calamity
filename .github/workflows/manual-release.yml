@@ -123,9 +123,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ inputs.tag_name }}" \
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz \
+            target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
             --clobber
+          # Also upload .app if tar.gz exists (updater bundle)
+          if ls target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz 1>/dev/null 2>&1; then
+            gh release upload "${{ inputs.tag_name }}" \
+              target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz \
+              --clobber
+          fi
 
   # ── Linux CLI + Daemon ─────────────────────────────────
   linux:
