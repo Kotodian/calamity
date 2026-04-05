@@ -167,14 +167,15 @@ impl SingboxProcess {
         *guard = None;
         drop(guard);
 
-        if runtime.mode == Some(RunMode::Tun) {
+        if runtime.mode == Some(RunMode::Tun) && unsafe { libc::geteuid() } != 0 {
             if let Some(config_path) = runtime.config_path.as_deref() {
                 self.stop_privileged_tun(config_path).await?;
             }
         }
 
         // If still alive, try killing via PID file (uses /bin/kill which is in sudoers)
-        if runtime.mode == Some(RunMode::Tun) || self.api.health_check().await.unwrap_or(false) {
+        let is_root = unsafe { libc::geteuid() } == 0;
+        if !is_root && (runtime.mode == Some(RunMode::Tun) || self.api.health_check().await.unwrap_or(false)) {
             if let Some(config_path) = runtime.config_path.as_deref() {
                 let pid_path = build_tun_pid_path(config_path);
                 if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
