@@ -450,9 +450,8 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
         Command::AddDnsServer { name, address, detour, domain_resolver } => {
             use calamity_core::singbox::dns_storage::{self, DnsServerConfig};
             let mut dns = dns_storage::load_dns_settings();
-            let id = format!("custom-{}", chrono::Utc::now().timestamp_millis());
             dns.servers.push(DnsServerConfig {
-                id: id.clone(),
+                id: name.clone(),
                 name: name.clone(),
                 address,
                 enabled: true,
@@ -460,7 +459,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 domain_resolver,
             });
             match dns_storage::save_dns_settings(&dns) {
-                Ok(()) => Response::Ok(serde_json::json!({"added": name, "id": id})),
+                Ok(()) => Response::Ok(serde_json::json!({"added": name})),
                 Err(e) => Response::Error(e),
             }
         }
@@ -480,16 +479,15 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
         Command::AddDnsRule { match_type, match_value, server } => {
             use calamity_core::singbox::dns_storage::{self, DnsRuleConfig};
             let mut dns = dns_storage::load_dns_settings();
-            let id = format!("dr-{}", chrono::Utc::now().timestamp_millis());
             dns.rules.push(DnsRuleConfig {
-                id: id.clone(),
+                id: match_value.clone(),
                 match_type,
                 match_value: match_value.clone(),
                 server,
                 enabled: true,
             });
             match dns_storage::save_dns_settings(&dns) {
-                Ok(()) => Response::Ok(serde_json::json!({"added": match_value, "id": id})),
+                Ok(()) => Response::Ok(serde_json::json!({"added": match_value})),
                 Err(e) => Response::Error(e),
             }
         }
