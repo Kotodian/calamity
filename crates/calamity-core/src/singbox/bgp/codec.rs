@@ -1,3 +1,4 @@
+use crate::singbox::dns_storage::{DnsMode, DnsRuleConfig, DnsServerConfig, DnsSettings};
 use crate::singbox::rules_storage::{RouteRuleConfig, RulesData};
 
 // TLV field types for rule encoding
@@ -14,8 +15,29 @@ const FIELD_INVERT: u8 = 10;
 const FIELD_ORDER: u8 = 11;
 const FIELD_RULE_SET_LOCAL_PATH: u8 = 12;
 
-/// Magic bytes to identify a RulesData metadata entry
+/// Magic bytes to identify entry types
 const METADATA_MARKER: &[u8] = b"__META__";
+const DNS_SERVER_MARKER: &[u8] = b"__DNSS__";
+const DNS_RULE_MARKER: &[u8] = b"__DNSR__";
+const DNS_META_MARKER: &[u8] = b"__DNSM__";
+
+// TLV field types for DNS server encoding
+const FIELD_DNS_NAME: u8 = 30;
+const FIELD_DNS_ADDRESS: u8 = 31;
+const FIELD_DNS_ENABLED: u8 = 32;
+const FIELD_DNS_DETOUR: u8 = 33;
+const FIELD_DNS_DOMAIN_RESOLVER: u8 = 34;
+
+// TLV field types for DNS rule encoding
+const FIELD_DNS_RULE_MATCH_TYPE: u8 = 40;
+const FIELD_DNS_RULE_MATCH_VALUE: u8 = 41;
+const FIELD_DNS_RULE_SERVER: u8 = 42;
+const FIELD_DNS_RULE_ENABLED: u8 = 43;
+
+// DNS metadata fields
+const FIELD_DNS_MODE: u8 = 50;
+const FIELD_DNS_FAKE_IP_RANGE: u8 = 51;
+const FIELD_DNS_FINAL: u8 = 52;
 
 const FIELD_FINAL_OUTBOUND: u8 = 20;
 const FIELD_FINAL_OUTBOUND_NODE: u8 = 21;
@@ -156,6 +178,135 @@ pub fn decode_rule(data: &[u8]) -> Result<RouteRuleConfig, String> {
     })
 }
 
+// --- DNS Server encode/decode ---
+
+pub fn encode_dns_server(server: &DnsServerConfig) -> Vec<u8> {
+    let mut buf = Vec::new();
+    write_tlv_str(&mut buf, FIELD_DNS_NAME, &server.name);
+    write_tlv_str(&mut buf, FIELD_DNS_ADDRESS, &server.address);
+    write_tlv_bool(&mut buf, FIELD_DNS_ENABLED, server.enabled);
+    if let Some(ref detour) = server.detour {
+        write_tlv_str(&mut buf, FIELD_DNS_DETOUR, detour);
+    }
+    if let Some(ref resolver) = server.domain_resolver {
+        write_tlv_str(&mut buf, FIELD_DNS_DOMAIN_RESOLVER, resolver);
+    }
+    buf
+}
+
+pub fn decode_dns_server(data: &[u8]) -> Result<DnsServerConfig, String> {
+    let mut name = String::new();
+    let mut address = String::new();
+    let mut enabled = true;
+    let mut detour = None;
+    let mut domain_resolver = None;
+
+    let mut pos = 0;
+    while pos < data.len() {
+        if pos + 3 > data.len() { return Err("truncated DNS server TLV".to_string()); }
+        let field_type = data[pos];
+        let length = u16::from_be_bytes([data[pos + 1], data[pos + 2]]) as usize;
+        pos += 3;
+        if pos + length > data.len() { return Err("DNS server TLV length exceeds data".to_string()); }
+        let value = &data[pos..pos + length];
+        pos += length;
+
+        match field_type {
+            FIELD_DNS_NAME => name = String::from_utf8_lossy(value).to_string(),
+            FIELD_DNS_ADDRESS => address = String::from_utf8_lossy(value).to_string(),
+            FIELD_DNS_ENABLED => enabled = value.first().copied().unwrap_or(1) != 0,
+            FIELD_DNS_DETOUR => detour = Some(String::from_utf8_lossy(value).to_string()),
+            FIELD_DNS_DOMAIN_RESOLVER => domain_resolver = Some(String::from_utf8_lossy(value).to_string()),
+            _ => {}
+        }
+    }
+
+    Ok(DnsServerConfig { id: None, name, address, enabled, detour, domain_resolver })
+}
+
+// --- DNS Rule encode/decode ---
+
+pub fn encode_dns_rule(rule: &DnsRuleConfig) -> Vec<u8> {
+    let mut buf = Vec::new();
+    write_tlv_str(&mut buf, FIELD_DNS_RULE_MATCH_TYPE, &rule.match_type);
+    write_tlv_str(&mut buf, FIELD_DNS_RULE_MATCH_VALUE, &rule.match_value);
+    write_tlv_str(&mut buf, FIELD_DNS_RULE_SERVER, &rule.server);
+    write_tlv_bool(&mut buf, FIELD_DNS_RULE_ENABLED, rule.enabled);
+    buf
+}
+
+pub fn decode_dns_rule(data: &[u8]) -> Result<DnsRuleConfig, String> {
+    let mut match_type = String::new();
+    let mut match_value = String::new();
+    let mut server = String::new();
+    let mut enabled = true;
+
+    let mut pos = 0;
+    while pos < data.len() {
+        if pos + 3 > data.len() { return Err("truncated DNS rule TLV".to_string()); }
+        let field_type = data[pos];
+        let length = u16::from_be_bytes([data[pos + 1], data[pos + 2]]) as usize;
+        pos += 3;
+        if pos + length > data.len() { return Err("DNS rule TLV length exceeds data".to_string()); }
+        let value = &data[pos..pos + length];
+        pos += length;
+
+        match field_type {
+            FIELD_DNS_RULE_MATCH_TYPE => match_type = String::from_utf8_lossy(value).to_string(),
+            FIELD_DNS_RULE_MATCH_VALUE => match_value = String::from_utf8_lossy(value).to_string(),
+            FIELD_DNS_RULE_SERVER => server = String::from_utf8_lossy(value).to_string(),
+            FIELD_DNS_RULE_ENABLED => enabled = value.first().copied().unwrap_or(1) != 0,
+            _ => {}
+        }
+    }
+
+    Ok(DnsRuleConfig { id: None, match_type, match_value, server, enabled })
+}
+
+// --- DNS metadata encode/decode ---
+
+pub fn encode_dns_metadata(dns: &DnsSettings) -> Vec<u8> {
+    let mut buf = Vec::new();
+    let mode_str = serde_json::to_value(&dns.mode)
+        .ok()
+        .and_then(|v| v.as_str().map(String::from))
+        .unwrap_or_else(|| "normal".to_string());
+    write_tlv_str(&mut buf, FIELD_DNS_MODE, &mode_str);
+    write_tlv_str(&mut buf, FIELD_DNS_FAKE_IP_RANGE, &dns.fake_ip_range);
+    write_tlv_str(&mut buf, FIELD_DNS_FINAL, &dns.final_server);
+    buf
+}
+
+pub fn decode_dns_metadata(data: &[u8]) -> Result<(DnsMode, String, String), String> {
+    let mut mode = DnsMode::Normal;
+    let mut fake_ip_range = "198.18.0.0/15".to_string();
+    let mut final_server = "AliDNS".to_string();
+
+    let mut pos = 0;
+    while pos < data.len() {
+        if pos + 3 > data.len() { return Err("truncated DNS meta TLV".to_string()); }
+        let field_type = data[pos];
+        let length = u16::from_be_bytes([data[pos + 1], data[pos + 2]]) as usize;
+        pos += 3;
+        if pos + length > data.len() { return Err("DNS meta TLV length exceeds data".to_string()); }
+        let value = &data[pos..pos + length];
+        pos += length;
+
+        match field_type {
+            FIELD_DNS_MODE => {
+                let s = String::from_utf8_lossy(value);
+                mode = serde_json::from_value(serde_json::Value::String(s.to_string()))
+                    .unwrap_or(DnsMode::Normal);
+            }
+            FIELD_DNS_FAKE_IP_RANGE => fake_ip_range = String::from_utf8_lossy(value).to_string(),
+            FIELD_DNS_FINAL => final_server = String::from_utf8_lossy(value).to_string(),
+            _ => {}
+        }
+    }
+
+    Ok((mode, fake_ip_range, final_server))
+}
+
 /// Encode RulesData metadata into a TLV buffer.
 pub fn encode_metadata(data: &RulesData) -> Vec<u8> {
     let mut buf = Vec::new();
@@ -202,22 +353,50 @@ pub fn decode_metadata(data: &[u8]) -> Result<(String, Option<String>, u64), Str
     Ok((final_outbound, final_outbound_node, update_interval))
 }
 
-/// Encode a complete RulesData into a list of (key, payload) pairs.
-pub fn encode_rules_data(data: &RulesData) -> Vec<(Vec<u8>, Vec<u8>)> {
+/// Sync payload: rules + DNS settings.
+#[derive(Debug, Clone)]
+pub struct SyncData {
+    pub rules: RulesData,
+    pub dns: Option<DnsSettings>,
+}
+
+/// Encode rules and DNS settings into (key, payload) pairs via TLV.
+pub fn encode_sync_data(rules: &RulesData, dns: Option<&DnsSettings>) -> Vec<(Vec<u8>, Vec<u8>)> {
     let mut entries = Vec::new();
-    entries.push((METADATA_MARKER.to_vec(), encode_metadata(data)));
-    for rule in &data.rules {
+    entries.push((METADATA_MARKER.to_vec(), encode_metadata(rules)));
+    for rule in &rules.rules {
         entries.push((rule.id.as_bytes().to_vec(), encode_rule(rule)));
+    }
+    if let Some(dns) = dns {
+        entries.push((DNS_META_MARKER.to_vec(), encode_dns_metadata(dns)));
+        for server in &dns.servers {
+            entries.push((DNS_SERVER_MARKER.to_vec(), encode_dns_server(server)));
+        }
+        for rule in &dns.rules {
+            entries.push((DNS_RULE_MARKER.to_vec(), encode_dns_rule(rule)));
+        }
     }
     entries
 }
 
-/// Decode a list of (key, payload) pairs back into RulesData.
-pub fn decode_rules_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<RulesData, String> {
+/// Encode a complete RulesData into (key, payload) pairs (without DNS).
+pub fn encode_rules_data(data: &RulesData) -> Vec<(Vec<u8>, Vec<u8>)> {
+    encode_sync_data(data, None)
+}
+
+/// Decode (key, payload) pairs back into SyncData (rules + optional DNS).
+pub fn decode_sync_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<SyncData, String> {
     let mut rules = Vec::new();
     let mut final_outbound = "proxy".to_string();
     let mut final_outbound_node = None;
     let mut update_interval = 86400u64;
+
+    let mut dns_mode = DnsMode::Normal;
+    let mut dns_fake_ip_range = "198.18.0.0/15".to_string();
+    let mut dns_final = "AliDNS".to_string();
+    let mut dns_servers = Vec::new();
+    let mut dns_rules = Vec::new();
+    let mut has_dns = false;
 
     for (key, payload) in entries {
         if key == METADATA_MARKER {
@@ -225,6 +404,16 @@ pub fn decode_rules_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<RulesData, St
             final_outbound = fo;
             final_outbound_node = fon;
             update_interval = ui;
+        } else if key == DNS_META_MARKER {
+            has_dns = true;
+            let (m, fir, fs) = decode_dns_metadata(payload)?;
+            dns_mode = m;
+            dns_fake_ip_range = fir;
+            dns_final = fs;
+        } else if key == DNS_SERVER_MARKER {
+            dns_servers.push(decode_dns_server(payload)?);
+        } else if key == DNS_RULE_MARKER {
+            dns_rules.push(decode_dns_rule(payload)?);
         } else {
             rules.push(decode_rule(payload)?);
         }
@@ -232,12 +421,32 @@ pub fn decode_rules_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<RulesData, St
 
     rules.sort_by_key(|r| r.order);
 
-    Ok(RulesData {
-        rules,
-        final_outbound,
-        final_outbound_node,
-        update_interval,
+    let dns = if has_dns {
+        Some(DnsSettings {
+            mode: dns_mode,
+            fake_ip_range: dns_fake_ip_range,
+            final_server: dns_final,
+            servers: dns_servers,
+            rules: dns_rules,
+        })
+    } else {
+        None
+    };
+
+    Ok(SyncData {
+        rules: RulesData {
+            rules,
+            final_outbound,
+            final_outbound_node,
+            update_interval,
+        },
+        dns,
     })
+}
+
+/// Decode (key, payload) pairs back into RulesData (ignores DNS).
+pub fn decode_rules_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<RulesData, String> {
+    decode_sync_data(entries).map(|s| s.rules)
 }
 
 #[cfg(test)]

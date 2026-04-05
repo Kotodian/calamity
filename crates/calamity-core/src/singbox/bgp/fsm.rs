@@ -1,7 +1,8 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use super::codec;
+use super::codec::{self, SyncData};
+use crate::singbox::dns_storage;
 use crate::singbox::rules_storage::RulesData;
 
 const BGP_MARKER: [u8; 16] = [0xff; 16];
@@ -20,6 +21,7 @@ const CALAMITY_SAFI: u8 = 1;
 #[derive(Debug, Clone)]
 pub struct PullResult {
     pub remote_rules: RulesData,
+    pub remote_dns: Option<dns_storage::DnsSettings>,
 }
 
 /// Build a BGP OPEN message.
@@ -290,11 +292,18 @@ pub async fn pull_rules(peer_addr: &str, local_router_id: [u8; 4]) -> Result<Pul
         }
     }
 
-    let remote_rules = codec::decode_rules_data(&all_entries)?;
-    eprintln!("[bgp] received {} rules from {peer_addr}", remote_rules.rules.len());
+    let sync_data = codec::decode_sync_data(&all_entries)?;
+    eprintln!(
+        "[bgp] received {} rules, {} DNS servers from {peer_addr}",
+        sync_data.rules.rules.len(),
+        sync_data.dns.as_ref().map_or(0, |d| d.servers.len())
+    );
     let _ = stream.shutdown().await;
 
-    Ok(PullResult { remote_rules })
+    Ok(PullResult {
+        remote_rules: sync_data.rules,
+        remote_dns: sync_data.dns,
+    })
 }
 
 /// Handle incoming peer connection — send local rules.
@@ -317,12 +326,18 @@ pub async fn serve_rules(mut stream: TcpStream, local_router_id: [u8; 4]) -> Res
 
     let rules_data = crate::singbox::rules_storage::load_rules();
     let syncable = codec::filter_syncable_rules(&rules_data);
-    let entries = codec::encode_rules_data(&syncable);
+    let dns_data = dns_storage::load_dns_settings();
+    let entries = codec::encode_sync_data(&syncable, Some(&dns_data));
 
     stream.write_all(&build_update(&entries)).await.map_err(|e| format!("send UPDATE: {e}"))?;
     stream.write_all(&build_update(&[])).await.map_err(|e| format!("send end-of-rib: {e}"))?;
 
-    eprintln!("[bgp] sent {} rules to {peer_addr} ({} process rules filtered)", syncable.rules.len(), rules_data.rules.len() - syncable.rules.len());
+    eprintln!(
+        "[bgp] sent {} rules + {} DNS servers to {peer_addr} ({} process rules filtered)",
+        syncable.rules.len(),
+        dns_data.servers.len(),
+        rules_data.rules.len() - syncable.rules.len()
+    );
 
     let _ = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let mut buf = [0u8; 1];
