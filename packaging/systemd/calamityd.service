@@ -1,0 +1,17 @@
+[Unit]
+Description=Calamity Proxy Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/calamityd
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RuntimeDirectory=calamity
+StateDirectory=calamity
+LogsDirectory=calamity
+ConfigurationDirectory=calamity
+
+[Install]
+WantedBy=multi-user.target

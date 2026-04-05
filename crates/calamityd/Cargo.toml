@@ -1,0 +1,15 @@
+[package]
+name = "calamityd"
+version = "0.3.0-beta"
+edition = "2021"
+description = "Calamity proxy daemon for Linux"
+
+[[bin]]
+name = "calamityd"
+path = "src/main.rs"
+
+[dependencies]
+calamity-core = { path = "../calamity-core", features = ["linux"] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+log = "0.4"

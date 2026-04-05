@@ -3,5 +3,6 @@ members = [
     "src-tauri",
     "crates/calamity-core",
     "crates/calamity-cli",
+    "crates/calamityd",
 ]
 resolver = "2"
