@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(ep["type"], "tailscale");
         assert_eq!(ep["tag"], "tailscale-ep");
         assert_eq!(ep["hostname"], "my-node");
-        assert_eq!(ep["accept_routes"], false);
+        assert_eq!(ep["accept_routes"], true);
         assert!(ep.get("auth_key").is_none());
         assert!(ep.get("exit_node").is_none());
         assert!(ep.get("advertise_routes").is_none());

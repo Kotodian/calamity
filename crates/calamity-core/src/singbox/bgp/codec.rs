@@ -20,6 +20,7 @@ const METADATA_MARKER: &[u8] = b"__META__";
 const DNS_SERVER_MARKER: &[u8] = b"__DNSS__";
 const DNS_RULE_MARKER: &[u8] = b"__DNSR__";
 const DNS_META_MARKER: &[u8] = b"__DNSM__";
+const NODE_MARKER: &[u8] = b"__NODE__";
 
 // TLV field types for DNS server encoding
 const FIELD_DNS_NAME: u8 = 30;
@@ -353,15 +354,16 @@ pub fn decode_metadata(data: &[u8]) -> Result<(String, Option<String>, u64), Str
     Ok((final_outbound, final_outbound_node, update_interval))
 }
 
-/// Sync payload: rules + DNS settings.
+/// Sync payload: rules + DNS + nodes.
 #[derive(Debug, Clone)]
 pub struct SyncData {
     pub rules: RulesData,
     pub dns: Option<DnsSettings>,
+    pub node_uris: Vec<String>,
 }
 
-/// Encode rules and DNS settings into (key, payload) pairs via TLV.
-pub fn encode_sync_data(rules: &RulesData, dns: Option<&DnsSettings>) -> Vec<(Vec<u8>, Vec<u8>)> {
+/// Encode rules, DNS, and node URIs into (key, payload) pairs.
+pub fn encode_sync_data(rules: &RulesData, dns: Option<&DnsSettings>, node_uris: &[String]) -> Vec<(Vec<u8>, Vec<u8>)> {
     let mut entries = Vec::new();
     entries.push((METADATA_MARKER.to_vec(), encode_metadata(rules)));
     for rule in &rules.rules {
@@ -376,12 +378,15 @@ pub fn encode_sync_data(rules: &RulesData, dns: Option<&DnsSettings>) -> Vec<(Ve
             entries.push((DNS_RULE_MARKER.to_vec(), encode_dns_rule(rule)));
         }
     }
+    for uri in node_uris {
+        entries.push((NODE_MARKER.to_vec(), uri.as_bytes().to_vec()));
+    }
     entries
 }
 
-/// Encode a complete RulesData into (key, payload) pairs (without DNS).
+/// Encode a complete RulesData into (key, payload) pairs (without DNS/nodes).
 pub fn encode_rules_data(data: &RulesData) -> Vec<(Vec<u8>, Vec<u8>)> {
-    encode_sync_data(data, None)
+    encode_sync_data(data, None, &[])
 }
 
 /// Decode (key, payload) pairs back into SyncData (rules + optional DNS).
@@ -397,6 +402,7 @@ pub fn decode_sync_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<SyncData, Stri
     let mut dns_servers = Vec::new();
     let mut dns_rules = Vec::new();
     let mut has_dns = false;
+    let mut node_uris = Vec::new();
 
     for (key, payload) in entries {
         if key == METADATA_MARKER {
@@ -414,6 +420,10 @@ pub fn decode_sync_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<SyncData, Stri
             dns_servers.push(decode_dns_server(payload)?);
         } else if key == DNS_RULE_MARKER {
             dns_rules.push(decode_dns_rule(payload)?);
+        } else if key == NODE_MARKER {
+            if let Ok(uri) = String::from_utf8(payload.clone()) {
+                node_uris.push(uri);
+            }
         } else {
             rules.push(decode_rule(payload)?);
         }
@@ -441,6 +451,7 @@ pub fn decode_sync_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<SyncData, Stri
             update_interval,
         },
         dns,
+        node_uris,
     })
 }
 

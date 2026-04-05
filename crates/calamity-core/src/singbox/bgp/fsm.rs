@@ -3,7 +3,9 @@ use tokio::net::TcpStream;
 
 use super::codec::{self, SyncData};
 use crate::singbox::dns_storage;
+use crate::singbox::nodes_storage;
 use crate::singbox::rules_storage::RulesData;
+use crate::singbox::subscription_fetch::node_to_uri;
 
 const BGP_MARKER: [u8; 16] = [0xff; 16];
 const BGP_VERSION: u8 = 4;
@@ -22,6 +24,7 @@ const CALAMITY_SAFI: u8 = 1;
 pub struct PullResult {
     pub remote_rules: RulesData,
     pub remote_dns: Option<dns_storage::DnsSettings>,
+    pub node_uris: Vec<String>,
 }
 
 /// Build a BGP OPEN message.
@@ -294,15 +297,17 @@ pub async fn pull_rules(peer_addr: &str, local_router_id: [u8; 4]) -> Result<Pul
 
     let sync_data = codec::decode_sync_data(&all_entries)?;
     eprintln!(
-        "[bgp] received {} rules, {} DNS servers from {peer_addr}",
+        "[bgp] received {} rules, {} DNS servers, {} nodes from {peer_addr}",
         sync_data.rules.rules.len(),
-        sync_data.dns.as_ref().map_or(0, |d| d.servers.len())
+        sync_data.dns.as_ref().map_or(0, |d| d.servers.len()),
+        sync_data.node_uris.len()
     );
     let _ = stream.shutdown().await;
 
     Ok(PullResult {
         remote_rules: sync_data.rules,
         remote_dns: sync_data.dns,
+        node_uris: sync_data.node_uris,
     })
 }
 
@@ -327,15 +332,21 @@ pub async fn serve_rules(mut stream: TcpStream, local_router_id: [u8; 4]) -> Res
     let rules_data = crate::singbox::rules_storage::load_rules();
     let syncable = codec::filter_syncable_rules(&rules_data);
     let dns_data = dns_storage::load_dns_settings();
-    let entries = codec::encode_sync_data(&syncable, Some(&dns_data));
+    let nodes_data = nodes_storage::load_nodes();
+    let node_uris: Vec<String> = nodes_data.groups.iter()
+        .flat_map(|g| g.nodes.iter())
+        .filter_map(|n| node_to_uri(n))
+        .collect();
+    let entries = codec::encode_sync_data(&syncable, Some(&dns_data), &node_uris);
 
     stream.write_all(&build_update(&entries)).await.map_err(|e| format!("send UPDATE: {e}"))?;
     stream.write_all(&build_update(&[])).await.map_err(|e| format!("send end-of-rib: {e}"))?;
 
     eprintln!(
-        "[bgp] sent {} rules + {} DNS servers to {peer_addr} ({} process rules filtered)",
+        "[bgp] sent {} rules + {} DNS servers + {} nodes to {peer_addr} ({} process rules filtered)",
         syncable.rules.len(),
         dns_data.servers.len(),
+        node_uris.len(),
         rules_data.rules.len() - syncable.rules.len()
     );
 

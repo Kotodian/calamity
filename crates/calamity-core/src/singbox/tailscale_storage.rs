@@ -25,12 +25,16 @@ pub struct TailscaleSettings {
     pub hostname: String,
     #[serde(default)]
     pub exit_node: String,
-    #[serde(default)]
+    #[serde(default = "default_accept_routes")]
     pub accept_routes: bool,
     #[serde(default)]
     pub advertise_routes: Vec<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+}
+
+fn default_accept_routes() -> bool {
+    true
 }
 
 fn default_hostname() -> String {
@@ -76,7 +80,7 @@ mod tests {
         assert!(settings.auth_key.is_empty());
         assert!(settings.oauth_client_id.is_empty());
         assert!(settings.exit_node.is_empty());
-        assert!(!settings.accept_routes);
+        assert!(settings.accept_routes);
         assert!(settings.advertise_routes.is_empty());
     }
 
@@ -96,7 +100,7 @@ mod tests {
         assert_eq!(settings.exit_node, "my-server");
         assert_eq!(settings.hostname, "calamity");
         assert!(settings.oauth_client_id.is_empty());
-        assert!(!settings.accept_routes);
+        assert!(settings.accept_routes);
     }
 
     #[test]

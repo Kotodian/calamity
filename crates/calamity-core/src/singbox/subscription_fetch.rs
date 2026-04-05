@@ -488,6 +488,119 @@ pub fn parse_v2ray_uri(uri: &str) -> Option<ProxyNode> {
     }
 }
 
+/// Encode a ProxyNode back to a URI string (vless://, vmess://, trojan://, ss://, hy2://, tuic://).
+pub fn node_to_uri(node: &ProxyNode) -> Option<String> {
+    let config = node.protocol_config.as_ref()?;
+    let proto = config["type"].as_str().unwrap_or("");
+    let name_encoded = urlencoding::encode(&node.name);
+
+    match proto {
+        "vless" => {
+            let uuid = config["uuid"].as_str().unwrap_or("");
+            let mut params = Vec::new();
+            if let Some(flow) = config["flow"].as_str() {
+                if !flow.is_empty() { params.push(format!("flow={flow}")); }
+            }
+            encode_tls_params(config, &mut params);
+            encode_transport_params(config, &mut params);
+            let query = if params.is_empty() { String::new() } else { format!("?{}", params.join("&")) };
+            Some(format!("vless://{}@{}:{}{}{}", uuid, node.server, node.port, query, format!("#{name_encoded}")))
+        }
+        "trojan" => {
+            let password = config["password"].as_str().unwrap_or("");
+            let mut params = Vec::new();
+            encode_tls_params(config, &mut params);
+            encode_transport_params(config, &mut params);
+            let query = if params.is_empty() { String::new() } else { format!("?{}", params.join("&")) };
+            Some(format!("trojan://{}@{}:{}{}{}", password, node.server, node.port, query, format!("#{name_encoded}")))
+        }
+        "vmess" => {
+            let obj = serde_json::json!({
+                "v": "2",
+                "ps": node.name,
+                "add": node.server,
+                "port": node.port.to_string(),
+                "id": config["uuid"].as_str().unwrap_or(""),
+                "aid": config["alterId"].as_u64().unwrap_or(0).to_string(),
+                "net": config["transport"]["type"].as_str().unwrap_or("tcp"),
+                "tls": if config["tls"]["enabled"].as_bool().unwrap_or(false) { "tls" } else { "" },
+                "sni": config["tls"]["sni"].as_str().unwrap_or(""),
+            });
+            let encoded = base64::engine::general_purpose::STANDARD.encode(serde_json::to_string(&obj).ok()?);
+            Some(format!("vmess://{encoded}"))
+        }
+        "shadowsocks" => {
+            let method = config["method"].as_str().unwrap_or("aes-256-gcm");
+            let password = config["password"].as_str().unwrap_or("");
+            let userinfo = base64::engine::general_purpose::STANDARD.encode(format!("{method}:{password}"));
+            Some(format!("ss://{}@{}:{}#{}", userinfo, node.server, node.port, name_encoded))
+        }
+        "hysteria2" => {
+            let password = config["password"].as_str().unwrap_or("");
+            let mut params = Vec::new();
+            encode_tls_params(config, &mut params);
+            if let Some(obfs) = config["obfs"]["type"].as_str() {
+                if !obfs.is_empty() { params.push(format!("obfs={obfs}")); }
+            }
+            if let Some(obfs_pw) = config["obfs"]["password"].as_str() {
+                if !obfs_pw.is_empty() { params.push(format!("obfs-password={obfs_pw}")); }
+            }
+            let query = if params.is_empty() { String::new() } else { format!("?{}", params.join("&")) };
+            Some(format!("hy2://{}@{}:{}{}{}", password, node.server, node.port, query, format!("#{name_encoded}")))
+        }
+        "tuic" => {
+            let uuid = config["uuid"].as_str().unwrap_or("");
+            let password = config["password"].as_str().unwrap_or("");
+            let mut params = Vec::new();
+            encode_tls_params(config, &mut params);
+            let query = if params.is_empty() { String::new() } else { format!("?{}", params.join("&")) };
+            Some(format!("tuic://{}:{}@{}:{}{}{}", uuid, password, node.server, node.port, query, format!("#{name_encoded}")))
+        }
+        _ => None,
+    }
+}
+
+fn encode_tls_params(config: &Value, params: &mut Vec<String>) {
+    let tls = &config["tls"];
+    if tls["reality"].as_bool().unwrap_or(false) {
+        params.push("security=reality".to_string());
+        if let Some(pbk) = tls["realityPublicKey"].as_str() {
+            if !pbk.is_empty() { params.push(format!("pbk={pbk}")); }
+        }
+        if let Some(sid) = tls["realityShortId"].as_str() {
+            if !sid.is_empty() { params.push(format!("sid={sid}")); }
+        }
+        if let Some(fp) = tls["fingerprint"].as_str() {
+            if !fp.is_empty() { params.push(format!("fp={fp}")); }
+        } else {
+            params.push("fp=random".to_string());
+        }
+    } else if tls["enabled"].as_bool().unwrap_or(false) {
+        params.push("security=tls".to_string());
+    } else {
+        params.push("security=none".to_string());
+    }
+    if let Some(sni) = tls["sni"].as_str() {
+        if !sni.is_empty() { params.push(format!("sni={sni}")); }
+    }
+    if let Some(alpn) = tls["alpn"].as_array() {
+        let alpn_str: Vec<&str> = alpn.iter().filter_map(|v| v.as_str()).collect();
+        if !alpn_str.is_empty() { params.push(format!("alpn={}", alpn_str.join(","))); }
+    }
+    if tls["insecure"].as_bool().unwrap_or(false) {
+        params.push("allowInsecure=1".to_string());
+    }
+}
+
+fn encode_transport_params(config: &Value, params: &mut Vec<String>) {
+    let transport_type = config["transport"]["type"].as_str().unwrap_or("tcp");
+    if transport_type != "tcp" {
+        params.push(format!("type={transport_type}"));
+    } else {
+        params.push("type=tcp".to_string());
+    }
+}
+
 pub async fn fetch_subscription(url: &str) -> Result<FetchResult, String> {
     let response = HTTP_CLIENT
         .get(url)
