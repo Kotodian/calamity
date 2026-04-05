@@ -246,6 +246,44 @@ enum ConfigAction {
 enum DnsAction {
     /// List DNS servers and rules
     List,
+    /// Add a DNS server
+    AddServer {
+        /// Server name
+        name: String,
+        /// Server address (e.g. https://1.1.1.1/dns-query, 223.5.5.5, tls://dns.google)
+        address: String,
+        /// Outbound detour for this server's traffic
+        #[arg(long)]
+        detour: Option<String>,
+        /// Another DNS server tag to resolve this server's domain
+        #[arg(long)]
+        domain_resolver: Option<String>,
+    },
+    /// Remove a DNS server
+    RemoveServer {
+        /// Server ID or name
+        id: String,
+    },
+    /// Add a DNS rule
+    AddRule {
+        /// Match type (rule_set, domain-suffix, domain-keyword, domain)
+        #[arg(name = "type")]
+        match_type: String,
+        /// Match value
+        value: String,
+        /// DNS server ID to use
+        server: String,
+    },
+    /// Remove a DNS rule
+    RemoveRule {
+        /// Rule ID
+        id: String,
+    },
+    /// Set the final DNS server (for unmatched queries)
+    SetFinal {
+        /// DNS server ID
+        server: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -393,6 +431,15 @@ fn cli_to_command(cmd: CliCommand) -> Command {
         },
         CliCommand::Dns { action } => match action {
             DnsAction::List => Command::GetDnsServers,
+            DnsAction::AddServer { name, address, detour, domain_resolver } => {
+                Command::AddDnsServer { name, address, detour, domain_resolver }
+            }
+            DnsAction::RemoveServer { id } => Command::RemoveDnsServer { id },
+            DnsAction::AddRule { match_type, value, server } => {
+                Command::AddDnsRule { match_type, match_value: value, server }
+            }
+            DnsAction::RemoveRule { id } => Command::RemoveDnsRule { id },
+            DnsAction::SetFinal { server } => Command::SetDnsFinal { server },
         },
         CliCommand::Bgp { action } => match action {
             BgpAction::Status => Command::BgpGetSettings,

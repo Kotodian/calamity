@@ -50,6 +50,11 @@ pub enum Command {
 
     // DNS
     GetDnsServers,
+    AddDnsServer { name: String, address: String, detour: Option<String>, domain_resolver: Option<String> },
+    RemoveDnsServer { id: String },
+    AddDnsRule { match_type: String, match_value: String, server: String },
+    RemoveDnsRule { id: String },
+    SetDnsFinal { server: String },
 
     // Settings
     GetSettings,
@@ -145,6 +150,11 @@ mod tests {
             Command::RemoveSubscription { id: "s1".into() },
             Command::UpdateSubscription { id: None },
             Command::GetDnsServers,
+            Command::AddDnsServer { name: "cf".into(), address: "https://1.1.1.1/dns-query".into(), detour: None, domain_resolver: None },
+            Command::RemoveDnsServer { id: "cf".into() },
+            Command::AddDnsRule { match_type: "rule_set".into(), match_value: "geosite-cn".into(), server: "dns-direct".into() },
+            Command::RemoveDnsRule { id: "dr-1".into() },
+            Command::SetDnsFinal { server: "dns-direct".into() },
             Command::GetSettings,
             Command::UpdateSettings { settings: serde_json::json!({}) },
             Command::BgpGetSettings,

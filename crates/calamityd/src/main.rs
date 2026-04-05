@@ -443,6 +443,78 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 Err(e) => Response::Error(format!("invalid settings: {e}")),
             }
         }
+        Command::GetDnsServers => {
+            let dns = calamity_core::singbox::dns_storage::load_dns_settings();
+            Response::Ok(serde_json::to_value(&dns).unwrap_or_default())
+        }
+        Command::AddDnsServer { name, address, detour, domain_resolver } => {
+            use calamity_core::singbox::dns_storage::{self, DnsServerConfig};
+            let mut dns = dns_storage::load_dns_settings();
+            let id = format!("custom-{}", chrono::Utc::now().timestamp_millis());
+            dns.servers.push(DnsServerConfig {
+                id: id.clone(),
+                name: name.clone(),
+                address,
+                enabled: true,
+                detour,
+                domain_resolver,
+            });
+            match dns_storage::save_dns_settings(&dns) {
+                Ok(()) => Response::Ok(serde_json::json!({"added": name, "id": id})),
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::RemoveDnsServer { id } => {
+            use calamity_core::singbox::dns_storage;
+            let mut dns = dns_storage::load_dns_settings();
+            let before = dns.servers.len();
+            dns.servers.retain(|s| s.id != id && s.name != id);
+            if dns.servers.len() == before {
+                return Response::Error(format!("DNS server '{id}' not found"));
+            }
+            match dns_storage::save_dns_settings(&dns) {
+                Ok(()) => Response::Ok(serde_json::json!({"removed": id})),
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::AddDnsRule { match_type, match_value, server } => {
+            use calamity_core::singbox::dns_storage::{self, DnsRuleConfig};
+            let mut dns = dns_storage::load_dns_settings();
+            let id = format!("dr-{}", chrono::Utc::now().timestamp_millis());
+            dns.rules.push(DnsRuleConfig {
+                id: id.clone(),
+                match_type,
+                match_value: match_value.clone(),
+                server,
+                enabled: true,
+            });
+            match dns_storage::save_dns_settings(&dns) {
+                Ok(()) => Response::Ok(serde_json::json!({"added": match_value, "id": id})),
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::RemoveDnsRule { id } => {
+            use calamity_core::singbox::dns_storage;
+            let mut dns = dns_storage::load_dns_settings();
+            let before = dns.rules.len();
+            dns.rules.retain(|r| r.id != id);
+            if dns.rules.len() == before {
+                return Response::Error(format!("DNS rule '{id}' not found"));
+            }
+            match dns_storage::save_dns_settings(&dns) {
+                Ok(()) => Response::Ok(serde_json::json!({"removed": id})),
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::SetDnsFinal { server } => {
+            use calamity_core::singbox::dns_storage;
+            let mut dns = dns_storage::load_dns_settings();
+            dns.final_server = server.clone();
+            match dns_storage::save_dns_settings(&dns) {
+                Ok(()) => Response::Ok(serde_json::json!({"final": server})),
+                Err(e) => Response::Error(e),
+            }
+        }
         Command::BgpGetSettings => {
             let settings = bgp_storage::load_bgp_settings();
             Response::Ok(serde_json::to_value(&settings).unwrap_or_default())
