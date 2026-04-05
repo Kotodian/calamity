@@ -98,8 +98,14 @@ impl SingboxProcess {
             &self.singbox_path, config_path
         );
 
+        let is_root = unsafe { libc::geteuid() } == 0;
+
         let spawned_child = match run_mode {
             RunMode::Normal => Some(self.spawn_managed(config_path)?),
+            RunMode::Tun if is_root => {
+                // Already root (e.g. Linux daemon) — no privilege escalation needed
+                Some(self.spawn_managed(config_path)?)
+            }
             RunMode::Tun => {
                 if let Err(error) = self.spawn_privileged_tun(config_path).await {
                     self.set_runtime(
