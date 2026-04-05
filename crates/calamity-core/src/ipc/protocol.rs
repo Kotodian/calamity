@@ -30,7 +30,8 @@ pub enum Command {
 
     // Nodes
     GetNodes,
-    AddNode { uri: String },
+    AddNode { uri: String, group: String },
+    RemoveNode { name: String },
     SelectNode { group: String, node: String },
     LatencyTest { group: String, node: Option<String> },
 
@@ -38,11 +39,13 @@ pub enum Command {
     GetRules,
     AddRule { rule: RouteRuleConfig },
     RemoveRule { id: String },
+    SetRuleEnabled { id: String, enabled: bool },
     SetFinalOutbound { outbound: String, node: Option<String> },
 
     // Subscriptions
     GetSubscriptions,
     AddSubscription { name: String, url: String },
+    RemoveSubscription { id: String },
     UpdateSubscription { id: Option<String> },
 
     // DNS
@@ -54,6 +57,8 @@ pub enum Command {
 
     // BGP
     BgpGetSettings,
+    BgpAddPeer { name: String, address: String },
+    BgpRemovePeer { id: String },
     BgpPullRules { peer_addr: String },
     BgpApplyRules { rules: Value },
     BgpDiscoverPeers,
@@ -127,19 +132,24 @@ mod tests {
             Command::Status,
             Command::SetProxyMode { mode: "direct".into() },
             Command::GetNodes,
-            Command::AddNode { uri: "vless://test@1.2.3.4:443".into() },
+            Command::AddNode { uri: "vless://test@1.2.3.4:443".into(), group: "proxy".into() },
+            Command::RemoveNode { name: "jp-1".into() },
             Command::SelectNode { group: "proxy".into(), node: "jp-1".into() },
             Command::LatencyTest { group: "proxy".into(), node: None },
             Command::GetRules,
             Command::RemoveRule { id: "r1".into() },
+            Command::SetRuleEnabled { id: "r1".into(), enabled: true },
             Command::SetFinalOutbound { outbound: "proxy".into(), node: Some("jp-1".into()) },
             Command::GetSubscriptions,
             Command::AddSubscription { name: "my-sub".into(), url: "https://example.com/sub".into() },
+            Command::RemoveSubscription { id: "s1".into() },
             Command::UpdateSubscription { id: None },
             Command::GetDnsServers,
             Command::GetSettings,
             Command::UpdateSettings { settings: serde_json::json!({}) },
             Command::BgpGetSettings,
+            Command::BgpAddPeer { name: "peer1".into(), address: "100.64.0.1".into() },
+            Command::BgpRemovePeer { id: "p1".into() },
             Command::BgpPullRules { peer_addr: "100.64.0.1".into() },
             Command::BgpApplyRules { rules: serde_json::json!({}) },
             Command::BgpDiscoverPeers,

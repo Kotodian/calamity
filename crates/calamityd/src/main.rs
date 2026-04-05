@@ -173,15 +173,22 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             let nodes = calamity_core::singbox::nodes_storage::load_nodes();
             Response::Ok(serde_json::to_value(&nodes).unwrap_or_default())
         }
-        Command::AddNode { uri } => {
+        Command::AddNode { uri, group } => {
             use calamity_core::singbox::subscription_fetch::parse_v2ray_uri;
             match parse_v2ray_uri(&uri) {
                 Some(node) => {
                     let mut nodes = calamity_core::singbox::nodes_storage::load_nodes();
                     let name = node.name.clone();
-                    // Add to the first group (proxy)
-                    if let Some(group) = nodes.groups.first_mut() {
-                        group.nodes.push(node);
+                    if let Some(g) = nodes.groups.iter_mut().find(|g| g.id == group || g.name == group) {
+                        g.nodes.push(node);
+                    } else {
+                        // Create group if it doesn't exist
+                        nodes.groups.push(calamity_core::singbox::nodes_storage::NodeGroup {
+                            id: group.clone(),
+                            name: group,
+                            group_type: "select".to_string(),
+                            nodes: vec![node],
+                        });
                     }
                     match calamity_core::singbox::nodes_storage::save_nodes(&nodes) {
                         Ok(()) => Response::Ok(serde_json::json!({"added": name})),
@@ -189,6 +196,24 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                     }
                 }
                 None => Response::Error(format!("failed to parse node URI: {uri}")),
+            }
+        }
+        Command::RemoveNode { name } => {
+            let mut nodes = calamity_core::singbox::nodes_storage::load_nodes();
+            let mut removed = false;
+            for group in &mut nodes.groups {
+                let before = group.nodes.len();
+                group.nodes.retain(|n| n.name != name);
+                if group.nodes.len() < before {
+                    removed = true;
+                }
+            }
+            if !removed {
+                return Response::Error(format!("node '{name}' not found"));
+            }
+            match calamity_core::singbox::nodes_storage::save_nodes(&nodes) {
+                Ok(()) => Response::Ok(serde_json::json!({"removed": name})),
+                Err(e) => Response::Error(e),
             }
         }
         Command::SelectNode { group, node } => {
@@ -238,7 +263,11 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
         }
         Command::RemoveRule { id } => {
             let mut data = rules_storage::load_rules();
-            data.rules.retain(|r| r.id != id);
+            let before = data.rules.len();
+            data.rules.retain(|r| r.id != id && r.name != id);
+            if data.rules.len() == before {
+                return Response::Error(format!("rule '{id}' not found"));
+            }
             match rules_storage::save_rules(&data) {
                 Ok(()) => {
                     let s = state.lock().await;
@@ -247,6 +276,25 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                     Response::Ok(serde_json::json!("ok"))
                 }
                 Err(e) => Response::Error(e),
+            }
+        }
+        Command::SetRuleEnabled { id, enabled } => {
+            let mut data = rules_storage::load_rules();
+            let rule = data.rules.iter_mut().find(|r| r.id == id || r.name == id);
+            match rule {
+                Some(r) => {
+                    r.enabled = enabled;
+                    match rules_storage::save_rules(&data) {
+                        Ok(()) => {
+                            let s = state.lock().await;
+                            let settings = storage::load_settings();
+                            let _ = s.process.reload(&settings).await;
+                            Response::Ok(serde_json::json!("ok"))
+                        }
+                        Err(e) => Response::Error(e),
+                    }
+                }
+                None => Response::Error(format!("rule '{id}' not found")),
             }
         }
         Command::SetFinalOutbound { outbound, node } => {
@@ -287,6 +335,19 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             data.subscriptions.push(sub);
             match subscriptions_storage::save_subscriptions(&data) {
                 Ok(()) => Response::Ok(serde_json::json!({"added": name})),
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::RemoveSubscription { id } => {
+            use calamity_core::singbox::subscriptions_storage;
+            let mut data = subscriptions_storage::load_subscriptions();
+            let before = data.subscriptions.len();
+            data.subscriptions.retain(|s| s.id != id && s.name != id);
+            if data.subscriptions.len() == before {
+                return Response::Error(format!("subscription '{id}' not found"));
+            }
+            match subscriptions_storage::save_subscriptions(&data) {
+                Ok(()) => Response::Ok(serde_json::json!({"removed": id})),
                 Err(e) => Response::Error(e),
             }
         }
@@ -385,6 +446,31 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
         Command::BgpGetSettings => {
             let settings = bgp_storage::load_bgp_settings();
             Response::Ok(serde_json::to_value(&settings).unwrap_or_default())
+        }
+        Command::BgpAddPeer { name, address } => {
+            let mut settings = bgp_storage::load_bgp_settings();
+            settings.peers.push(bgp_storage::BgpPeer {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: name.clone(),
+                address,
+                auto_discovered: false,
+            });
+            match bgp_storage::save_bgp_settings(&settings) {
+                Ok(()) => Response::Ok(serde_json::json!({"added": name})),
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::BgpRemovePeer { id } => {
+            let mut settings = bgp_storage::load_bgp_settings();
+            let before = settings.peers.len();
+            settings.peers.retain(|p| p.id != id && p.name != id);
+            if settings.peers.len() == before {
+                return Response::Error(format!("peer '{id}' not found"));
+            }
+            match bgp_storage::save_bgp_settings(&settings) {
+                Ok(()) => Response::Ok(serde_json::json!({"removed": id})),
+                Err(e) => Response::Error(e),
+            }
         }
         Command::BgpPullRules { peer_addr } => {
             let local_ip = match calamity_core::platform::get_tailscale_ip() {

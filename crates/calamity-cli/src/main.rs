@@ -1,7 +1,54 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use calamity_core::ipc::client::IpcClient;
 use calamity_core::ipc::protocol::{Command, Response};
 use calamity_core::ipc::server::default_socket_path;
+
+#[derive(Clone, ValueEnum)]
+enum ProxyMode {
+    Direct,
+    Rule,
+    Global,
+}
+
+#[derive(Clone, ValueEnum)]
+enum Outbound {
+    Proxy,
+    Direct,
+    Reject,
+}
+
+#[derive(Clone, ValueEnum)]
+enum MatchType {
+    Domain,
+    DomainSuffix,
+    DomainKeyword,
+    Geosite,
+    Geoip,
+    IpCidr,
+    Port,
+    Network,
+    RuleSet,
+    ProcessName,
+    ProcessPath,
+}
+
+impl std::fmt::Display for MatchType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Domain => write!(f, "domain"),
+            Self::DomainSuffix => write!(f, "domain-suffix"),
+            Self::DomainKeyword => write!(f, "domain-keyword"),
+            Self::Geosite => write!(f, "geosite"),
+            Self::Geoip => write!(f, "geoip"),
+            Self::IpCidr => write!(f, "ip-cidr"),
+            Self::Port => write!(f, "port"),
+            Self::Network => write!(f, "network"),
+            Self::RuleSet => write!(f, "rule-set"),
+            Self::ProcessName => write!(f, "process-name"),
+            Self::ProcessPath => write!(f, "process-path"),
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "calamity", version, about = "Calamity proxy CLI client")]
@@ -31,8 +78,8 @@ enum CliCommand {
 
     /// Switch proxy mode
     Mode {
-        /// Mode: direct, rule, or global
-        mode: String,
+        /// Mode
+        mode: ProxyMode,
     },
 
     /// Node management
@@ -59,6 +106,12 @@ enum CliCommand {
         action: ConfigAction,
     },
 
+    /// DNS management
+    Dns {
+        #[command(subcommand)]
+        action: DnsAction,
+    },
+
     /// BGP rule sync
     Bgp {
         #[command(subcommand)]
@@ -80,6 +133,14 @@ enum NodeAction {
     Add {
         /// Proxy URI
         uri: String,
+        /// Target group name (default: proxy)
+        #[arg(long, default_value = "proxy")]
+        group: String,
+    },
+    /// Remove a node by name
+    Remove {
+        /// Node name
+        name: String,
     },
     /// Select a node in a group
     Select {
@@ -103,29 +164,42 @@ enum RuleAction {
     List,
     /// Add a rule (auto-fills rule-set URL for geosite/geoip if --url not given)
     Add {
-        /// Match type (e.g. domain-suffix, geosite, geoip, rule-set)
+        /// Match type
         #[arg(name = "type")]
-        match_type: String,
-        /// Match value (e.g. cn, google.com, 1.1.1.1)
+        match_type: MatchType,
+        /// Match value
         value: String,
-        /// Outbound (proxy, direct, reject)
-        outbound: String,
+        /// Outbound
+        outbound: Outbound,
         /// Specific node name for this rule's outbound
         #[arg(long)]
         node: Option<String>,
         /// Custom rule-set URL (.srs file)
         #[arg(long)]
         url: Option<String>,
+        /// Invert match (NOT logic)
+        #[arg(long)]
+        invert: bool,
     },
-    /// Remove a rule by ID
+    /// Remove a rule by ID or name
     Remove {
-        /// Rule ID
+        /// Rule ID or name
+        id: String,
+    },
+    /// Enable a rule
+    Enable {
+        /// Rule ID or name
+        id: String,
+    },
+    /// Disable a rule
+    Disable {
+        /// Rule ID or name
         id: String,
     },
     /// Set the final outbound (traffic not matching any rule)
     SetFinal {
-        /// Outbound (proxy, direct)
-        outbound: String,
+        /// Outbound
+        outbound: Outbound,
         /// Specific node name
         #[arg(long)]
         node: Option<String>,
@@ -143,6 +217,11 @@ enum SubAction {
         /// Subscription URL
         url: String,
     },
+    /// Remove a subscription
+    Remove {
+        /// Subscription ID or name
+        id: String,
+    },
     /// Update subscriptions (fetch latest nodes)
     Update {
         /// Subscription ID (omit to update all)
@@ -156,7 +235,7 @@ enum ConfigAction {
     Get,
     /// Update a setting
     Set {
-        /// Setting key (e.g. httpPort, socksPort, logLevel)
+        /// Setting key (e.g. httpPort, socksPort, logLevel, allowLan, enhancedMode)
         key: String,
         /// Setting value
         value: String,
@@ -164,9 +243,27 @@ enum ConfigAction {
 }
 
 #[derive(Subcommand)]
+enum DnsAction {
+    /// List DNS servers and rules
+    List,
+}
+
+#[derive(Subcommand)]
 enum BgpAction {
     /// Show BGP status and peers
     Status,
+    /// Add a peer manually
+    AddPeer {
+        /// Peer name
+        name: String,
+        /// Peer address (Tailscale IP)
+        address: String,
+    },
+    /// Remove a peer
+    RemovePeer {
+        /// Peer ID or name
+        id: String,
+    },
     /// Pull rules from a peer
     Pull {
         /// Peer address or ID
@@ -199,10 +296,17 @@ fn cli_to_command(cmd: CliCommand) -> Command {
         CliCommand::Stop => Command::Stop,
         CliCommand::Restart => Command::Restart,
         CliCommand::Status => Command::Status,
-        CliCommand::Mode { mode } => Command::SetProxyMode { mode },
+        CliCommand::Mode { mode } => Command::SetProxyMode {
+            mode: match mode {
+                ProxyMode::Direct => "direct",
+                ProxyMode::Rule => "rule",
+                ProxyMode::Global => "global",
+            }.to_string(),
+        },
         CliCommand::Node { action } => match action {
             NodeAction::List => Command::GetNodes,
-            NodeAction::Add { uri } => Command::AddNode { uri },
+            NodeAction::Add { uri, group } => Command::AddNode { uri, group },
+            NodeAction::Remove { name } => Command::RemoveNode { name },
             NodeAction::Select { group, node } => Command::SelectNode { group, node },
             NodeAction::Test { group, node } => Command::LatencyTest { group, node },
         },
@@ -214,14 +318,20 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                 outbound,
                 node,
                 url,
+                invert,
             } => {
-                // Use provided URL, or auto-fill for geosite/geoip
-                let rule_set_url = url.or_else(|| match match_type.as_str() {
-                    "geosite" => Some(format!(
+                let match_type_str = match_type.to_string();
+                let outbound_str = match outbound {
+                    Outbound::Proxy => "proxy",
+                    Outbound::Direct => "direct",
+                    Outbound::Reject => "reject",
+                }.to_string();
+                let rule_set_url = url.or_else(|| match match_type {
+                    MatchType::Geosite => Some(format!(
                         "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-{}.srs",
                         value
                     )),
-                    "geoip" => Some(format!(
+                    MatchType::Geoip => Some(format!(
                         "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-{}.srs",
                         value
                     )),
@@ -234,34 +344,43 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                 };
                 let rule = calamity_core::singbox::rules_storage::RouteRuleConfig {
                     id: uuid::Uuid::new_v4().to_string(),
-                    name: format!("{} {}", match_type, value),
+                    name: format!("{} {}", match_type_str, value),
                     enabled: true,
-                    match_type,
+                    match_type: match_type_str,
                     match_value: value,
-                    outbound,
+                    outbound: outbound_str,
                     outbound_node: node,
                     rule_set_url,
                     rule_set_local_path: None,
                     download_detour,
-                    invert: false,
+                    invert,
                     order: 0,
                 };
                 Command::AddRule { rule }
             }
             RuleAction::Remove { id } => Command::RemoveRule { id },
+            RuleAction::Enable { id } => Command::SetRuleEnabled { id, enabled: true },
+            RuleAction::Disable { id } => Command::SetRuleEnabled { id, enabled: false },
             RuleAction::SetFinal { outbound, node } => {
-                Command::SetFinalOutbound { outbound, node }
+                Command::SetFinalOutbound {
+                    outbound: match outbound {
+                        Outbound::Proxy => "proxy",
+                        Outbound::Direct => "direct",
+                        Outbound::Reject => "reject",
+                    }.to_string(),
+                    node,
+                }
             }
         },
         CliCommand::Sub { action } => match action {
             SubAction::List => Command::GetSubscriptions,
             SubAction::Add { name, url } => Command::AddSubscription { name, url },
+            SubAction::Remove { id } => Command::RemoveSubscription { id },
             SubAction::Update { id } => Command::UpdateSubscription { id },
         },
         CliCommand::Config { action } => match action {
             ConfigAction::Get => Command::GetSettings,
             ConfigAction::Set { key, value } => {
-                // Try to parse value as number or bool, fall back to string
                 let json_value = if let Ok(n) = value.parse::<u64>() {
                     serde_json::json!({ key: n })
                 } else if let Ok(b) = value.parse::<bool>() {
@@ -272,8 +391,13 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                 Command::UpdateSettings { settings: json_value }
             }
         },
+        CliCommand::Dns { action } => match action {
+            DnsAction::List => Command::GetDnsServers,
+        },
         CliCommand::Bgp { action } => match action {
             BgpAction::Status => Command::BgpGetSettings,
+            BgpAction::AddPeer { name, address } => Command::BgpAddPeer { name, address },
+            BgpAction::RemovePeer { id } => Command::BgpRemovePeer { id },
             BgpAction::Pull { peer } => Command::BgpPullRules { peer_addr: peer },
             BgpAction::Apply => Command::BgpApplyRules {
                 rules: serde_json::json!(null),
