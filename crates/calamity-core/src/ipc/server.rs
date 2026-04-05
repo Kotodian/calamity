@@ -138,11 +138,8 @@ pub fn default_socket_path() -> PathBuf {
     }
     #[cfg(target_os = "linux")]
     {
-        if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
-            PathBuf::from(runtime_dir).join("calamity.sock")
-        } else {
-            PathBuf::from("/run/calamity/calamity.sock")
-        }
+        // Always use /run/calamity/ so CLI and daemon agree on the path
+        PathBuf::from("/run/calamity/calamity.sock")
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
