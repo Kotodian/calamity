@@ -38,6 +38,7 @@ pub enum Command {
     GetRules,
     AddRule { rule: RouteRuleConfig },
     RemoveRule { id: String },
+    SetFinalOutbound { outbound: String, node: Option<String> },
 
     // Subscriptions
     GetSubscriptions,
@@ -131,6 +132,7 @@ mod tests {
             Command::LatencyTest { group: "proxy".into(), node: None },
             Command::GetRules,
             Command::RemoveRule { id: "r1".into() },
+            Command::SetFinalOutbound { outbound: "proxy".into(), node: Some("jp-1".into()) },
             Command::GetSubscriptions,
             Command::AddSubscription { name: "my-sub".into(), url: "https://example.com/sub".into() },
             Command::UpdateSubscription { id: None },

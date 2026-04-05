@@ -101,20 +101,31 @@ enum NodeAction {
 enum RuleAction {
     /// List all rules
     List,
-    /// Add a rule
+    /// Add a rule (auto-fills rule-set URL for geosite/geoip)
     Add {
         /// Match type (e.g. domain-suffix, geosite, geoip)
         #[arg(name = "type")]
         match_type: String,
-        /// Match value
+        /// Match value (e.g. cn, google, 1.1.1.1)
         value: String,
         /// Outbound (proxy, direct, reject)
         outbound: String,
+        /// Specific node name for this rule's outbound
+        #[arg(long)]
+        node: Option<String>,
     },
     /// Remove a rule by ID
     Remove {
         /// Rule ID
         id: String,
+    },
+    /// Set the final outbound (traffic not matching any rule)
+    SetFinal {
+        /// Outbound (proxy, direct)
+        outbound: String,
+        /// Specific node name
+        #[arg(long)]
+        node: Option<String>,
     },
 }
 
@@ -198,7 +209,25 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                 match_type,
                 value,
                 outbound,
+                node,
             } => {
+                // Auto-fill rule-set URL for geosite/geoip
+                let rule_set_url = match match_type.as_str() {
+                    "geosite" => Some(format!(
+                        "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-{}.srs",
+                        value
+                    )),
+                    "geoip" => Some(format!(
+                        "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-{}.srs",
+                        value
+                    )),
+                    _ => None,
+                };
+                let download_detour = if rule_set_url.is_some() {
+                    Some("proxy".to_string())
+                } else {
+                    None
+                };
                 let rule = calamity_core::singbox::rules_storage::RouteRuleConfig {
                     id: uuid::Uuid::new_v4().to_string(),
                     name: format!("{} {}", match_type, value),
@@ -206,16 +235,19 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                     match_type,
                     match_value: value,
                     outbound,
-                    outbound_node: None,
-                    rule_set_url: None,
+                    outbound_node: node,
+                    rule_set_url,
                     rule_set_local_path: None,
-                    download_detour: None,
+                    download_detour,
                     invert: false,
                     order: 0,
                 };
                 Command::AddRule { rule }
             }
             RuleAction::Remove { id } => Command::RemoveRule { id },
+            RuleAction::SetFinal { outbound, node } => {
+                Command::SetFinalOutbound { outbound, node }
+            }
         },
         CliCommand::Sub { action } => match action {
             SubAction::List => Command::GetSubscriptions,

@@ -249,6 +249,20 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 Err(e) => Response::Error(e),
             }
         }
+        Command::SetFinalOutbound { outbound, node } => {
+            let mut data = rules_storage::load_rules();
+            data.final_outbound = outbound.clone();
+            data.final_outbound_node = node.clone();
+            match rules_storage::save_rules(&data) {
+                Ok(()) => {
+                    let s = state.lock().await;
+                    let settings = storage::load_settings();
+                    let _ = s.process.reload(&settings).await;
+                    Response::Ok(serde_json::json!({"finalOutbound": outbound, "finalOutboundNode": node}))
+                }
+                Err(e) => Response::Error(e),
+            }
+        }
         Command::GetSubscriptions => {
             let subs = calamity_core::singbox::subscriptions_storage::load_subscriptions();
             Response::Ok(serde_json::to_value(&subs).unwrap_or_default())
