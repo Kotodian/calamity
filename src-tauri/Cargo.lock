@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "calamity"
-version = "0.2.16-beta"
+version = "0.2.18-beta"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -243,6 +243,7 @@ dependencies = [
  "log",
  "plist",
  "reqwest 0.12.28",
+ "rustybgp-packet",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -3154,6 +3155,18 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "rustybgp-packet"
+version = "0.1.0"
+source = "git+https://github.com/osrg/rustybgp#54de59be73c1929c50b3b4c3d56ab537e3608b58"
+dependencies = [
+ "byteorder",
+ "bytes",
+ "fnv",
+ "thiserror 2.0.18",
+ "tokio-util",
+]
 
 [[package]]
 name = "ryu"

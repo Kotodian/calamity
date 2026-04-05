@@ -15,3 +15,4 @@ pub mod tailscale_config;
 pub mod ruleset_market;
 pub mod tailscale_storage;
 pub mod gateway;
+pub mod bgp;

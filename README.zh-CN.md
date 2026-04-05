@@ -83,6 +83,14 @@
 - 合盖防休眠，确保网关持续运行
 - 一键开关，退出时自动清理
 
+**规则同步 (BGP)**
+
+- 通过 Tailscale 网络在多个 Calamity 实例之间同步路由规则
+- 内置轻量 BGP speaker，��用自定义 AFI/SAFI 编码规则
+- 自动发现 Tailnet 中的其他 Calamity 设备，或手动添加节点
+- 拉取规则前预览差异 — 查看新增、删除、修改的规则后再应用
+- 第一阶段：手动拉取；第二阶段（计划��）：持久会话自动同步
+
 **订阅管理**
 
 - 多订阅管理，支持自动更新
@@ -178,7 +186,7 @@ calamity/
 │   └── lib/                # 工具函数
 ├── src-tauri/              # Tauri + Rust 后端
 │   └── src/
-│       ├── commands/       # 14 个 Tauri 命令模块
+│       ├── commands/       # 15 个 Tauri 命令模块
 │       └── singbox/        # sing-box 配置、进程、存储、API
 ├── docs/                   # 文档与截图
 ├── tailscale/              # Tailscale 集成资源
@@ -194,6 +202,8 @@ calamity/
 - [x] DNS 自动分流规则生成
 - [x] 并发订阅拉取
 - [x] 网关模式（透明局域网代理）
+- [x] BGP 规则同步（第一阶段：手动拉取）
+- [ ] BGP 规则同步第二阶段：持久会话自动同步
 - [ ] 配置热重载
 - [ ] 版本化发布
 - [ ] CLI 工具 (`calamity start/stop/restart/status`)

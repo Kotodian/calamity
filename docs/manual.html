@@ -380,6 +380,7 @@
           <a href="#dns">DNS 配置</a>
           <a href="#tun">TUN 模式</a>
           <a href="#gateway">网关模式</a>
+          <a href="#bgp-sync">规则同步 (BGP)</a>
           <a href="#tailscale">Tailscale</a>
           <a href="#settings">设置</a>
           <a href="#logs">日志与排障</a>
@@ -770,6 +771,43 @@
           <p>
             首次开启前需要重新安装 sudoers 权限，确保 sysctl、pfctl 和 pmset 命令包含在免密列表中。
           </p>
+        </div>
+
+        <a class="back-top" href="#top">↑ 返回顶部</a>
+      </section>
+
+      <!-- ════ 10.5 规则同步 (BGP) ════ -->
+      <section class="section" id="bgp-sync">
+        <h2>10.5 规则同步 (BGP)</h2>
+        <p class="subtitle">通过 Tailscale 网络在多个 Calamity 实例之间同步路由规则</p>
+
+        <h3>概述</h3>
+        <p>
+          如果你有多台 Mac 都安装了 Calamity，并且通过 Tailscale 组网，可以使用规则同步功能将一台设备上的路由规则拉取到另一台。
+          底层使用 BGP（Border Gateway Protocol）协议通信，通过自定义 Address Family 编码规则数据。
+        </p>
+
+        <h3>使用步骤</h3>
+        <ol>
+          <li>确保两台设备都已连接 Tailscale</li>
+          <li>在侧边栏点击「规则同步」</li>
+          <li>打开「启用规则同步」开关 — 这会在 Tailscale IP 上启动 BGP 服务（端口 179）</li>
+          <li>点击「扫描 Tailnet」自动发现其他 Calamity 设备，或手动输入 Tailscale IP 添加节点</li>
+          <li>点击节点旁的「拉取规则」按钮</li>
+          <li>查看规则差异预览（新增 / 删除 / 修改），确认后点击「应用变更」</li>
+        </ol>
+
+        <h3>技术细节</h3>
+        <ul>
+          <li>所有实例使用固定私有 ASN 64512，采用 iBGP 模式</li>
+          <li>规则编码为自定义 AFI=99 / SAFI=1 的 TLV 格式 NLRI</li>
+          <li>BGP speaker 仅绑定 Tailscale 网络接口（100.x.x.x），外网不可达</li>
+          <li>Tailscale 提供端到端加密，无需额外认证</li>
+          <li>仅同步路由规则（rules.json），不包括节点、订阅、DNS 等其他配置</li>
+        </ul>
+
+        <div class="callout">
+          <strong>当前阶段：</strong>手动拉取模式。未来将支持 BGP session 保持和实时自动同步。
         </div>
 
         <a class="back-top" href="#top">↑ 返回顶部</a>

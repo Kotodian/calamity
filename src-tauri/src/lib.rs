@@ -250,6 +250,13 @@ pub fn run() {
             commands::config_io::import_config,
             commands::connection::app_quit,
             commands::apps::list_apps,
+            commands::bgp_sync::bgp_get_settings,
+            commands::bgp_sync::bgp_set_enabled,
+            commands::bgp_sync::bgp_add_peer,
+            commands::bgp_sync::bgp_remove_peer,
+            commands::bgp_sync::bgp_pull_rules,
+            commands::bgp_sync::bgp_apply_rules,
+            commands::bgp_sync::bgp_discover_peers,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

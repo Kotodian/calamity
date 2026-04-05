@@ -12,3 +12,4 @@ pub mod settings;
 pub mod subscriptions;
 pub mod tailscale;
 pub mod traffic;
+pub mod bgp_sync;

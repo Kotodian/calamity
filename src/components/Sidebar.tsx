@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PackageSearch,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/stores/connection";
@@ -35,6 +36,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     { to: "/subscriptions", icon: Rss, label: t("sidebar.subscriptions") },
     { to: "/tailnet", icon: Network, label: t("sidebar.tailnet") },
     { to: "/dns", icon: Shell, label: t("sidebar.dns") },
+    { to: "/bgp-sync", icon: RefreshCw, label: t("sidebar.bgpSync") },
     { to: "/settings", icon: Settings, label: t("sidebar.settings") },
   ];
 

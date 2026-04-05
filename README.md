@@ -103,6 +103,14 @@ A modern, feature-rich macOS proxy client powered by <a href="https://sing-box.s
 - TCP MSS clamping to avoid fragmentation when Tailscale forces lower MTU
 - One-toggle activation with automatic cleanup on exit
 
+**Rule Sync (BGP)**
+
+- Synchronize routing rules between Calamity instances over Tailscale network
+- Built-in lightweight BGP speaker with custom AFI/SAFI for rule encoding
+- Auto-discover other Calamity devices on your Tailnet or manually add peers
+- Pull rules with diff preview — see added, removed, and modified rules before applying
+- Phase 1: manual pull; Phase 2 (planned): persistent sessions with auto-sync
+
 **Subscriptions**
 
 - Multi-subscription management with auto-update intervals
@@ -206,7 +214,7 @@ calamity/
 │   └── lib/                # Utilities (flags, URI parsing, etc.)
 ├── src-tauri/              # Tauri + Rust backend
 │   └── src/
-│       ├── commands/       # 14 Tauri command modules
+│       ├── commands/       # 15 Tauri command modules
 │       └── singbox/        # sing-box config, process, storage, APIs
 ├── docs/                   # Documentation & screenshots
 ├── tailscale/              # Tailscale integration resources
@@ -222,6 +230,8 @@ calamity/
 - [x] DNS auto-detour generation
 - [x] Concurrent subscription fetching
 - [x] Gateway mode (transparent LAN proxy)
+- [x] BGP rule sync between Calamity instances (Phase 1: manual pull)
+- [ ] BGP rule sync Phase 2: auto-sync with persistent sessions
 - [ ] Config hot-reload
 - [ ] Versioned releases
 - [ ] CLI tool (`calamity start/stop/restart/status`)

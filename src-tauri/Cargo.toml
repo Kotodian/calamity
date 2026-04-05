@@ -31,3 +31,4 @@ tauri-plugin-dialog = "2"
 serde_yaml = "0.9"
 tokio-util = "0.7"
 plist = "1"
+rustybgp-packet = { git = "https://github.com/osrg/rustybgp" }

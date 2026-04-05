@@ -11,6 +11,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage";
 import { RuleSetMarketPage } from "./pages/RuleSetMarketPage";
+import { BgpSyncPage } from "./pages/BgpSyncPage";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useSettingsStore } from "./stores/settings";
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="tailnet" element={<TailnetPage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="dns" element={<DnsPage />} />
+          <Route path="bgp-sync" element={<BgpSyncPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
