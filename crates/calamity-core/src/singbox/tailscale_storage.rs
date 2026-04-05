@@ -49,7 +49,7 @@ impl Default for TailscaleSettings {
             tailnet: String::new(),
             hostname: default_hostname(),
             exit_node: String::new(),
-            accept_routes: false,
+            accept_routes: true,
             advertise_routes: Vec::new(),
             tags: Vec::new(),
         }
