@@ -598,19 +598,30 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 0
             };
 
-            // Apply nodes from URIs
+            // Apply nodes from URIs (format: "group_name\turi")
             let mut nodes_data = nodes_storage::load_nodes();
+            // Clear existing groups and rebuild from remote
+            nodes_data.groups.clear();
             let mut added_nodes = 0u32;
-            for uri in &result.node_uris {
+            for entry in &result.node_uris {
+                let (group_name, uri) = match entry.split_once('\t') {
+                    Some((g, u)) => (g, u),
+                    None => ("Proxy", entry.as_str()),
+                };
                 if let Some(node) = parse_v2ray_uri(uri) {
-                    // Skip if node with same name already exists
-                    let exists = nodes_data.groups.iter().any(|g| g.nodes.iter().any(|n| n.name == node.name));
-                    if !exists {
-                        if let Some(group) = nodes_data.groups.first_mut() {
-                            group.nodes.push(node);
-                            added_nodes += 1;
-                        }
+                    // Find or create group
+                    let group = nodes_data.groups.iter_mut().find(|g| g.name == group_name);
+                    if let Some(group) = group {
+                        group.nodes.push(node);
+                    } else {
+                        nodes_data.groups.push(nodes_storage::NodeGroup {
+                            id: group_name.to_lowercase().replace(' ', "-"),
+                            name: group_name.to_string(),
+                            group_type: "select".to_string(),
+                            nodes: vec![node],
+                        });
                     }
+                    added_nodes += 1;
                 }
             }
             if added_nodes > 0 {

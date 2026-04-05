@@ -334,8 +334,9 @@ pub async fn serve_rules(mut stream: TcpStream, local_router_id: [u8; 4]) -> Res
     let dns_data = dns_storage::load_dns_settings();
     let nodes_data = nodes_storage::load_nodes();
     let node_uris: Vec<String> = nodes_data.groups.iter()
-        .flat_map(|g| g.nodes.iter())
-        .filter_map(|n| node_to_uri(n))
+        .flat_map(|g| g.nodes.iter().filter_map(move |n| {
+            node_to_uri(n).map(|uri| format!("{}\t{}", g.name, uri))
+        }))
         .collect();
     let entries = codec::encode_sync_data(&syncable, Some(&dns_data), &node_uris);
 
