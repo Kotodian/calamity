@@ -9,6 +9,9 @@ const DNS_FILE: &str = "dns.json";
 pub enum DnsMode {
     Normal,
     FakeIp,
+    /// Legacy value from old configs, treated as Normal.
+    #[serde(rename = "redir-host")]
+    RedirHost,
 }
 
 impl Default for DnsMode {
