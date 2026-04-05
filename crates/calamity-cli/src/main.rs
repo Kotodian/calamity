@@ -76,6 +76,11 @@ enum CliCommand {
 enum NodeAction {
     /// List all groups and nodes
     List,
+    /// Add a node from URI (vmess://, vless://, ss://, trojan://, hy2://, tuic://)
+    Add {
+        /// Proxy URI
+        uri: String,
+    },
     /// Select a node in a group
     Select {
         /// Group name
@@ -117,7 +122,14 @@ enum RuleAction {
 enum SubAction {
     /// List subscriptions
     List,
-    /// Update subscriptions
+    /// Add a subscription
+    Add {
+        /// Subscription name
+        name: String,
+        /// Subscription URL
+        url: String,
+    },
+    /// Update subscriptions (fetch latest nodes)
     Update {
         /// Subscription ID (omit to update all)
         id: Option<String>,
@@ -176,6 +188,7 @@ fn cli_to_command(cmd: CliCommand) -> Command {
         CliCommand::Mode { mode } => Command::SetProxyMode { mode },
         CliCommand::Node { action } => match action {
             NodeAction::List => Command::GetNodes,
+            NodeAction::Add { uri } => Command::AddNode { uri },
             NodeAction::Select { group, node } => Command::SelectNode { group, node },
             NodeAction::Test { group, node } => Command::LatencyTest { group, node },
         },
@@ -206,6 +219,7 @@ fn cli_to_command(cmd: CliCommand) -> Command {
         },
         CliCommand::Sub { action } => match action {
             SubAction::List => Command::GetSubscriptions,
+            SubAction::Add { name, url } => Command::AddSubscription { name, url },
             SubAction::Update { id } => Command::UpdateSubscription { id },
         },
         CliCommand::Config { action } => match action {

@@ -465,7 +465,7 @@ fn parse_tuic(uri: &str) -> Option<ProxyNode> {
     })
 }
 
-fn parse_v2ray_uri(uri: &str) -> Option<ProxyNode> {
+pub fn parse_v2ray_uri(uri: &str) -> Option<ProxyNode> {
     let uri = uri.trim();
     if uri.is_empty() {
         return None;

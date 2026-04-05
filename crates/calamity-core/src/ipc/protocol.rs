@@ -30,6 +30,7 @@ pub enum Command {
 
     // Nodes
     GetNodes,
+    AddNode { uri: String },
     SelectNode { group: String, node: String },
     LatencyTest { group: String, node: Option<String> },
 
@@ -40,6 +41,7 @@ pub enum Command {
 
     // Subscriptions
     GetSubscriptions,
+    AddSubscription { name: String, url: String },
     UpdateSubscription { id: Option<String> },
 
     // DNS
@@ -124,11 +126,13 @@ mod tests {
             Command::Status,
             Command::SetProxyMode { mode: "direct".into() },
             Command::GetNodes,
+            Command::AddNode { uri: "vless://test@1.2.3.4:443".into() },
             Command::SelectNode { group: "proxy".into(), node: "jp-1".into() },
             Command::LatencyTest { group: "proxy".into(), node: None },
             Command::GetRules,
             Command::RemoveRule { id: "r1".into() },
             Command::GetSubscriptions,
+            Command::AddSubscription { name: "my-sub".into(), url: "https://example.com/sub".into() },
             Command::UpdateSubscription { id: None },
             Command::GetDnsServers,
             Command::GetSettings,

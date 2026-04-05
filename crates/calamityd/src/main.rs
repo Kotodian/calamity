@@ -173,6 +173,24 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             let nodes = calamity_core::singbox::nodes_storage::load_nodes();
             Response::Ok(serde_json::to_value(&nodes).unwrap_or_default())
         }
+        Command::AddNode { uri } => {
+            use calamity_core::singbox::subscription_fetch::parse_v2ray_uri;
+            match parse_v2ray_uri(&uri) {
+                Some(node) => {
+                    let mut nodes = calamity_core::singbox::nodes_storage::load_nodes();
+                    let name = node.name.clone();
+                    // Add to the first group (proxy)
+                    if let Some(group) = nodes.groups.first_mut() {
+                        group.nodes.push(node);
+                    }
+                    match calamity_core::singbox::nodes_storage::save_nodes(&nodes) {
+                        Ok(()) => Response::Ok(serde_json::json!({"added": name})),
+                        Err(e) => Response::Error(e),
+                    }
+                }
+                None => Response::Error(format!("failed to parse node URI: {uri}")),
+            }
+        }
         Command::SelectNode { group, node } => {
             let mut nodes = calamity_core::singbox::nodes_storage::load_nodes();
             // Find the node in the group and set as active
@@ -235,9 +253,91 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
             let subs = calamity_core::singbox::subscriptions_storage::load_subscriptions();
             Response::Ok(serde_json::to_value(&subs).unwrap_or_default())
         }
-        Command::UpdateSubscription { id: _ } => {
-            // TODO: implement subscription update via fetch
-            Response::Error("subscription update not yet implemented in daemon".to_string())
+        Command::AddSubscription { name, url } => {
+            use calamity_core::singbox::subscriptions_storage::{self, SubscriptionConfig};
+            let mut data = subscriptions_storage::load_subscriptions();
+            let sub = SubscriptionConfig {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: name.clone(),
+                url,
+                enabled: true,
+                auto_update_interval: 86400,
+                last_updated: None,
+                node_count: 0,
+                group_id: "proxy".to_string(),
+                traffic_upload: 0,
+                traffic_download: 0,
+                traffic_total: 0,
+                expire: None,
+            };
+            data.subscriptions.push(sub);
+            match subscriptions_storage::save_subscriptions(&data) {
+                Ok(()) => Response::Ok(serde_json::json!({"added": name})),
+                Err(e) => Response::Error(e),
+            }
+        }
+        Command::UpdateSubscription { id } => {
+            use calamity_core::singbox::{
+                nodes_storage,
+                subscription_fetch::fetch_subscription,
+                subscriptions_storage,
+            };
+            let mut subs_data = subscriptions_storage::load_subscriptions();
+            let mut nodes_data = nodes_storage::load_nodes();
+            let mut updated = 0u32;
+
+            for sub in &mut subs_data.subscriptions {
+                if !sub.enabled {
+                    continue;
+                }
+                if let Some(ref target_id) = id {
+                    if &sub.id != target_id {
+                        continue;
+                    }
+                }
+                match fetch_subscription(&sub.url).await {
+                    Ok(result) => {
+                        // Find or create the group for this subscription
+                        let group = nodes_data.groups.iter_mut().find(|g| g.id == sub.group_id);
+                        if let Some(group) = group {
+                            group.nodes = result.nodes.clone();
+                        } else {
+                            nodes_data.groups.push(nodes_storage::NodeGroup {
+                                id: sub.group_id.clone(),
+                                name: sub.name.clone(),
+                                group_type: "select".to_string(),
+                                nodes: result.nodes.clone(),
+                            });
+                        }
+                        sub.node_count = result.nodes.len() as u32;
+                        sub.last_updated = Some(chrono::Utc::now().to_rfc3339());
+                        if let Some(info) = &result.user_info {
+                            sub.traffic_upload = info.upload;
+                            sub.traffic_download = info.download;
+                            sub.traffic_total = info.total;
+                            sub.expire = info.expire.clone();
+                        }
+                        updated += 1;
+                    }
+                    Err(e) => {
+                        eprintln!("[daemon] failed to update subscription '{}': {e}", sub.name);
+                    }
+                }
+            }
+
+            if let Err(e) = nodes_storage::save_nodes(&nodes_data) {
+                return Response::Error(e);
+            }
+            if let Err(e) = subscriptions_storage::save_subscriptions(&subs_data) {
+                return Response::Error(e);
+            }
+
+            // Reload sing-box if running
+            let s = state.lock().await;
+            let settings = storage::load_settings();
+            let _ = s.process.reload(&settings).await;
+
+            Response::Ok(serde_json::json!({"updated": updated}))
         }
         Command::GetDnsServers => {
             let dns = calamity_core::singbox::dns_storage::load_dns_settings();
