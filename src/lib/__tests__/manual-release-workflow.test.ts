@@ -15,6 +15,6 @@ describe("manual release workflow", () => {
     expect(workflow).toContain("aarch64-apple-darwin");
     expect(workflow).not.toContain("x86_64-apple-darwin");
     expect(workflow).toContain("npm test");
-    expect(workflow).toContain("cargo test --manifest-path src-tauri/Cargo.toml");
+    expect(workflow).toContain("cargo test --workspace");
   });
 });
