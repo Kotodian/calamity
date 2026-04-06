@@ -67,7 +67,7 @@ impl Default for DnsSettings {
         Self {
             mode: DnsMode::Normal,
             fake_ip_range: "198.18.0.0/15".to_string(),
-            final_server: "dns-direct".to_string(),
+            final_server: "AliDNS".to_string(),
             servers: vec![
                 DnsServerConfig {
                     id: None,

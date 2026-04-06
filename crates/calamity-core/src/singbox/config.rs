@@ -8,9 +8,9 @@ use super::storage::{self, AppSettings};
 use super::tailscale_config;
 use super::tailscale_storage;
 
-/// Get the tag/identifier for a DNS server. Uses `id` if present (old data), else `name`.
+/// Get the tag/identifier for a DNS server. Always uses `name`.
 fn dns_server_tag(s: &DnsServerConfig) -> &str {
-    s.id.as_deref().unwrap_or(&s.name)
+    &s.name
 }
 
 pub fn generate_config(settings: &AppSettings) -> Value {
@@ -56,7 +56,7 @@ pub fn generate_config(settings: &AppSettings) -> Value {
         })
         .or_else(|| dns_settings.servers.iter().find(|s| s.enabled))
         .map(|s| dns_server_tag(s).to_string())
-        .unwrap_or_else(|| "dns-resolver".to_string());
+        .unwrap_or_default();
 
     // Build outbounds from nodes
     let nodes_data = nodes_storage::load_nodes();
@@ -946,7 +946,7 @@ mod tests {
             rules: vec![],
             mode: dns_storage::DnsMode::Normal,
             fake_ip_range: "198.18.0.0/15".to_string(),
-            final_server: "dns-direct".to_string(),
+            final_server: "Ali".to_string(),
         };
 
         let rules_data = rules_storage::RulesData {
@@ -1076,7 +1076,7 @@ mod tests {
             id: None,
             match_type: "rule_set".to_string(),
             match_value: "geosite-geolocation-!cn".to_string(),
-            server: "dns-proxy".to_string(),
+            server: "AliDNS".to_string(),
             enabled: true,
         }];
 
