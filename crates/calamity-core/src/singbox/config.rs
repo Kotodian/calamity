@@ -13,6 +13,23 @@ fn dns_server_tag(s: &DnsServerConfig) -> &str {
     &s.name
 }
 
+/// Built-in inline rule-sets with hardcoded domain lists.
+fn builtin_inline_ruleset(name: &str) -> Option<Value> {
+    match name {
+        "Tailscale" => Some(json!({
+            "tag": "ruleset-Tailscale",
+            "type": "inline",
+            "rules": [{
+                "domain_suffix": [
+                    "tailscale.com",
+                    "tailscale.io"
+                ]
+            }]
+        })),
+        _ => None,
+    }
+}
+
 pub fn generate_config(settings: &AppSettings) -> Value {
     // Gateway mode forces TUN + allow_lan + auto_route + extended DNS hijack
     let effective = if settings.gateway_mode {
@@ -105,10 +122,28 @@ pub fn generate_config(settings: &AppSettings) -> Value {
     );
     let route_final =
         resolve_route_final(&rules_data, &all_node_tags, nodes_data.active_node.as_deref());
-    let (stored_route_rules, rule_sets) =
+    let (stored_route_rules, mut rule_sets) =
         build_route_rules(&rules_data, &all_node_tags, nodes_data.active_node.as_deref());
     let mut route_rules = build_pre_match_route_rules(settings);
     route_rules.extend(stored_route_rules);
+
+    // Ensure DNS-referenced rule_sets have definitions (e.g. built-in inline ones)
+    let existing_tags: std::collections::HashSet<String> = rule_sets
+        .iter()
+        .filter_map(|rs| rs["tag"].as_str().map(|s| s.to_string()))
+        .collect();
+    for dns_rule in &dns_settings.rules {
+        if dns_rule.enabled && dns_rule.match_type == "rule_set" {
+            let tag = &dns_rule.match_value;
+            if !existing_tags.contains(tag) {
+                // Strip "ruleset-" prefix to get the builtin name
+                let name = tag.strip_prefix("ruleset-").unwrap_or(tag);
+                if let Some(inline_rs) = builtin_inline_ruleset(name) {
+                    rule_sets.push(inline_rs);
+                }
+            }
+        }
+    }
 
     let mut route_section = json!({
         "auto_detect_interface": true,
@@ -436,28 +471,32 @@ fn build_route_rules(
                 if !seen_rule_sets.contains(&rule_set_tag) {
                     seen_rule_sets.insert(rule_set_tag.clone());
 
-                    let url = rule.rule_set_url.clone().unwrap_or_default();
-                    let mut rs = json!({
-                        "tag": rule_set_tag,
-                        "type": "remote",
-                        "format": "binary",
-                        "url": url,
-                        "update_interval": format!("{}s", rules_data.update_interval)
-                    });
+                    if let Some(inline_rs) = builtin_inline_ruleset(&rule.match_value) {
+                        rule_sets.push(inline_rs);
+                    } else {
+                        let url = rule.rule_set_url.clone().unwrap_or_default();
+                        let mut rs = json!({
+                            "tag": rule_set_tag,
+                            "type": "remote",
+                            "format": "binary",
+                            "url": url,
+                            "update_interval": format!("{}s", rules_data.update_interval)
+                        });
 
-                    if let Some(detour) = &rule.download_detour {
-                        let detour_tag = match detour.as_str() {
-                            "direct" => "direct-out".to_string(),
-                            "proxy" => all_node_tags
-                                .first()
-                                .cloned()
-                                .unwrap_or_else(|| "direct-out".to_string()),
-                            other => other.to_string(),
-                        };
-                        rs["download_detour"] = json!(detour_tag);
+                        if let Some(detour) = &rule.download_detour {
+                            let detour_tag = match detour.as_str() {
+                                "direct" => "direct-out".to_string(),
+                                "proxy" => all_node_tags
+                                    .first()
+                                    .cloned()
+                                    .unwrap_or_else(|| "direct-out".to_string()),
+                                other => other.to_string(),
+                            };
+                            rs["download_detour"] = json!(detour_tag);
+                        }
+
+                        rule_sets.push(rs);
                     }
-
-                    rule_sets.push(rs);
                 }
             }
             _ => {
