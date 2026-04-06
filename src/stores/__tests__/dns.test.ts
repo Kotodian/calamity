@@ -26,10 +26,9 @@ describe("useDnsStore", () => {
     await useDnsStore.getState().fetchAll();
     const before = useDnsStore.getState().rules.length;
     await useDnsStore.getState().addRule({
-      id: "test-rule",
       matchType: "domain-suffix",
       matchValue: ".test.dev",
-      server: "cf-https",
+      server: "AliDNS",
       enabled: true,
     });
     expect(useDnsStore.getState().rules.length).toBe(before + 1);
@@ -39,15 +38,14 @@ describe("useDnsStore", () => {
     await useDnsStore.getState().fetchAll();
     const rules = useDnsStore.getState().rules;
     const target = rules[rules.length - 1];
-    await useDnsStore.getState().deleteRule(target.id);
-    expect(useDnsStore.getState().rules.find((r) => r.id === target.id)).toBeUndefined();
+    await useDnsStore.getState().deleteRule(target.matchValue);
+    expect(useDnsStore.getState().rules.find((r) => r.matchValue === target.matchValue)).toBeUndefined();
   });
 
   it("addServer adds to config", async () => {
     await useDnsStore.getState().fetchAll();
     const before = useDnsStore.getState().config!.servers.length;
     await useDnsStore.getState().addServer({
-      id: "test-srv",
       name: "Test",
       address: "1.2.3.4",
       enabled: true,
@@ -57,7 +55,7 @@ describe("useDnsStore", () => {
 
   it("deleteServer removes from config", async () => {
     await useDnsStore.getState().fetchAll();
-    await useDnsStore.getState().deleteServer("test-srv");
-    expect(useDnsStore.getState().config!.servers.find((s) => s.id === "test-srv")).toBeUndefined();
+    await useDnsStore.getState().deleteServer("Test");
+    expect(useDnsStore.getState().config!.servers.find((s) => s.name === "Test")).toBeUndefined();
   });
 });

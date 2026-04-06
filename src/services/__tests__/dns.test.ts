@@ -27,10 +27,9 @@ describe("dnsService", () => {
   it("addRule creates a new DNS rule", async () => {
     const before = (await dnsService.getSettings()).rules;
     await dnsService.addRule({
-      id: "test-rule",
       matchType: "domain-suffix",
       matchValue: ".test.com",
-      server: "cf-https",
+      server: "AliDNS",
       enabled: true,
     });
     const after = (await dnsService.getSettings()).rules;
@@ -40,15 +39,14 @@ describe("dnsService", () => {
   it("deleteRule removes a DNS rule", async () => {
     const { rules } = await dnsService.getSettings();
     const target = rules[rules.length - 1];
-    await dnsService.deleteRule(target.id);
+    await dnsService.deleteRule(target.matchValue);
     const after = (await dnsService.getSettings()).rules;
-    expect(after.find((r) => r.id === target.id)).toBeUndefined();
+    expect(after.find((r) => r.matchValue === target.matchValue)).toBeUndefined();
   });
 
   it("addServer adds a DNS server", async () => {
     const before = (await dnsService.getSettings()).config.servers;
     await dnsService.addServer({
-      id: "test-server",
       name: "Test",
       address: "1.2.3.4",
       enabled: true,
@@ -58,8 +56,8 @@ describe("dnsService", () => {
   });
 
   it("deleteServer removes server and related rules", async () => {
-    await dnsService.deleteServer("test-server");
+    await dnsService.deleteServer("Test");
     const { config } = await dnsService.getSettings();
-    expect(config.servers.find((s) => s.id === "test-server")).toBeUndefined();
+    expect(config.servers.find((s) => s.name === "Test")).toBeUndefined();
   });
 });
