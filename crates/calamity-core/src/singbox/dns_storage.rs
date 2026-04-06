@@ -100,7 +100,51 @@ impl Default for DnsSettings {
 }
 
 pub fn load_dns_settings() -> DnsSettings {
-    read_json(DNS_FILE)
+    let mut settings: DnsSettings = read_json(DNS_FILE);
+    if migrate_id_to_name(&mut settings) {
+        let _ = write_json(DNS_FILE, &settings);
+    }
+    settings
+}
+
+/// Migrate old id-based references to name-based. Returns true if any changes were made.
+fn migrate_id_to_name(settings: &mut DnsSettings) -> bool {
+    // Build id -> name mapping from servers that still have a legacy id
+    let id_map: std::collections::HashMap<String, String> = settings
+        .servers
+        .iter()
+        .filter_map(|s| s.id.as_ref().map(|id| (id.clone(), s.name.clone())))
+        .collect();
+
+    if id_map.is_empty() {
+        return false;
+    }
+
+    // Rewrite final_server
+    if let Some(name) = id_map.get(&settings.final_server) {
+        settings.final_server = name.clone();
+    }
+
+    // Rewrite domain_resolver references
+    for server in &mut settings.servers {
+        if let Some(ref resolver) = server.domain_resolver {
+            if let Some(name) = id_map.get(resolver) {
+                server.domain_resolver = Some(name.clone());
+            }
+        }
+        // Clear the legacy id
+        server.id = None;
+    }
+
+    // Rewrite rule server references
+    for rule in &mut settings.rules {
+        if let Some(name) = id_map.get(&rule.server) {
+            rule.server = name.clone();
+        }
+        rule.id = None;
+    }
+
+    true
 }
 
 pub fn save_dns_settings(settings: &DnsSettings) -> Result<(), String> {
