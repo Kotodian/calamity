@@ -1,6 +1,6 @@
 [package]
 name = "calamity-cli"
-version = "0.3.1-beta"
+version = "0.3.2-beta"
 edition = "2024"
 description = "CLI client for Calamity proxy"
 
