@@ -4,7 +4,7 @@ use std::sync::Arc;
 use calamity_core::ipc::protocol::{Command, Response};
 use calamity_core::ipc::server::IpcServer;
 use calamity_core::singbox::{
-    bgp::{fsm, speaker, storage as bgp_storage},
+    bgp::{fsm, speaker, storage as bgp_storage, sync_session::SyncSession},
     process::SingboxProcess,
     rules_storage, storage,
     tailscale_api, tailscale_storage,
@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 struct AppState {
     process: SingboxProcess,
     bgp_speaker: Option<speaker::BgpSpeaker>,
+    sync_session: Option<SyncSession>,
 }
 
 #[tokio::main]
@@ -68,8 +69,38 @@ async fn main() {
     let state = Arc::new(Mutex::new(AppState {
         process,
         bgp_speaker,
+        sync_session: None,
     }));
 
+    // Auto-start sync if active_peer is set
+    {
+        let bgp_settings = bgp_storage::load_bgp_settings();
+        if let Some(ref active_peer_id) = bgp_settings.active_peer {
+            if let Some(peer) = bgp_settings.peers.iter().find(|p| p.id == *active_peer_id || p.name == *active_peer_id) {
+                if let Some(local_ip) = calamity_core::platform::get_tailscale_ip() {
+                    let peer_addr = peer.address.clone();
+                    let reload_state = state.clone();
+                    let on_applied: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || {
+                        let st = reload_state.clone();
+                        tokio::spawn(async move {
+                            let s = st.lock().await;
+                            let settings = storage::load_settings();
+                            let _ = s.process.reload(&settings).await;
+                        });
+                    });
+                    match SyncSession::start(peer_addr, local_ip.octets(), on_applied).await {
+                        Ok(session) => {
+                            eprintln!("[calamityd] auto-started sync with peer {active_peer_id}");
+                            state.lock().await.sync_session = Some(session);
+                        }
+                        Err(e) => {
+                            eprintln!("[calamityd] failed to auto-start sync: {e}");
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Start IPC server
     let socket_path = PathBuf::from("/run/calamity/calamity.sock");
@@ -107,6 +138,9 @@ async fn main() {
     eprintln!("[calamityd] shutting down...");
     {
         let mut s = shutdown_state.lock().await;
+        if let Some(session) = s.sync_session.take() {
+            session.stop();
+        }
         s.process.stop().await;
         if let Some(bgp) = s.bgp_speaker.take() {
             bgp.stop();
@@ -644,6 +678,65 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
         Command::BgpApplyRules { .. } => {
             // Pull now auto-applies, this is kept for backward compat
             Response::Ok(serde_json::json!("use bgp pull instead"))
+        }
+        Command::BgpStartSync { peer_id } => {
+            let bgp_settings = bgp_storage::load_bgp_settings();
+            let peer = bgp_settings.peers.iter().find(|p| p.id == peer_id || p.name == peer_id);
+            let peer = match peer {
+                Some(p) => p.clone(),
+                None => return Response::Error(format!("peer '{peer_id}' not found")),
+            };
+            let local_ip = match calamity_core::platform::get_tailscale_ip() {
+                Some(ip) => ip,
+                None => return Response::Error("Tailscale IP not found".to_string()),
+            };
+            let reload_state = state.clone();
+            let on_applied: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || {
+                let st = reload_state.clone();
+                tokio::spawn(async move {
+                    let s = st.lock().await;
+                    let settings = storage::load_settings();
+                    let _ = s.process.reload(&settings).await;
+                });
+            });
+            match SyncSession::start(peer.address.clone(), local_ip.octets(), on_applied).await {
+                Ok(session) => {
+                    let mut s = state.lock().await;
+                    // Stop previous session if any
+                    if let Some(prev) = s.sync_session.take() {
+                        prev.stop();
+                    }
+                    s.sync_session = Some(session);
+                    // Save active_peer
+                    let mut settings = bgp_storage::load_bgp_settings();
+                    settings.active_peer = Some(peer.id.clone());
+                    let _ = bgp_storage::save_bgp_settings(&settings);
+                    Response::Ok(serde_json::json!({"syncing": peer.address}))
+                }
+                Err(e) => Response::Error(format!("start sync: {e}")),
+            }
+        }
+        Command::BgpStopSync => {
+            let mut s = state.lock().await;
+            if let Some(session) = s.sync_session.take() {
+                session.stop();
+                // Clear active_peer
+                let mut settings = bgp_storage::load_bgp_settings();
+                settings.active_peer = None;
+                let _ = bgp_storage::save_bgp_settings(&settings);
+                Response::Ok(serde_json::json!("stopped"))
+            } else {
+                Response::Ok(serde_json::json!("no active sync"))
+            }
+        }
+        Command::BgpSyncStatus => {
+            let s = state.lock().await;
+            if let Some(ref session) = s.sync_session {
+                let status = session.status().await;
+                Response::Ok(serde_json::to_value(&status).unwrap_or_default())
+            } else {
+                Response::Ok(serde_json::json!("disconnected"))
+            }
         }
         Command::BgpDiscoverPeers => {
             // Try local Tailscale API first (Linux with tailscaled installed)

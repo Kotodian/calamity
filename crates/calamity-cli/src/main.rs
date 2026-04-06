@@ -327,6 +327,15 @@ enum BgpAction {
     Apply,
     /// Discover peers on Tailnet
     Discover,
+    /// Start syncing with a peer
+    Sync {
+        /// Peer ID or name
+        peer_id: String,
+    },
+    /// Stop syncing
+    Unsync,
+    /// Show sync status
+    SyncStatus,
 }
 
 #[derive(Subcommand)]
@@ -473,6 +482,9 @@ fn cli_to_command(cmd: CliCommand) -> Command {
                 rules: serde_json::json!(null),
             },
             BgpAction::Discover => Command::BgpDiscoverPeers,
+            BgpAction::Sync { peer_id } => Command::BgpStartSync { peer_id },
+            BgpAction::Unsync => Command::BgpStopSync,
+            BgpAction::SyncStatus => Command::BgpSyncStatus,
         },
         CliCommand::Tailscale { action } => match action {
             TailscaleAction::Status => Command::TailscaleStatus,

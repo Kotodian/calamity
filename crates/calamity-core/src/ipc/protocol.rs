@@ -69,6 +69,9 @@ pub enum Command {
     BgpPullRules { peer_addr: String },
     BgpApplyRules { rules: Value },
     BgpDiscoverPeers,
+    BgpStartSync { peer_id: String },
+    BgpStopSync,
+    BgpSyncStatus,
 
     // Tailscale
     TailscaleStatus,
@@ -165,6 +168,9 @@ mod tests {
             Command::BgpPullRules { peer_addr: "100.64.0.1".into() },
             Command::BgpApplyRules { rules: serde_json::json!({}) },
             Command::BgpDiscoverPeers,
+            Command::BgpStartSync { peer_id: "p1".into() },
+            Command::BgpStopSync,
+            Command::BgpSyncStatus,
             Command::TailscaleStatus,
             Command::TailscaleAuth,
             Command::TailscaleLogout,
