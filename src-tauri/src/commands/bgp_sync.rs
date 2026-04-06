@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::singbox::bgp::{fsm, speaker, storage};
+use crate::singbox::bgp::{discovery, fsm, speaker, storage, sync_session};
 use crate::singbox::rules_storage::{self, RouteRuleConfig, RulesData};
-use crate::singbox::tailscale_api;
-use crate::singbox::tailscale_storage;
+
+/// Type alias for the managed sync session state.
+pub type SyncSessionState = Arc<tokio::sync::Mutex<Option<sync_session::SyncSession>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,13 +28,6 @@ pub struct RuleDiffEntry {
     pub remote: RouteRuleConfig,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DiscoveredPeer {
-    pub name: String,
-    pub hostname: String,
-    pub address: String,
-}
 
 fn compute_diff(local: &RulesData, remote: &RulesData) -> RuleDiff {
     let local_map: std::collections::HashMap<&str, &RouteRuleConfig> =
@@ -179,19 +173,79 @@ pub async fn bgp_apply_rules(app: AppHandle, remote_rules: RulesData) -> Result<
 }
 
 #[tauri::command]
-pub async fn bgp_discover_peers() -> Result<Vec<DiscoveredPeer>, String> {
-    let mut ts_settings = tailscale_storage::load_tailscale_settings();
-    let devices = tailscale_api::fetch_devices(&mut ts_settings).await?;
-    let peers: Vec<DiscoveredPeer> = devices
-        .into_iter()
-        .filter(|d| !d.is_self && d.hostname.to_lowercase().contains("calamity"))
-        .map(|d| DiscoveredPeer {
-            name: d.name.clone(),
-            hostname: d.hostname,
-            address: d.ip,
-        })
-        .collect();
-    Ok(peers)
+pub async fn bgp_discover_peers() -> Result<Vec<discovery::DiscoveredPeer>, String> {
+    Ok(discovery::discover_all().await)
+}
+
+#[tauri::command]
+pub async fn bgp_start_sync(app: AppHandle, peer_id: String) -> Result<(), String> {
+    let settings = storage::load_bgp_settings();
+    let peer = settings
+        .peers
+        .iter()
+        .find(|p| p.id == peer_id)
+        .ok_or_else(|| format!("peer {peer_id} not found"))?
+        .clone();
+
+    let local_ip = speaker::get_tailscale_ip().ok_or("Tailscale IP not found")?;
+    let router_id = local_ip.octets();
+
+    let app_handle = app.clone();
+    let on_applied: sync_session::OnSyncApplied = Arc::new(move || {
+        let app = app_handle.clone();
+        tokio::spawn(async move {
+            let process = app
+                .state::<Arc<crate::singbox::process::SingboxProcess>>()
+                .inner()
+                .clone();
+            let settings = crate::singbox::storage::load_settings();
+            let _ = process.reload(&settings).await;
+            let _ = app.emit("singbox-restarted", ());
+        });
+    });
+
+    let session = sync_session::SyncSession::start(peer.address, router_id, on_applied).await?;
+
+    let state = app.state::<SyncSessionState>();
+    let mut guard = state.lock().await;
+    // Stop any existing session
+    if let Some(old) = guard.take() {
+        old.stop();
+    }
+    *guard = Some(session);
+
+    // Save active_peer
+    let mut bgp_settings = storage::load_bgp_settings();
+    bgp_settings.active_peer = Some(peer_id);
+    storage::save_bgp_settings(&bgp_settings)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn bgp_stop_sync(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<SyncSessionState>();
+    let mut guard = state.lock().await;
+    if let Some(session) = guard.take() {
+        session.stop();
+    }
+
+    // Clear active_peer
+    let mut settings = storage::load_bgp_settings();
+    settings.active_peer = None;
+    storage::save_bgp_settings(&settings)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn bgp_sync_status(app: AppHandle) -> Result<sync_session::SyncStatus, String> {
+    let state = app.state::<SyncSessionState>();
+    let guard = state.lock().await;
+    match guard.as_ref() {
+        Some(session) => Ok(session.status().await),
+        None => Ok(sync_session::SyncStatus::Disconnected),
+    }
 }
 
 #[cfg(test)]

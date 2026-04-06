@@ -53,6 +53,11 @@ pub fn run() {
             let process = Arc::new(SingboxProcess::new(singbox_path));
             app.manage(process.clone());
 
+            // BGP sync session state
+            app.manage(Arc::new(tokio::sync::Mutex::new(
+                Option::<calamity_core::singbox::bgp::sync_session::SyncSession>::None,
+            )));
+
             // Don't auto-start sing-box; user clicks connect to start
 
             // BGP speaker starts after sing-box connects (see connection.rs singbox_start)
@@ -259,6 +264,9 @@ pub fn run() {
             commands::bgp_sync::bgp_pull_rules,
             commands::bgp_sync::bgp_apply_rules,
             commands::bgp_sync::bgp_discover_peers,
+            commands::bgp_sync::bgp_start_sync,
+            commands::bgp_sync::bgp_stop_sync,
+            commands::bgp_sync::bgp_sync_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
