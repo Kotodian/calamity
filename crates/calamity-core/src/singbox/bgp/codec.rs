@@ -47,6 +47,11 @@ const FIELD_UPDATE_INTERVAL: u8 = 22;
 /// Process-level match types that are machine-specific and should not be synced via BGP.
 const PROCESS_MATCH_TYPES: &[&str] = &["process-name", "process-path", "process-path-regex"];
 
+/// Tailscale DNS server address — device-specific, should not be synced.
+fn is_tailscale_dns_server(server: &DnsServerConfig) -> bool {
+    server.address == "100.100.100.100"
+}
+
 /// Filter out process-level rules that are machine-specific and shouldn't be synced.
 pub fn filter_syncable_rules(data: &RulesData) -> RulesData {
     RulesData {
@@ -372,9 +377,22 @@ pub fn encode_sync_data(rules: &RulesData, dns: Option<&DnsSettings>, node_uris:
     if let Some(dns) = dns {
         entries.push((DNS_META_MARKER.to_vec(), encode_dns_metadata(dns)));
         for server in &dns.servers {
+            // Skip Tailscale DNS server — device-specific
+            if is_tailscale_dns_server(server) {
+                continue;
+            }
             entries.push((DNS_SERVER_MARKER.to_vec(), encode_dns_server(server)));
         }
+        // Collect tailscale server names to filter referencing rules
+        let ts_server_names: std::collections::HashSet<&str> = dns.servers.iter()
+            .filter(|s| is_tailscale_dns_server(s))
+            .map(|s| s.name.as_str())
+            .collect();
         for rule in &dns.rules {
+            // Skip rules that reference a Tailscale DNS server
+            if ts_server_names.contains(rule.server.as_str()) {
+                continue;
+            }
             entries.push((DNS_RULE_MARKER.to_vec(), encode_dns_rule(rule)));
         }
     }
