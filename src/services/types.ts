@@ -229,7 +229,6 @@ export interface DnsConfig {
 }
 
 export interface DnsServer {
-  id: string;
   name: string;
   address: string;
   enabled: boolean;
@@ -238,7 +237,6 @@ export interface DnsServer {
 }
 
 export interface DnsRule {
-  id: string;
   matchType: "domain" | "domain-suffix" | "domain-keyword" | "domain-regex" | "rule_set";
   matchValue: string;
   server: string;

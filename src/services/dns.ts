@@ -36,22 +36,20 @@ function splitSettings(raw: RawDnsSettings): { config: DnsConfig; rules: DnsRule
 
 let mockData: RawDnsSettings = {
   mode: "redir-host",
-  final: "dns-direct",
+  final: "AliDNS",
   fakeIpRange: "198.18.0.0/15",
   servers: [
-    { id: "dns-proxy", name: "Cloudflare", address: "https://1.1.1.1/dns-query", enabled: false },
-    { id: "dns-direct", name: "AliDNS", address: "https://dns.alidns.com/dns-query", enabled: true, domainResolver: "dns-resolver" },
-    { id: "dns-resolver", name: "Bootstrap", address: "223.5.5.5", enabled: true },
-    { id: "tailscale", name: "Tailscale", address: "100.100.100.100", enabled: true },
+    { name: "Cloudflare", address: "https://1.1.1.1/dns-query", enabled: false },
+    { name: "AliDNS", address: "https://dns.alidns.com/dns-query", enabled: true, domainResolver: "Bootstrap" },
+    { name: "Bootstrap", address: "223.5.5.5", enabled: true },
+    { name: "Tailscale", address: "100.100.100.100", enabled: true },
   ],
   rules: [
-    { id: "cn-rule", matchType: "rule_set", matchValue: "geosite-cn", server: "dns-direct", enabled: true },
-    { id: "not-cn-rule", matchType: "rule_set", matchValue: "geosite-geolocation-!cn", server: "dns-proxy", enabled: true },
-    { id: "ts-rule", matchType: "domain-suffix", matchValue: ".ts.net", server: "tailscale", enabled: true },
+    { matchType: "rule_set", matchValue: "geosite-cn", server: "AliDNS", enabled: true },
+    { matchType: "rule_set", matchValue: "geosite-geolocation-!cn", server: "Cloudflare", enabled: true },
+    { matchType: "domain-suffix", matchValue: ".ts.net", server: "Tailscale", enabled: true },
   ],
 };
-
-let ruleId = 100;
 
 const mockDnsService: DnsService = {
   async getSettings() {
@@ -68,20 +66,20 @@ const mockDnsService: DnsService = {
     return splitSettings(JSON.parse(JSON.stringify(mockData)));
   },
   async updateServer(server) {
-    mockData.servers = mockData.servers.map((s) => (s.id === server.id ? server : s));
+    mockData.servers = mockData.servers.map((s) => (s.name === server.name ? server : s));
     return splitSettings(JSON.parse(JSON.stringify(mockData)));
   },
   async deleteServer(id) {
-    mockData.servers = mockData.servers.filter((s) => s.id !== id);
+    mockData.servers = mockData.servers.filter((s) => s.name !== id);
     mockData.rules = mockData.rules.filter((r) => r.server !== id);
     return splitSettings(JSON.parse(JSON.stringify(mockData)));
   },
   async addRule(rule) {
-    mockData.rules.push({ ...rule, id: `dr${ruleId++}` });
+    mockData.rules.push(rule);
     return splitSettings(JSON.parse(JSON.stringify(mockData)));
   },
   async deleteRule(id) {
-    mockData.rules = mockData.rules.filter((r) => r.id !== id);
+    mockData.rules = mockData.rules.filter((r) => r.matchValue !== id);
     return splitSettings(JSON.parse(JSON.stringify(mockData)));
   },
 };
@@ -118,7 +116,7 @@ function createTauriDnsService(): DnsService {
     },
     async deleteServer(id) {
       const { invoke } = await import("@tauri-apps/api/core");
-      const raw = await invoke<RawDnsSettings>("delete_dns_server", { id });
+      const raw = await invoke<RawDnsSettings>("delete_dns_server", { name: id });
       return splitSettings(raw);
     },
     async addRule(rule) {
@@ -128,7 +126,7 @@ function createTauriDnsService(): DnsService {
     },
     async deleteRule(id) {
       const { invoke } = await import("@tauri-apps/api/core");
-      const raw = await invoke<RawDnsSettings>("delete_dns_rule", { id });
+      const raw = await invoke<RawDnsSettings>("delete_dns_rule", { matchValue: id });
       return splitSettings(raw);
     },
   };

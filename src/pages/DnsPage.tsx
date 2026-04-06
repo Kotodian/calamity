@@ -21,14 +21,14 @@ import type { DnsMode } from "@/services/types";
 import { useTranslation } from "react-i18next";
 
 const PRESET_SERVERS = [
-  { id: "cf-https", name: "Cloudflare", address: "https://1.1.1.1/dns-query" },
-  { id: "cf-tls", name: "Cloudflare TLS", address: "tls://1.1.1.1" },
-  { id: "google-https", name: "Google", address: "https://8.8.8.8/dns-query" },
-  { id: "google-tls", name: "Google TLS", address: "tls://8.8.8.8" },
-  { id: "ali-udp", name: "AliDNS", address: "223.5.5.5" },
-  { id: "ali-https", name: "AliDNS HTTPS", address: "https://223.5.5.5/dns-query" },
-  { id: "dnspod-https", name: "DNSPod", address: "https://1.12.12.12/dns-query" },
-  { id: "tailscale", name: "Tailscale", address: "100.100.100.100" },
+  { name: "Cloudflare", address: "https://1.1.1.1/dns-query" },
+  { name: "Cloudflare TLS", address: "tls://1.1.1.1" },
+  { name: "Google", address: "https://8.8.8.8/dns-query" },
+  { name: "Google TLS", address: "tls://8.8.8.8" },
+  { name: "AliDNS", address: "223.5.5.5" },
+  { name: "AliDNS HTTPS", address: "https://223.5.5.5/dns-query" },
+  { name: "DNSPod", address: "https://1.12.12.12/dns-query" },
+  { name: "Tailscale", address: "100.100.100.100" },
 ] as const;
 
 export function DnsPage() {
@@ -64,9 +64,18 @@ export function DnsPage() {
 
   const routeRules = useRulesStore((s) => s.rules);
   const fetchRouteRules = useRulesStore((s) => s.fetchRules);
-  const ruleSetOptions = routeRules
-    .filter((r) => r.matchType === "geosite" || r.matchType === "geoip")
-    .map((r) => ({ value: `${r.matchType}-${r.matchValue}`, label: `${r.matchType}-${r.matchValue}` }));
+  const ruleSetOptions = [
+    // Built-in inline rule-sets
+    { value: "ruleset-Tailscale", label: "Tailscale" },
+    // From geosite/geoip route rules
+    ...routeRules
+      .filter((r) => r.matchType === "geosite" || r.matchType === "geoip")
+      .map((r) => ({ value: `${r.matchType}-${r.matchValue}`, label: `${r.matchType}-${r.matchValue}` })),
+    // From rule-set type route rules
+    ...routeRules
+      .filter((r) => r.matchType === "rule-set")
+      .map((r) => ({ value: `ruleset-${r.matchValue}`, label: r.matchValue })),
+  ];
 
   useEffect(() => {
     fetchAll();
@@ -88,8 +97,8 @@ export function DnsPage() {
     { value: "rule_set", label: t("dns.matchTypes.ruleSet") },
   ] as const;
 
-  const existingServerIds = new Set(config.servers.map((s) => s.id));
-  const availablePresets = PRESET_SERVERS.filter((p) => !existingServerIds.has(p.id));
+  const existingServerNames = new Set(config.servers.map((s) => s.name));
+  const availablePresets = PRESET_SERVERS.filter((p) => !existingServerNames.has(p.name));
 
   return (
     <div className="p-6 space-y-6">
@@ -193,14 +202,13 @@ export function DnsPage() {
                       <div className="flex flex-wrap gap-1.5">
                         {availablePresets.map((preset) => (
                           <Badge
-                            key={preset.id}
+                            key={preset.name}
                             variant="outline"
                             className="cursor-pointer text-[10px] hover:bg-primary/10 transition-colors"
                             onClick={async () => {
-                              setBusyAction(`preset-${preset.id}`);
+                              setBusyAction(`preset-${preset.name}`);
                               try {
                                 await addServer({
-                                  id: preset.id,
                                   name: preset.name,
                                   address: preset.address,
                                   enabled: true,
@@ -238,9 +246,7 @@ export function DnsPage() {
                         onClick={async () => {
                           setBusyAction("add-server");
                           try {
-                            const id = `custom-${Date.now()}`;
                             await addServer({
-                              id,
                               name: customName,
                               address: customAddress,
                               enabled: true,
@@ -260,14 +266,14 @@ export function DnsPage() {
               {/* Server list */}
               {config.servers.map((server) => (
                 <div
-                  key={server.id}
+                  key={server.name}
                   className="flex items-center gap-3 rounded-lg border border-white/[0.04] bg-muted/20 p-3 transition-all duration-200 hover:bg-muted/30"
                 >
                   <Switch
                     checked={server.enabled}
                     disabled={!!busyAction}
                     onCheckedChange={async (checked) => {
-                      setBusyAction(`toggle-${server.id}`);
+                      setBusyAction(`toggle-${server.name}`);
                       try { await updateServer({ ...server, enabled: checked }); }
                       finally { setBusyAction(null); }
                     }}
@@ -279,7 +285,7 @@ export function DnsPage() {
                   <Select
                     value={server.detour ?? "direct"}
                     onValueChange={async (v) => {
-                      setBusyAction(`detour-${server.id}`);
+                      setBusyAction(`detour-${server.name}`);
                       try { await updateServer({ ...server, detour: v === "direct" ? undefined : v }); }
                       finally { setBusyAction(null); }
                     }}
@@ -302,12 +308,12 @@ export function DnsPage() {
                     className="h-8 w-8 text-destructive hover:bg-red-500/10 transition-all duration-200"
                     disabled={!!busyAction}
                     onClick={async () => {
-                      setBusyAction(`del-server-${server.id}`);
-                      try { await deleteServer(server.id); }
+                      setBusyAction(`del-server-${server.name}`);
+                      try { await deleteServer(server.name); }
                       finally { setBusyAction(null); }
                     }}
                   >
-                    {busyAction === `del-server-${server.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    {busyAction === `del-server-${server.name}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
               ))}
@@ -368,7 +374,7 @@ export function DnsPage() {
                   </SelectTrigger>
                   <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
                     {config.servers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
+                      <SelectItem key={s.name} value={s.name}>
                         {s.name}
                       </SelectItem>
                     ))}
@@ -382,8 +388,7 @@ export function DnsPage() {
                     setBusyAction("add-rule");
                     try {
                       await addRule({
-                        id: `dr-${Date.now()}`,
-                        matchType: newMatchType as "domain" | "domain-suffix" | "domain-keyword" | "domain-regex",
+                        matchType: newMatchType as "domain" | "domain-suffix" | "domain-keyword" | "domain-regex" | "rule_set",
                         matchValue: newMatchValue,
                         server: newRuleServer,
                         enabled: true,
@@ -400,13 +405,12 @@ export function DnsPage() {
               {/* Rules list */}
               <div className="space-y-2">
                 {rules.map((rule) => {
-                  const serverName =
-                    config.servers.find((s) => s.id === rule.server)?.name ?? rule.server;
+                  const serverName = rule.server;
                   const matchLabel =
                     MATCH_TYPES.find((t) => t.value === rule.matchType)?.label ?? rule.matchType;
                   return (
                     <div
-                      key={rule.id}
+                      key={`${rule.matchType}-${rule.matchValue}`}
                       className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-muted/20 p-3 transition-all duration-200 hover:border-white/10 hover:bg-muted/30"
                     >
                       <div className="flex-1">
@@ -436,12 +440,12 @@ export function DnsPage() {
                         className="h-8 w-8 text-destructive hover:bg-red-500/10 transition-all duration-200"
                         disabled={!!busyAction}
                         onClick={async () => {
-                          setBusyAction(`del-rule-${rule.id}`);
-                          try { await deleteRule(rule.id); }
+                          setBusyAction(`del-rule-${rule.matchValue}`);
+                          try { await deleteRule(rule.matchValue); }
                           finally { setBusyAction(null); }
                         }}
                       >
-                        {busyAction === `del-rule-${rule.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        {busyAction === `del-rule-${rule.matchValue}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
                   );

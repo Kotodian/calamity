@@ -487,16 +487,16 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 Err(e) => Response::Error(e),
             }
         }
-        Command::RemoveDnsServer { id } => {
+        Command::RemoveDnsServer { name } => {
             use calamity_core::singbox::dns_storage;
             let mut dns = dns_storage::load_dns_settings();
             let before = dns.servers.len();
-            dns.servers.retain(|s| s.name != id);
+            dns.servers.retain(|s| s.name != name);
             if dns.servers.len() == before {
-                return Response::Error(format!("DNS server '{id}' not found"));
+                return Response::Error(format!("DNS server '{name}' not found"));
             }
             match dns_storage::save_dns_settings(&dns) {
-                Ok(()) => Response::Ok(serde_json::json!({"removed": id})),
+                Ok(()) => Response::Ok(serde_json::json!({"removed": name})),
                 Err(e) => Response::Error(e),
             }
         }
@@ -515,16 +515,16 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 Err(e) => Response::Error(e),
             }
         }
-        Command::RemoveDnsRule { id } => {
+        Command::RemoveDnsRule { match_value } => {
             use calamity_core::singbox::dns_storage;
             let mut dns = dns_storage::load_dns_settings();
             let before = dns.rules.len();
-            dns.rules.retain(|r| r.match_value != id);
+            dns.rules.retain(|r| r.match_value != match_value);
             if dns.rules.len() == before {
-                return Response::Error(format!("DNS rule '{id}' not found"));
+                return Response::Error(format!("DNS rule '{match_value}' not found"));
             }
             match dns_storage::save_dns_settings(&dns) {
-                Ok(()) => Response::Ok(serde_json::json!({"removed": id})),
+                Ok(()) => Response::Ok(serde_json::json!({"removed": match_value})),
                 Err(e) => Response::Error(e),
             }
         }

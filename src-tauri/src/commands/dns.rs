@@ -51,7 +51,7 @@ pub async fn update_dns_server(
     server: DnsServerConfig,
 ) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
-    if let Some(s) = settings.servers.iter_mut().find(|s| s.id == server.id) {
+    if let Some(s) = settings.servers.iter_mut().find(|s| s.name == server.name) {
         *s = server;
     }
     dns_storage::save_dns_settings(&settings)?;
@@ -60,10 +60,10 @@ pub async fn update_dns_server(
 }
 
 #[tauri::command]
-pub async fn delete_dns_server(app: AppHandle, id: String) -> Result<DnsSettings, String> {
+pub async fn delete_dns_server(app: AppHandle, name: String) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
-    settings.servers.retain(|s| s.name != id && s.id.as_deref() != Some(&id));
-    settings.rules.retain(|r| r.server != id);
+    settings.servers.retain(|s| s.name != name);
+    settings.rules.retain(|r| r.server != name);
     dns_storage::save_dns_settings(&settings)?;
     restart_singbox(&app).await;
     Ok(settings)
@@ -79,9 +79,9 @@ pub async fn add_dns_rule(app: AppHandle, rule: DnsRuleConfig) -> Result<DnsSett
 }
 
 #[tauri::command]
-pub async fn delete_dns_rule(app: AppHandle, id: String) -> Result<DnsSettings, String> {
+pub async fn delete_dns_rule(app: AppHandle, match_value: String) -> Result<DnsSettings, String> {
     let mut settings = dns_storage::load_dns_settings();
-    settings.rules.retain(|r| r.match_value != id && r.id.as_deref() != Some(&id));
+    settings.rules.retain(|r| r.match_value != match_value);
     dns_storage::save_dns_settings(&settings)?;
     restart_singbox(&app).await;
     Ok(settings)

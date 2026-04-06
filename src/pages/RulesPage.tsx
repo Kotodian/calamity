@@ -50,8 +50,13 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useRulesStore } from "@/stores/rules";
 import { useNodesStore } from "@/stores/nodes";
+import { useRuleSetMarketStore } from "@/stores/ruleset-market";
 import type { OutboundType, RouteRule } from "@/services/types";
 import { cn } from "@/lib/utils";
+
+const BUILTIN_RULESETS = [
+  { name: "Tailscale", label: "Tailscale (tailscale.com, tailscale.io)" },
+];
 
 const outboundColors: Record<string, string> = {
   proxy: "border-l-primary",
@@ -144,6 +149,7 @@ export function RulesPage() {
   const { t } = useTranslation();
   const { rules, fetchRules, addRule, updateRule, deleteRule, reorderRules, finalOutbound, fetchFinalOutbound, updateFinalOutbound } = useRulesStore();
   const { groups, fetchGroups } = useNodesStore();
+  const { entries: marketEntries, fetchList: fetchMarket } = useRuleSetMarketStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -155,7 +161,8 @@ export function RulesPage() {
     fetchRules();
     fetchFinalOutbound();
     fetchGroups();
-  }, [fetchRules, fetchFinalOutbound, fetchGroups]);
+    fetchMarket();
+  }, [fetchRules, fetchFinalOutbound, fetchGroups, fetchMarket]);
 
   useEffect(() => {
     if (!appPickerOpen || apps.length > 0) return;
@@ -329,23 +336,37 @@ export function RulesPage() {
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2">
-              <Input
-                placeholder={
-                  form.matchType === "process-name" ? "e.g. Chrome, qbittorrent" :
-                  form.matchType === "process-path" ? "e.g. /Applications/Safari.app/Contents/MacOS/Safari" :
-                  form.matchType === "process-path-regex" ? "e.g. ^/Applications/.+" :
-                  form.matchType === "port" ? "e.g. 80, 443" :
-                  form.matchType === "port-range" ? "e.g. 1000:2000" :
-                  form.matchType === "network" ? "tcp or udp" :
-                  form.matchType === "domain-regex" ? "e.g. ^stun\\..+" :
-                  form.matchType === "geosite" ? "e.g. cn, geolocation-!cn, google, netflix" :
-                  form.matchType === "geoip" ? "e.g. cn, us, jp" :
-                  "Match value"
-                }
-                className="flex-1 bg-muted/30 border-white/[0.06]"
-                value={form.matchValue}
-                onChange={(e) => setForm({ ...form, matchValue: e.target.value })}
-              />
+              {form.matchType === "rule-set" ? (
+                <Select value={form.matchValue || undefined} onValueChange={(v) => setForm({ ...form, matchValue: v })}>
+                  <SelectTrigger className="flex-1 bg-muted/30 border-white/[0.06]"><SelectValue placeholder={t("rules.selectRuleSet")} /></SelectTrigger>
+                  <SelectContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl">
+                    {BUILTIN_RULESETS.map((rs) => (
+                      <SelectItem key={rs.name} value={rs.name}>{rs.label}</SelectItem>
+                    ))}
+                    {marketEntries.map((rs) => (
+                      <SelectItem key={rs.name} value={rs.name}>{rs.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  placeholder={
+                    form.matchType === "process-name" ? "e.g. Chrome, qbittorrent" :
+                    form.matchType === "process-path" ? "e.g. /Applications/Safari.app/Contents/MacOS/Safari" :
+                    form.matchType === "process-path-regex" ? "e.g. ^/Applications/.+" :
+                    form.matchType === "port" ? "e.g. 80, 443" :
+                    form.matchType === "port-range" ? "e.g. 1000:2000" :
+                    form.matchType === "network" ? "tcp or udp" :
+                    form.matchType === "domain-regex" ? "e.g. ^stun\\..+" :
+                    form.matchType === "geosite" ? "e.g. cn, geolocation-!cn, google, netflix" :
+                    form.matchType === "geoip" ? "e.g. cn, us, jp" :
+                    "Match value"
+                  }
+                  className="flex-1 bg-muted/30 border-white/[0.06]"
+                  value={form.matchValue}
+                  onChange={(e) => setForm({ ...form, matchValue: e.target.value })}
+                />
+              )}
               {(form.matchType === "process-path" || form.matchType === "process-name") && (
                 <Popover open={appPickerOpen} onOpenChange={setAppPickerOpen}>
                   <PopoverTrigger asChild>
@@ -416,7 +437,7 @@ export function RulesPage() {
                 </SelectContent>
               </Select>
             )}
-            {(form.matchType === "geosite" || form.matchType === "geoip") && (
+            {(form.matchType === "geosite" || form.matchType === "geoip" || (form.matchType === "rule-set" && !BUILTIN_RULESETS.some((b) => b.name === form.matchValue))) && (
               <div className="space-y-2 rounded-lg border border-white/[0.04] bg-muted/10 p-3">
                 <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t("rules.ruleSetDownload")}</label>
                 <Input

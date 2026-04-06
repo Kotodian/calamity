@@ -275,10 +275,10 @@ enum DnsAction {
         #[arg(long)]
         domain_resolver: Option<String>,
     },
-    /// Remove a DNS server
+    /// Remove a DNS server by name
     RemoveServer {
-        /// Server ID or name
-        id: String,
+        /// Server name
+        name: String,
     },
     /// Add a DNS rule
     AddRule {
@@ -287,13 +287,13 @@ enum DnsAction {
         match_type: String,
         /// Match value
         value: String,
-        /// DNS server ID to use
+        /// DNS server name to use
         server: String,
     },
-    /// Remove a DNS rule
+    /// Remove a DNS rule by match value
     RemoveRule {
-        /// Rule ID
-        id: String,
+        /// Match value of the rule to remove
+        match_value: String,
     },
     /// Set the final DNS server (for unmatched queries)
     SetFinal {
@@ -457,11 +457,11 @@ fn cli_to_command(cmd: CliCommand) -> Command {
             DnsAction::AddServer { name, address, detour, domain_resolver } => {
                 Command::AddDnsServer { name, address, detour, domain_resolver }
             }
-            DnsAction::RemoveServer { id } => Command::RemoveDnsServer { id },
+            DnsAction::RemoveServer { name } => Command::RemoveDnsServer { name },
             DnsAction::AddRule { match_type, value, server } => {
                 Command::AddDnsRule { match_type, match_value: value, server }
             }
-            DnsAction::RemoveRule { id } => Command::RemoveDnsRule { id },
+            DnsAction::RemoveRule { match_value } => Command::RemoveDnsRule { match_value },
             DnsAction::SetFinal { server } => Command::SetDnsFinal { server },
         },
         CliCommand::Bgp { action } => match action {
