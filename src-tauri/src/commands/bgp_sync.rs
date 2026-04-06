@@ -97,7 +97,7 @@ pub async fn bgp_set_enabled(app: AppHandle, enabled: bool) -> Result<(), String
 
     if enabled {
         if let Some(ip) = speaker::get_tailscale_ip() {
-            let bgp_speaker = speaker::BgpSpeaker::start(ip).await?;
+            let bgp_speaker = speaker::BgpSpeaker::start(ip, None).await?;
             app.manage(Arc::new(tokio::sync::Mutex::new(Some(bgp_speaker))));
         } else {
             return Err("Tailscale IP not found. Is Tailscale connected?".to_string());

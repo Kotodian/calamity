@@ -47,7 +47,7 @@ async fn main() {
     // Start BGP speaker if Tailscale is available
     let bgp_speaker = if bgp_storage::load_bgp_settings().enabled {
         if let Some(ip) = calamity_core::platform::get_tailscale_ip() {
-            match speaker::BgpSpeaker::start(ip).await {
+            match speaker::BgpSpeaker::start(ip, None).await {
                 Ok(s) => {
                     eprintln!("[calamityd] BGP speaker started on {ip}");
                     Some(s)
