@@ -21,6 +21,8 @@ pub struct BgpSettings {
     pub enabled: bool,
     #[serde(default)]
     pub peers: Vec<BgpPeer>,
+    #[serde(default)]
+    pub active_peer: Option<String>,
 }
 
 pub fn load_bgp_settings() -> BgpSettings {
@@ -60,6 +62,7 @@ mod tests {
                 address: "100.64.0.2".to_string(),
                 auto_discovered: true,
             }],
+            active_peer: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         let deserialized: BgpSettings = serde_json::from_str(&json).unwrap();
@@ -78,9 +81,30 @@ mod tests {
                 address: "10.0.0.1".to_string(),
                 auto_discovered: false,
             }],
+            active_peer: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.contains("autoDiscovered"));
         assert!(!json.contains("auto_discovered"));
+    }
+
+    #[test]
+    fn active_peer_serialization() {
+        let settings = BgpSettings {
+            enabled: true,
+            peers: vec![],
+            active_peer: Some("peer-1".to_string()),
+        };
+        let json = serde_json::to_string(&settings).unwrap();
+        assert!(json.contains("activePeer"));
+        let deserialized: BgpSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.active_peer, Some("peer-1".to_string()));
+    }
+
+    #[test]
+    fn active_peer_defaults_to_none() {
+        let json = r#"{"enabled": true, "peers": []}"#;
+        let settings: BgpSettings = serde_json::from_str(json).unwrap();
+        assert_eq!(settings.active_peer, None);
     }
 }
