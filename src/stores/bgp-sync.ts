@@ -4,6 +4,7 @@ import {
   type BgpSettings,
   type RuleDiff,
   type DiscoveredPeer,
+  type SyncStatus,
 } from "../services/bgp-sync";
 
 interface BgpSyncStore {
@@ -12,6 +13,8 @@ interface BgpSyncStore {
   pullDiff: RuleDiff | null;
   pulling: boolean;
   discovering: boolean;
+  syncStatus: SyncStatus;
+  activePeer: string | null;
 
   fetchSettings: () => Promise<void>;
   setEnabled: (enabled: boolean) => Promise<void>;
@@ -21,6 +24,9 @@ interface BgpSyncStore {
   applyRules: () => Promise<void>;
   discoverPeers: () => Promise<void>;
   clearDiff: () => void;
+  startSync: (peerId: string) => Promise<void>;
+  stopSync: () => Promise<void>;
+  fetchSyncStatus: () => Promise<void>;
 }
 
 export const useBgpSyncStore = create<BgpSyncStore>((set, get) => ({
@@ -29,10 +35,12 @@ export const useBgpSyncStore = create<BgpSyncStore>((set, get) => ({
   pullDiff: null,
   pulling: false,
   discovering: false,
+  syncStatus: "disconnected" as SyncStatus,
+  activePeer: null as string | null,
 
   async fetchSettings() {
     const settings = await bgpSyncService.getSettings();
-    set({ settings });
+    set({ settings, activePeer: (settings as BgpSettings & { activePeer?: string }).activePeer ?? null });
   },
 
   async setEnabled(enabled) {
@@ -79,5 +87,20 @@ export const useBgpSyncStore = create<BgpSyncStore>((set, get) => ({
 
   clearDiff() {
     set({ pullDiff: null });
+  },
+
+  async startSync(peerId) {
+    await bgpSyncService.startSync(peerId);
+    set({ activePeer: peerId, syncStatus: "synced" });
+  },
+
+  async stopSync() {
+    await bgpSyncService.stopSync();
+    set({ activePeer: null, syncStatus: "disconnected" });
+  },
+
+  async fetchSyncStatus() {
+    const status = await bgpSyncService.getSyncStatus();
+    set({ syncStatus: status });
   },
 }));

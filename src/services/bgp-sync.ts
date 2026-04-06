@@ -34,9 +34,11 @@ export interface RuleDiff {
 
 export interface DiscoveredPeer {
   name: string;
-  hostname: string;
   address: string;
+  source: "mdns" | "tailscale";
 }
+
+export type SyncStatus = "disconnected" | "connecting" | "synced" | { reconnecting: { attempt: number } };
 
 export interface BgpSyncService {
   getSettings(): Promise<BgpSettings>;
@@ -46,6 +48,9 @@ export interface BgpSyncService {
   pullRules(peerId: string): Promise<RuleDiff>;
   applyRules(remoteRules: RuleDiff["remoteRules"]): Promise<void>;
   discoverPeers(): Promise<DiscoveredPeer[]>;
+  startSync(peerId: string): Promise<void>;
+  stopSync(): Promise<void>;
+  getSyncStatus(): Promise<SyncStatus>;
 }
 
 const mockBgpSyncService: BgpSyncService = {
@@ -75,6 +80,11 @@ const mockBgpSyncService: BgpSyncService = {
   async applyRules() {},
   async discoverPeers() {
     return [];
+  },
+  async startSync() {},
+  async stopSync() {},
+  async getSyncStatus() {
+    return "disconnected" as SyncStatus;
   },
 };
 
@@ -107,6 +117,18 @@ function createTauriBgpSyncService(): BgpSyncService {
     async discoverPeers() {
       const { invoke } = await import("@tauri-apps/api/core");
       return invoke<DiscoveredPeer[]>("bgp_discover_peers");
+    },
+    async startSync(peerId) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("bgp_start_sync", { peerId });
+    },
+    async stopSync() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("bgp_stop_sync");
+    },
+    async getSyncStatus() {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return invoke<SyncStatus>("bgp_sync_status");
     },
   };
 }
