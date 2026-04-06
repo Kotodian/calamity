@@ -12,10 +12,10 @@ const BGP_VERSION: u8 = 4;
 const BGP_ASN: u16 = 64512;
 const BGP_HOLD_TIME: u16 = 60;
 
-const MSG_OPEN: u8 = 1;
-const MSG_UPDATE: u8 = 2;
-const MSG_NOTIFICATION: u8 = 3;
-const MSG_KEEPALIVE: u8 = 4;
+pub const MSG_OPEN: u8 = 1;
+pub const MSG_UPDATE: u8 = 2;
+pub const MSG_NOTIFICATION: u8 = 3;
+pub const MSG_KEEPALIVE: u8 = 4;
 
 const CALAMITY_AFI: u16 = 99;
 const CALAMITY_SAFI: u8 = 1;
@@ -28,7 +28,7 @@ pub struct PullResult {
 }
 
 /// Build a BGP OPEN message.
-fn build_open(router_id: [u8; 4]) -> Vec<u8> {
+pub fn build_open(router_id: [u8; 4]) -> Vec<u8> {
     let cap_mp_reach: Vec<u8> = vec![
         2, 4,
         (CALAMITY_AFI >> 8) as u8, (CALAMITY_AFI & 0xff) as u8,
@@ -58,7 +58,7 @@ fn build_open(router_id: [u8; 4]) -> Vec<u8> {
 }
 
 /// Build a BGP KEEPALIVE message.
-fn build_keepalive() -> Vec<u8> {
+pub fn build_keepalive() -> Vec<u8> {
     let mut msg = Vec::with_capacity(19);
     msg.extend_from_slice(&BGP_MARKER);
     msg.extend_from_slice(&19u16.to_be_bytes());
@@ -67,7 +67,7 @@ fn build_keepalive() -> Vec<u8> {
 }
 
 /// Build a BGP UPDATE carrying Calamity rule entries via MP_REACH_NLRI (AFI=99/SAFI=1).
-fn build_update(entries: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
+pub fn build_update(entries: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
     let mut nlri_blob = Vec::new();
     for (key, payload) in entries {
         nlri_blob.extend_from_slice(&(key.len() as u16).to_be_bytes());
@@ -104,7 +104,7 @@ fn build_update(entries: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
 }
 
 /// Parse entries from a received UPDATE message body.
-fn parse_update_entries(update_body: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, String> {
+pub fn parse_update_entries(update_body: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, String> {
     if update_body.len() < 4 {
         return Err("UPDATE too short".to_string());
     }
@@ -203,7 +203,7 @@ fn parse_nlri_blob(data: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, String> {
 }
 
 /// Read one BGP message from stream. Returns (type, body).
-async fn read_message(stream: &mut TcpStream) -> Result<(u8, Vec<u8>), String> {
+pub async fn read_message(stream: &mut TcpStream) -> Result<(u8, Vec<u8>), String> {
     let mut header = [0u8; 19];
     stream.read_exact(&mut header).await.map_err(|e| format!("read header: {e}"))?;
 
@@ -357,6 +357,36 @@ pub async fn serve_rules(mut stream: TcpStream, local_router_id: [u8; 4]) -> Res
     }).await;
     let _ = stream.shutdown().await;
 
+    Ok(())
+}
+
+/// Perform client-side BGP handshake (send OPEN, receive OPEN, exchange KEEPALIVEs).
+pub async fn handshake_client(stream: &mut TcpStream, local_router_id: [u8; 4]) -> Result<(), String> {
+    stream.write_all(&build_open(local_router_id)).await.map_err(|e| format!("send OPEN: {e}"))?;
+    let (msg_type, _) = read_message(stream).await?;
+    if msg_type != MSG_OPEN {
+        return Err(format!("expected OPEN, got type {msg_type}"));
+    }
+    stream.write_all(&build_keepalive()).await.map_err(|e| format!("send KEEPALIVE: {e}"))?;
+    let (msg_type, _) = read_message(stream).await?;
+    if msg_type != MSG_KEEPALIVE {
+        return Err(format!("expected KEEPALIVE, got type {msg_type}"));
+    }
+    Ok(())
+}
+
+/// Perform server-side BGP handshake (receive OPEN, send OPEN + KEEPALIVE, receive KEEPALIVE).
+pub async fn handshake_server(stream: &mut TcpStream, local_router_id: [u8; 4]) -> Result<(), String> {
+    let (msg_type, _) = read_message(stream).await?;
+    if msg_type != MSG_OPEN {
+        return Err(format!("expected OPEN, got type {msg_type}"));
+    }
+    stream.write_all(&build_open(local_router_id)).await.map_err(|e| format!("send OPEN: {e}"))?;
+    stream.write_all(&build_keepalive()).await.map_err(|e| format!("send KEEPALIVE: {e}"))?;
+    let (msg_type, _) = read_message(stream).await?;
+    if msg_type != MSG_KEEPALIVE {
+        return Err(format!("expected KEEPALIVE, got type {msg_type}"));
+    }
     Ok(())
 }
 

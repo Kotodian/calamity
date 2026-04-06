@@ -26,3 +26,5 @@ serde_yaml = "0.9"
 tokio-util = "0.7"
 plist = "1"
 rustybgp-packet = { git = "https://github.com/osrg/rustybgp" }
+notify = { version = "7", default-features = false, features = ["macos_kqueue"] }
+mdns-sd = "0.11"
