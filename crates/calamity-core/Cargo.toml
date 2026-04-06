@@ -1,6 +1,6 @@
 [package]
 name = "calamity-core"
-version = "0.3.0-beta"
+version = "0.3.1-beta"
 edition = "2024"
 description = "Shared core library for Calamity proxy client"
 
