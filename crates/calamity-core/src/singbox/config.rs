@@ -13,6 +13,18 @@ fn dns_server_tag(s: &DnsServerConfig) -> &str {
     &s.name
 }
 
+/// Resolve a download_detour value to a valid outbound tag.
+fn resolve_detour(detour: &str, all_node_tags: &[String]) -> String {
+    match detour.to_lowercase().as_str() {
+        "direct" => "direct-out".to_string(),
+        "proxy" => all_node_tags
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "direct-out".to_string()),
+        _ => detour.to_string(),
+    }
+}
+
 /// Built-in inline rule-sets with hardcoded domain lists.
 fn builtin_inline_ruleset(name: &str) -> Option<Value> {
     match name {
@@ -440,15 +452,7 @@ fn build_route_rules(
                         });
 
                         if let Some(detour) = &rule.download_detour {
-                            let detour_tag = match detour.as_str() {
-                                "direct" => "direct-out".to_string(),
-                                "proxy" => all_node_tags
-                                    .first()
-                                    .cloned()
-                                    .unwrap_or_else(|| "direct-out".to_string()),
-                                other => other.to_string(),
-                            };
-                            rs["download_detour"] = json!(detour_tag);
+                            rs["download_detour"] = json!(resolve_detour(detour, all_node_tags));
                         }
 
                         rule_sets.push(rs);
@@ -484,15 +488,7 @@ fn build_route_rules(
                         });
 
                         if let Some(detour) = &rule.download_detour {
-                            let detour_tag = match detour.as_str() {
-                                "direct" => "direct-out".to_string(),
-                                "proxy" => all_node_tags
-                                    .first()
-                                    .cloned()
-                                    .unwrap_or_else(|| "direct-out".to_string()),
-                                other => other.to_string(),
-                            };
-                            rs["download_detour"] = json!(detour_tag);
+                            rs["download_detour"] = json!(resolve_detour(detour, all_node_tags));
                         }
 
                         rule_sets.push(rs);
