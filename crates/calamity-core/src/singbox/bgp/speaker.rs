@@ -25,7 +25,11 @@ impl BgpSpeaker {
         eprintln!("[bgp] speaker listening on {bind_addr}");
 
         // Register mDNS service for LAN discovery
-        let mdns = super::discovery::register_mdns("calamity", 17900).ok();
+        let sys_hostname = hostname::get()
+            .ok()
+            .and_then(|h| h.into_string().ok())
+            .unwrap_or_else(|| "calamity".to_string());
+        let mdns = super::discovery::register_mdns(&sys_hostname, 17900).ok();
 
         let mut rx = shutdown_rx;
         tokio::spawn(async move {

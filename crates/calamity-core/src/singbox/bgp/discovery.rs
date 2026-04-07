@@ -24,11 +24,24 @@ pub enum DiscoverySource {
 /// Returns the daemon handle; drop it to unregister.
 pub fn register_mdns(hostname: &str, port: u16) -> Result<mdns_sd::ServiceDaemon, String> {
     let mdns = mdns_sd::ServiceDaemon::new().map_err(|e| format!("mDNS daemon: {e}"))?;
+    // Collect all non-loopback IPv4 addresses for mDNS registration
+    let local_ips: Vec<std::net::IpAddr> = if_addrs::get_if_addrs()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|iface| {
+            if let std::net::IpAddr::V4(ip) = iface.ip() {
+                if !ip.is_loopback() { Some(std::net::IpAddr::V4(ip)) } else { None }
+            } else {
+                None
+            }
+        })
+        .collect();
+    let host_fqdn = &format!("{hostname}.local.");
     let service_info = mdns_sd::ServiceInfo::new(
         MDNS_SERVICE_TYPE,
         hostname,
-        hostname,
-        "",
+        host_fqdn,
+        local_ips.as_slice(),
         port,
         None::<std::collections::HashMap<String, String>>,
     )
