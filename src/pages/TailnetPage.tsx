@@ -133,16 +133,20 @@ export function TailnetPage() {
   async function handleSave() {
     if (!settings) return;
     const enabled = !!(oauthId && oauthSecret);
-    await saveSettings({
-      ...settings,
-      enabled,
-      oauthClientId: oauthId,
-      oauthClientSecret: oauthSecret,
-      authKey,
-      hostname,
-      tags: tags.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean),
-    });
-    toast.success(t("tailnet.saved"));
+    try {
+      await saveSettings({
+        ...settings,
+        enabled,
+        oauthClientId: oauthId,
+        oauthClientSecret: oauthSecret,
+        authKey,
+        hostname,
+        tags: tags.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean),
+      });
+      toast.success(t("tailnet.saved"));
+    } catch (e: any) {
+      toast.error(e?.message || String(e));
+    }
   }
 
   async function handleSetExitNode(name: string) {
