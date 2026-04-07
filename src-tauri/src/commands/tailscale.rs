@@ -23,15 +23,8 @@ pub async fn tailscale_save_settings(
         && !settings.oauth_client_id.is_empty()
         && !settings.oauth_client_secret.is_empty()
     {
-        match tailscale_api::create_auth_key(&mut settings).await {
-            Ok(key) => {
-                settings.auth_key = key;
-            }
-            Err(e) => {
-                eprintln!("[tailscale] auto-create auth key failed: {}", e);
-                // Continue without auth key — user can set one manually
-            }
-        }
+        let key = tailscale_api::create_auth_key(&mut settings).await?;
+        settings.auth_key = key;
     }
     // Fix root-owned tailscale state directory from previous TUN runs
     fix_tailscale_state_permissions();
