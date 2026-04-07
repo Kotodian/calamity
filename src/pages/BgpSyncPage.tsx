@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useBgpSyncStore } from "../stores/bgp-sync";
@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../components/ui/dialog";
-import { Plus, Trash2, Download, Search, Loader2, Square } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, Square, RefreshCw } from "lucide-react";
 
 function SyncStatusBadge({ status }: { status: SyncStatus }) {
   const { t } = useTranslation();
@@ -63,8 +63,6 @@ export function BgpSyncPage() {
   const {
     settings,
     discoveredPeers,
-    pullDiff,
-    pulling,
     discovering,
     syncStatus,
     activePeer,
@@ -72,10 +70,7 @@ export function BgpSyncPage() {
     setEnabled,
     addPeer,
     removePeer,
-    pullRules,
-    applyRules,
     discoverPeers,
-    clearDiff,
     startSync,
     stopSync,
     fetchSyncStatus,
@@ -84,18 +79,12 @@ export function BgpSyncPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [peerName, setPeerName] = useState("");
   const [peerAddress, setPeerAddress] = useState("");
-  const [diffDialogOpen, setDiffDialogOpen] = useState(false);
   const [discoverDialogOpen, setDiscoverDialogOpen] = useState(false);
   const [enableLoading, setEnableLoading] = useState(false);
-  const [syncTargetPeerId, setSyncTargetPeerId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
-
-  useEffect(() => {
-    if (pullDiff) setDiffDialogOpen(true);
-  }, [pullDiff]);
 
   // Poll sync status while activePeer is set
   useEffect(() => {
@@ -125,29 +114,6 @@ export function BgpSyncPage() {
     setAddDialogOpen(false);
   }
 
-  async function handlePull(peerId: string) {
-    setSyncTargetPeerId(peerId);
-    try {
-      await pullRules(peerId);
-    } catch (e) {
-      toast.error(String(e));
-      setSyncTargetPeerId(null);
-    }
-  }
-
-  const handleApplyAndSync = useCallback(async () => {
-    try {
-      await applyRules();
-      if (syncTargetPeerId) {
-        await startSync(syncTargetPeerId);
-      }
-      setDiffDialogOpen(false);
-      setSyncTargetPeerId(null);
-    } catch (e) {
-      toast.error(String(e));
-    }
-  }, [applyRules, startSync, syncTargetPeerId]);
-
   async function handleStopSync() {
     try {
       await stopSync();
@@ -169,13 +135,6 @@ export function BgpSyncPage() {
     await addPeer(name, address);
     setDiscoverDialogOpen(false);
   }
-
-  const totalChanges = pullDiff
-    ? pullDiff.added.length +
-      pullDiff.removed.length +
-      pullDiff.modified.length +
-      (pullDiff.finalOutboundChanged ? 1 : 0)
-    : 0;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -242,7 +201,7 @@ export function BgpSyncPage() {
                       }}
                       disabled={!!activePeer}
                     >
-                      <Download className="mr-1 h-4 w-4" />
+                      <RefreshCw className="mr-1 h-4 w-4" />
                       {t("bgpSync.sync")}
                     </Button>
                   )}
@@ -287,71 +246,6 @@ export function BgpSyncPage() {
               {t("common.actions.cancel")}
             </Button>
             <Button onClick={handleAddPeer}>{t("common.actions.confirm")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diff Preview Dialog */}
-      <Dialog
-        open={diffDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) { setDiffDialogOpen(false); clearDiff(); setSyncTargetPeerId(null); }
-        }}
-      >
-        <DialogContent className="border-white/[0.06] bg-card/90 backdrop-blur-2xl max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{t("bgpSync.diffTitle")}</DialogTitle>
-          </DialogHeader>
-          {pullDiff && totalChanges === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("bgpSync.diffEmpty")}</p>
-          ) : pullDiff ? (
-            <div className="flex flex-col gap-3 max-h-80 overflow-y-auto">
-              {pullDiff.added.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-green-400">
-                    + {t("bgpSync.diffAdded")} ({pullDiff.added.length})
-                  </p>
-                  {pullDiff.added.map((r) => (
-                    <p key={r.id} className="text-xs text-muted-foreground ml-4">{r.name}</p>
-                  ))}
-                </div>
-              )}
-              {pullDiff.removed.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-red-400">
-                    - {t("bgpSync.diffRemoved")} ({pullDiff.removed.length})
-                  </p>
-                  {pullDiff.removed.map((r) => (
-                    <p key={r.id} className="text-xs text-muted-foreground ml-4">{r.name}</p>
-                  ))}
-                </div>
-              )}
-              {pullDiff.modified.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-yellow-400">
-                    ~ {t("bgpSync.diffModified")} ({pullDiff.modified.length})
-                  </p>
-                  {pullDiff.modified.map((entry) => (
-                    <p key={entry.remote.id} className="text-xs text-muted-foreground ml-4">
-                      {entry.remote.name}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {pullDiff.finalOutboundChanged && (
-                <p className="text-sm text-yellow-400">
-                  {t("bgpSync.diffFinalOutbound", { outbound: pullDiff.newFinalOutbound })}
-                </p>
-              )}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setDiffDialogOpen(false); clearDiff(); setSyncTargetPeerId(null); }}>
-              {t("common.actions.cancel")}
-            </Button>
-            {totalChanges > 0 && (
-              <Button onClick={handleApplyAndSync}>{t("bgpSync.applyAndSync")}</Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

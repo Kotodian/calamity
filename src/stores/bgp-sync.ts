@@ -2,7 +2,6 @@ import { create } from "zustand";
 import {
   bgpSyncService,
   type BgpSettings,
-  type RuleDiff,
   type DiscoveredPeer,
   type SyncStatus,
 } from "../services/bgp-sync";
@@ -10,8 +9,6 @@ import {
 interface BgpSyncStore {
   settings: BgpSettings;
   discoveredPeers: DiscoveredPeer[];
-  pullDiff: RuleDiff | null;
-  pulling: boolean;
   discovering: boolean;
   syncStatus: SyncStatus;
   activePeer: string | null;
@@ -20,10 +17,7 @@ interface BgpSyncStore {
   setEnabled: (enabled: boolean) => Promise<void>;
   addPeer: (name: string, address: string) => Promise<void>;
   removePeer: (id: string) => Promise<void>;
-  pullRules: (peerId: string) => Promise<void>;
-  applyRules: () => Promise<void>;
   discoverPeers: () => Promise<void>;
-  clearDiff: () => void;
   startSync: (peerId: string) => Promise<void>;
   stopSync: () => Promise<void>;
   fetchSyncStatus: () => Promise<void>;
@@ -32,8 +26,6 @@ interface BgpSyncStore {
 export const useBgpSyncStore = create<BgpSyncStore>((set, get) => ({
   settings: { enabled: false, peers: [] },
   discoveredPeers: [],
-  pullDiff: null,
-  pulling: false,
   discovering: false,
   syncStatus: "disconnected" as SyncStatus,
   activePeer: null as string | null,
@@ -58,23 +50,6 @@ export const useBgpSyncStore = create<BgpSyncStore>((set, get) => ({
     set({ settings });
   },
 
-  async pullRules(peerId) {
-    set({ pulling: true, pullDiff: null });
-    try {
-      const diff = await bgpSyncService.pullRules(peerId);
-      set({ pullDiff: diff });
-    } finally {
-      set({ pulling: false });
-    }
-  },
-
-  async applyRules() {
-    const diff = get().pullDiff;
-    if (!diff) return;
-    await bgpSyncService.applyRules(diff.remoteRules);
-    set({ pullDiff: null });
-  },
-
   async discoverPeers() {
     set({ discovering: true });
     try {
@@ -83,10 +58,6 @@ export const useBgpSyncStore = create<BgpSyncStore>((set, get) => ({
     } finally {
       set({ discovering: false });
     }
-  },
-
-  clearDiff() {
-    set({ pullDiff: null });
   },
 
   async startSync(peerId) {

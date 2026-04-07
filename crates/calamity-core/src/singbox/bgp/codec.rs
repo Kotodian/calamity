@@ -21,6 +21,8 @@ const DNS_SERVER_MARKER: &[u8] = b"__DNSS__";
 const DNS_RULE_MARKER: &[u8] = b"__DNSR__";
 const DNS_META_MARKER: &[u8] = b"__DNSM__";
 const NODE_MARKER: &[u8] = b"__NODE__";
+/// Marker used for withdrawal entries in incremental updates.
+pub const WITHDRAW_MARKER: &[u8] = b"__WDRW__";
 
 // TLV field types for DNS server encoding
 const FIELD_DNS_NAME: u8 = 30;
@@ -359,12 +361,18 @@ pub fn decode_metadata(data: &[u8]) -> Result<(String, Option<String>, u64), Str
     Ok((final_outbound, final_outbound_node, update_interval))
 }
 
-/// Sync payload: rules + DNS + nodes.
+/// Encode a withdrawal entry: returns (WITHDRAW_MARKER, key) pair.
+pub fn encode_withdrawal(key: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    (WITHDRAW_MARKER.to_vec(), key.to_vec())
+}
+
+/// Sync payload: rules + DNS + nodes + withdrawn keys.
 #[derive(Debug, Clone)]
 pub struct SyncData {
     pub rules: RulesData,
     pub dns: Option<DnsSettings>,
     pub node_uris: Vec<String>,
+    pub withdrawn_keys: Vec<Vec<u8>>,
 }
 
 /// Encode rules, DNS, and node URIs into (key, payload) pairs.
@@ -421,9 +429,12 @@ pub fn decode_sync_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<SyncData, Stri
     let mut dns_rules = Vec::new();
     let mut has_dns = false;
     let mut node_uris = Vec::new();
+    let mut withdrawn_keys = Vec::new();
 
     for (key, payload) in entries {
-        if key == METADATA_MARKER {
+        if key == WITHDRAW_MARKER {
+            withdrawn_keys.push(payload.clone());
+        } else if key == METADATA_MARKER {
             let (fo, fon, ui) = decode_metadata(payload)?;
             final_outbound = fo;
             final_outbound_node = fon;
@@ -470,6 +481,7 @@ pub fn decode_sync_data(entries: &[(Vec<u8>, Vec<u8>)]) -> Result<SyncData, Stri
         },
         dns,
         node_uris,
+        withdrawn_keys,
     })
 }
 

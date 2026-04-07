@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
@@ -82,6 +82,13 @@ fn rand_jitter() -> u64 {
     (nanos % 1000) as u64
 }
 
+/// Metadata marker keys that should always be sent and never treated as withdrawals.
+const METADATA_KEYS: &[&[u8]] = &[b"__META__", b"__DNSM__"];
+
+fn is_metadata_key(key: &[u8]) -> bool {
+    METADATA_KEYS.iter().any(|m| *m == key)
+}
+
 /// Collect current local sync data for pushing to peer.
 pub fn collect_local_data() -> Vec<(Vec<u8>, Vec<u8>)> {
     let rules_data = rules_storage::load_rules();
@@ -100,33 +107,170 @@ pub fn collect_local_data() -> Vec<(Vec<u8>, Vec<u8>)> {
     codec::encode_sync_data(&syncable, Some(&dns_data), &node_uris)
 }
 
-/// Merge remote sync data into local storage using union semantics.
-/// - Rules/DNS servers/DNS rules/nodes that only remote has -> add to local
-/// - Same name -> keep local version
-/// - Rules in `prev_remote_names` that are NOT in current remote -> remove from local (WITHDRAW)
-/// Returns updated set of remote rule names for next comparison.
-fn merge_remote_data(data: &SyncData, prev_remote_rule_names: &HashSet<String>) -> HashSet<String> {
-    // --- Merge route rules ---
-    let mut local_rules = rules_storage::load_rules();
-    let local_rule_names: HashSet<String> =
-        local_rules.rules.iter().map(|r| r.name.clone()).collect();
-    let remote_rule_names: HashSet<String> =
-        data.rules.rules.iter().map(|r| r.name.clone()).collect();
+/// Compute incremental update between previous and current entry sets.
+/// Returns only changed/new entries plus withdrawal markers for removed keys.
+/// Metadata entries (__META__, __DNSM__) are always included.
+/// Returns empty vec if nothing changed.
+pub fn compute_incremental_update(
+    prev: &[(Vec<u8>, Vec<u8>)],
+    current: &[(Vec<u8>, Vec<u8>)],
+) -> Vec<(Vec<u8>, Vec<u8>)> {
+    let prev_map: HashMap<&[u8], &[u8]> = prev.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
+    let current_map: HashMap<&[u8], &[u8]> = current.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
 
-    // Add rules that remote has but local doesn't
-    for rule in &data.rules.rules {
-        if !local_rule_names.contains(&rule.name) {
-            local_rules.rules.push(rule.clone());
+    let mut incremental = Vec::new();
+
+    // Always include metadata entries from current
+    for (key, payload) in current {
+        if is_metadata_key(key) {
+            incremental.push((key.clone(), payload.clone()));
         }
     }
 
-    // Withdraw: rules that were previously from remote but are now gone
-    let withdrawn: HashSet<&String> = prev_remote_rule_names
-        .difference(&remote_rule_names)
-        .collect();
-    if !withdrawn.is_empty() {
-        local_rules.rules.retain(|r| !withdrawn.contains(&r.name));
-        eprintln!("[bgp-sync] withdrew {} rules", withdrawn.len());
+    // Additions and modifications (skip metadata, already added)
+    for (key, payload) in current {
+        if is_metadata_key(key) {
+            continue;
+        }
+        match prev_map.get(key.as_slice()) {
+            None => {
+                // New entry
+                incremental.push((key.clone(), payload.clone()));
+            }
+            Some(old_payload) => {
+                if *old_payload != payload.as_slice() {
+                    // Modified entry
+                    incremental.push((key.clone(), payload.clone()));
+                }
+            }
+        }
+    }
+
+    // Withdrawals: keys in prev but not in current (skip metadata)
+    for (key, _) in prev {
+        if is_metadata_key(key) {
+            continue;
+        }
+        if !current_map.contains_key(key.as_slice()) {
+            incremental.push(codec::encode_withdrawal(key));
+        }
+    }
+
+    // Check if anything actually changed beyond metadata
+    let non_metadata_count = incremental.iter().filter(|(k, _)| !is_metadata_key(k)).count();
+    if non_metadata_count == 0 {
+        // Check if metadata itself changed
+        let metadata_changed = incremental.iter().any(|(k, v)| {
+            if is_metadata_key(k) {
+                prev_map.get(k.as_slice()).map_or(true, |old| *old != v.as_slice())
+            } else {
+                false
+            }
+        });
+        if !metadata_changed {
+            return Vec::new();
+        }
+    }
+
+    incremental
+}
+
+/// Merge remote sync data into local storage using union semantics.
+/// - For withdrawn keys: remove matching rules/DNS/nodes from local storage
+/// - For additions: add entries that only remote has (same name -> keep local)
+fn merge_remote_data(data: &SyncData) {
+    // --- Process withdrawals ---
+    if !data.withdrawn_keys.is_empty() {
+        let mut local_rules = rules_storage::load_rules();
+        let mut local_dns = dns_storage::load_dns_settings();
+        let mut local_nodes = nodes_storage::load_nodes();
+        let mut rules_changed = false;
+        let mut dns_changed = false;
+        let mut nodes_changed = false;
+
+        for wkey in &data.withdrawn_keys {
+            let key_str = String::from_utf8_lossy(wkey);
+
+            // Check if it's a DNS server marker key
+            if wkey.as_slice() == b"__DNSS__" {
+                // DNS server withdrawals are handled via the payload, skip marker
+                continue;
+            }
+            // Check if it's a DNS rule marker key
+            if wkey.as_slice() == b"__DNSR__" {
+                continue;
+            }
+            // Check if it's a node marker key
+            if wkey.as_slice() == b"__NODE__" {
+                continue;
+            }
+
+            // Try as rule ID
+            let before_len = local_rules.rules.len();
+            local_rules.rules.retain(|r| r.id != key_str.as_ref());
+            if local_rules.rules.len() < before_len {
+                rules_changed = true;
+                continue;
+            }
+
+            // Try as DNS server name
+            let before_dns_servers = local_dns.servers.len();
+            local_dns.servers.retain(|s| s.name != key_str.as_ref());
+            if local_dns.servers.len() < before_dns_servers {
+                dns_changed = true;
+                continue;
+            }
+
+            // Try as DNS rule key (match_type:match_value)
+            let before_dns_rules = local_dns.rules.len();
+            local_dns.rules.retain(|r| {
+                format!("{}:{}", r.match_type, r.match_value) != key_str.as_ref()
+            });
+            if local_dns.rules.len() < before_dns_rules {
+                dns_changed = true;
+                continue;
+            }
+
+            // Try as node URI
+            for group in &mut local_nodes.groups {
+                let before_nodes = group.nodes.len();
+                group.nodes.retain(|n| {
+                    node_to_uri(n).map_or(true, |uri| {
+                        let full = format!("{}\t{}", group.name, uri);
+                        full != key_str.as_ref()
+                    })
+                });
+                if group.nodes.len() < before_nodes {
+                    nodes_changed = true;
+                }
+            }
+        }
+
+        if rules_changed {
+            let _ = rules_storage::save_rules(&local_rules);
+            eprintln!("[bgp-sync] withdrew rules via explicit withdrawal");
+        }
+        if dns_changed {
+            let _ = dns_storage::save_dns_settings(&local_dns);
+            eprintln!("[bgp-sync] withdrew DNS entries via explicit withdrawal");
+        }
+        if nodes_changed {
+            let _ = nodes_storage::save_nodes(&local_nodes);
+            eprintln!("[bgp-sync] withdrew nodes via explicit withdrawal");
+        }
+    }
+
+    // --- Merge route rules (additions) ---
+    let mut local_rules = rules_storage::load_rules();
+    let local_rule_names: HashSet<String> =
+        local_rules.rules.iter().map(|r| r.name.clone()).collect();
+
+    let mut rules_added = false;
+    for rule in &data.rules.rules {
+        if !local_rule_names.contains(&rule.name) {
+            local_rules.rules.push(rule.clone());
+            rules_added = true;
+        }
     }
 
     // Merge metadata (final_outbound) -- keep local unless local is default
@@ -135,7 +279,9 @@ fn merge_remote_data(data: &SyncData, prev_remote_rule_names: &HashSet<String>) 
         local_rules.final_outbound_node = data.rules.final_outbound_node.clone();
     }
 
-    let _ = rules_storage::save_rules(&local_rules);
+    if rules_added {
+        let _ = rules_storage::save_rules(&local_rules);
+    }
 
     // --- Merge DNS ---
     if let Some(ref remote_dns) = data.dns {
@@ -188,8 +334,6 @@ fn merge_remote_data(data: &SyncData, prev_remote_rule_names: &HashSet<String>) 
         }
         let _ = nodes_storage::save_nodes(&nodes_data);
     }
-
-    remote_rule_names
 }
 
 /// Set up a file watcher on the data directory.
@@ -300,17 +444,17 @@ async fn connect_and_sync(
     fsm::handshake_client(&mut stream, local_router_id).await?;
     eprintln!("[bgp-sync] session established with {peer_addr}");
 
-    // Send our data first
+    // Send our data first (full initial sync)
     let local_entries = collect_local_data();
     stream
         .write_all(&fsm::build_update(&local_entries))
         .await
         .map_err(|e| format!("send initial UPDATE: {e}"))?;
 
-    *status.lock().await = SyncStatus::Synced;
+    // Track last sent for incremental updates
+    let mut last_sent = local_entries;
 
-    // Track remote rule names for WITHDRAW detection
-    let mut prev_remote_rule_names: HashSet<String> = HashSet::new();
+    *status.lock().await = SyncStatus::Synced;
 
     // File watcher for local changes
     let (file_tx, mut file_rx) = mpsc::channel::<()>(1);
@@ -338,12 +482,13 @@ async fn connect_and_sync(
                         if !entries.is_empty() {
                             let sync_data = codec::decode_sync_data(&entries)?;
                             eprintln!(
-                                "[bgp-sync] received {} rules, {} DNS servers, {} nodes",
+                                "[bgp-sync] received {} rules, {} DNS servers, {} nodes, {} withdrawals",
                                 sync_data.rules.rules.len(),
                                 sync_data.dns.as_ref().map_or(0, |d| d.servers.len()),
-                                sync_data.node_uris.len()
+                                sync_data.node_uris.len(),
+                                sync_data.withdrawn_keys.len()
                             );
-                            prev_remote_rule_names = merge_remote_data(&sync_data, &prev_remote_rule_names);
+                            merge_remote_data(&sync_data);
                             on_sync_applied();
                         }
                     }
@@ -362,10 +507,14 @@ async fn connect_and_sync(
                 tokio::time::sleep(Duration::from_millis(500)).await;
                 while file_rx.try_recv().is_ok() {}
 
-                let entries = collect_local_data();
-                stream.write_all(&fsm::build_update(&entries)).await
-                    .map_err(|e| format!("send UPDATE: {e}"))?;
-                eprintln!("[bgp-sync] pushed local changes to {peer_addr}");
+                let current = collect_local_data();
+                let incremental = compute_incremental_update(&last_sent, &current);
+                if !incremental.is_empty() {
+                    stream.write_all(&fsm::build_update(&incremental)).await
+                        .map_err(|e| format!("send UPDATE: {e}"))?;
+                    eprintln!("[bgp-sync] pushed incremental update ({} entries) to {peer_addr}", incremental.len());
+                }
+                last_sent = current;
             }
             _ = keepalive_timer.tick() => {
                 stream.write_all(&fsm::build_keepalive()).await
@@ -392,5 +541,71 @@ mod tests {
     fn backoff_caps_at_60s() {
         let d = backoff_duration(20);
         assert!(d <= Duration::from_secs(60));
+    }
+
+    #[test]
+    fn incremental_no_changes() {
+        let entries = vec![
+            (b"__META__".to_vec(), b"payload".to_vec()),
+            (b"rule1".to_vec(), b"data1".to_vec()),
+        ];
+        let result = compute_incremental_update(&entries, &entries);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn incremental_detects_addition() {
+        let prev = vec![
+            (b"__META__".to_vec(), b"meta".to_vec()),
+            (b"rule1".to_vec(), b"data1".to_vec()),
+        ];
+        let current = vec![
+            (b"__META__".to_vec(), b"meta".to_vec()),
+            (b"rule1".to_vec(), b"data1".to_vec()),
+            (b"rule2".to_vec(), b"data2".to_vec()),
+        ];
+        let result = compute_incremental_update(&prev, &current);
+        assert!(!result.is_empty());
+        // Should contain metadata + the new rule
+        let non_meta: Vec<_> = result.iter().filter(|(k, _)| !is_metadata_key(k)).collect();
+        assert_eq!(non_meta.len(), 1);
+        assert_eq!(non_meta[0].0, b"rule2");
+    }
+
+    #[test]
+    fn incremental_detects_removal() {
+        let prev = vec![
+            (b"__META__".to_vec(), b"meta".to_vec()),
+            (b"rule1".to_vec(), b"data1".to_vec()),
+            (b"rule2".to_vec(), b"data2".to_vec()),
+        ];
+        let current = vec![
+            (b"__META__".to_vec(), b"meta".to_vec()),
+            (b"rule1".to_vec(), b"data1".to_vec()),
+        ];
+        let result = compute_incremental_update(&prev, &current);
+        assert!(!result.is_empty());
+        // Should contain withdrawal for rule2
+        let withdrawals: Vec<_> = result.iter().filter(|(k, _)| k == codec::WITHDRAW_MARKER).collect();
+        assert_eq!(withdrawals.len(), 1);
+        assert_eq!(withdrawals[0].1, b"rule2");
+    }
+
+    #[test]
+    fn incremental_detects_modification() {
+        let prev = vec![
+            (b"__META__".to_vec(), b"meta".to_vec()),
+            (b"rule1".to_vec(), b"data1".to_vec()),
+        ];
+        let current = vec![
+            (b"__META__".to_vec(), b"meta".to_vec()),
+            (b"rule1".to_vec(), b"data1_modified".to_vec()),
+        ];
+        let result = compute_incremental_update(&prev, &current);
+        assert!(!result.is_empty());
+        let non_meta: Vec<_> = result.iter().filter(|(k, _)| !is_metadata_key(k)).collect();
+        assert_eq!(non_meta.len(), 1);
+        assert_eq!(non_meta[0].0, b"rule1");
+        assert_eq!(non_meta[0].1, b"data1_modified");
     }
 }

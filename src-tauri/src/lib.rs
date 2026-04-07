@@ -261,8 +261,6 @@ pub fn run() {
             commands::bgp_sync::bgp_set_enabled,
             commands::bgp_sync::bgp_add_peer,
             commands::bgp_sync::bgp_remove_peer,
-            commands::bgp_sync::bgp_pull_rules,
-            commands::bgp_sync::bgp_apply_rules,
             commands::bgp_sync::bgp_discover_peers,
             commands::bgp_sync::bgp_start_sync,
             commands::bgp_sync::bgp_stop_sync,
