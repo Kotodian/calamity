@@ -233,15 +233,17 @@ export function BgpSyncPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handlePull(peer.id)}
-                      disabled={pulling || !!activePeer}
+                      onClick={async () => {
+                        try {
+                          await startSync(peer.id);
+                        } catch (e: any) {
+                          toast.error(e?.message || String(e));
+                        }
+                      }}
+                      disabled={!!activePeer}
                     >
-                      {pulling && syncTargetPeerId === peer.id ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="mr-1 h-4 w-4" />
-                      )}
-                      {pulling && syncTargetPeerId === peer.id ? t("bgpSync.pulling") : t("bgpSync.sync")}
+                      <Download className="mr-1 h-4 w-4" />
+                      {t("bgpSync.sync")}
                     </Button>
                   )}
                   <Button variant="ghost" size="sm" onClick={() => removePeer(peer.id)} disabled={isSyncing}>
