@@ -97,7 +97,7 @@ pub async fn discover_tailscale() -> Vec<DiscoveredPeer> {
     use crate::singbox::tailscale_storage;
 
     let mut ts_settings = tailscale_storage::load_tailscale_settings();
-    let devices = match tailscale_api::fetch_devices(&mut ts_settings).await {
+    let devices = match tailscale_api::fetch_all_devices(&mut ts_settings).await {
         Ok(d) => d,
         Err(e) => {
             eprintln!("[bgp-discovery] Tailscale API failed: {e}");

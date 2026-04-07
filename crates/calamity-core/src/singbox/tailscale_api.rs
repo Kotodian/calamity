@@ -252,6 +252,47 @@ pub async fn fetch_devices(
     Ok(devices)
 }
 
+/// Fetch all devices without filtering self. Used by BGP discovery which filters by IP instead.
+pub async fn fetch_all_devices(
+    settings: &mut TailscaleSettings,
+) -> Result<Vec<TailscaleDevice>, String> {
+    let token = get_oauth_token(settings).await?;
+    let tailnet = if settings.tailnet.is_empty() {
+        "-"
+    } else {
+        &settings.tailnet
+    };
+
+    let url = format!(
+        "https://api.tailscale.com/api/v2/tailnet/{}/devices",
+        tailnet
+    );
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| format!("Tailscale API request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("Tailscale API error {}: {}", status, body));
+    }
+
+    let api_resp: ApiDevicesResponse = resp
+        .json()
+        .await
+        .map_err(|e| format!("Tailscale API parse error: {}", e))?;
+
+    Ok(api_resp
+        .devices
+        .into_iter()
+        .map(|d| map_api_device(d, &settings.hostname))
+        .collect())
+}
+
 /// Get the Tailscale IP of the current device via OAuth API.
 pub async fn get_self_ip(settings: &mut TailscaleSettings) -> Option<std::net::Ipv4Addr> {
     let token = get_oauth_token(settings).await.ok()?;
