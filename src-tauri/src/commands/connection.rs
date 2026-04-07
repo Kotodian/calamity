@@ -96,14 +96,12 @@ pub async fn singbox_start(app: AppHandle) -> Result<(), String> {
     // Auto-start BGP speaker if enabled
     let bgp_settings = crate::singbox::bgp::storage::load_bgp_settings();
     if bgp_settings.enabled {
-        if let Some(ip) = calamity_core::platform::get_tailscale_ip() {
-            match crate::singbox::bgp::speaker::BgpSpeaker::start(ip, None).await {
-                Ok(speaker) => {
-                    app.manage(std::sync::Arc::new(tokio::sync::Mutex::new(Some(speaker))));
-                    eprintln!("[bgp] speaker started on {ip}:17900");
-                }
-                Err(e) => eprintln!("[bgp] failed to start speaker: {e}"),
+        match crate::singbox::bgp::speaker::BgpSpeaker::start(None).await {
+            Ok(speaker) => {
+                app.manage(std::sync::Arc::new(tokio::sync::Mutex::new(Some(speaker))));
+                eprintln!("[bgp] speaker started on 0.0.0.0:17900");
             }
+            Err(e) => eprintln!("[bgp] failed to start speaker: {e}"),
         }
     }
 

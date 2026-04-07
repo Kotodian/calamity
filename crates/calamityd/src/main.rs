@@ -45,22 +45,17 @@ async fn main() {
         }
     }
 
-    // Start BGP speaker if Tailscale is available
+    // Start BGP speaker if enabled
     let bgp_speaker = if bgp_storage::load_bgp_settings().enabled {
-        if let Some(ip) = calamity_core::platform::get_tailscale_ip() {
-            match speaker::BgpSpeaker::start(ip, None).await {
-                Ok(s) => {
-                    eprintln!("[calamityd] BGP speaker started on {ip}");
-                    Some(s)
-                }
-                Err(e) => {
-                    eprintln!("[calamityd] BGP speaker failed: {e}");
-                    None
-                }
+        match speaker::BgpSpeaker::start(None).await {
+            Ok(s) => {
+                eprintln!("[calamityd] BGP speaker started on 0.0.0.0:17900");
+                Some(s)
             }
-        } else {
-            eprintln!("[calamityd] Tailscale not detected, BGP disabled");
-            None
+            Err(e) => {
+                eprintln!("[calamityd] BGP speaker failed: {e}");
+                None
+            }
         }
     } else {
         None
@@ -77,8 +72,8 @@ async fn main() {
         let bgp_settings = bgp_storage::load_bgp_settings();
         if let Some(ref active_peer_id) = bgp_settings.active_peer {
             if let Some(peer) = bgp_settings.peers.iter().find(|p| p.id == *active_peer_id || p.name == *active_peer_id) {
-                if let Some(local_ip) = calamity_core::platform::get_tailscale_ip() {
-                    let peer_addr = peer.address.clone();
+                let peer_addr = peer.address.clone();
+                    let router_id = speaker::get_router_id();
                     let reload_state = state.clone();
                     let on_applied: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || {
                         let st = reload_state.clone();
@@ -88,7 +83,7 @@ async fn main() {
                             let _ = s.process.reload(&settings).await;
                         });
                     });
-                    match SyncSession::start(peer_addr, local_ip.octets(), on_applied).await {
+                    match SyncSession::start(peer_addr, router_id, on_applied).await {
                         Ok(session) => {
                             eprintln!("[calamityd] auto-started sync with peer {active_peer_id}");
                             state.lock().await.sync_session = Some(session);
@@ -97,7 +92,6 @@ async fn main() {
                             eprintln!("[calamityd] failed to auto-start sync: {e}");
                         }
                     }
-                }
             }
         }
     }
@@ -606,11 +600,8 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 subscription_fetch::parse_v2ray_uri,
             };
 
-            let local_ip = match calamity_core::platform::get_tailscale_ip() {
-                Some(ip) => ip,
-                None => return Response::Error("Tailscale IP not found".to_string()),
-            };
-            let result = match fsm::pull_rules(&peer_addr, local_ip.octets()).await {
+            let router_id = speaker::get_router_id();
+            let result = match fsm::pull_rules(&peer_addr, router_id).await {
                 Ok(r) => r,
                 Err(e) => return Response::Error(e),
             };
@@ -686,10 +677,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                 Some(p) => p.clone(),
                 None => return Response::Error(format!("peer '{peer_id}' not found")),
             };
-            let local_ip = match calamity_core::platform::get_tailscale_ip() {
-                Some(ip) => ip,
-                None => return Response::Error("Tailscale IP not found".to_string()),
-            };
+            let router_id = speaker::get_router_id();
             let reload_state = state.clone();
             let on_applied: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || {
                 let st = reload_state.clone();
@@ -699,7 +687,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                     let _ = s.process.reload(&settings).await;
                 });
             });
-            match SyncSession::start(peer.address.clone(), local_ip.octets(), on_applied).await {
+            match SyncSession::start(peer.address.clone(), router_id, on_applied).await {
                 Ok(session) => {
                     let mut s = state.lock().await;
                     // Stop previous session if any

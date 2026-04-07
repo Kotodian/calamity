@@ -12,11 +12,10 @@ pub struct BgpSpeaker {
 
 impl BgpSpeaker {
     pub async fn start(
-        tailscale_ip: Ipv4Addr,
         on_remote_update: Option<sync_session::OnSyncApplied>,
     ) -> Result<Self, String> {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let router_id = tailscale_ip.octets();
+        let router_id = get_router_id();
         let bind_addr = "0.0.0.0:17900".to_string();
 
         let listener = TcpListener::bind(&bind_addr)
@@ -134,4 +133,19 @@ async fn handle_incoming(
 /// Find local Tailscale IP (100.64-127.x.x.x CGNAT range).
 pub fn get_tailscale_ip() -> Option<Ipv4Addr> {
     crate::platform::get_tailscale_ip()
+}
+
+/// Get a router ID for BGP. Prefer Tailscale IP, fall back to any interface IP.
+pub fn get_router_id() -> [u8; 4] {
+    if let Some(ip) = get_tailscale_ip() {
+        return ip.octets();
+    }
+    for iface in if_addrs::get_if_addrs().unwrap_or_default() {
+        if let std::net::IpAddr::V4(ip) = iface.ip() {
+            if !ip.is_loopback() {
+                return ip.octets();
+            }
+        }
+    }
+    [10, 0, 0, 1]
 }

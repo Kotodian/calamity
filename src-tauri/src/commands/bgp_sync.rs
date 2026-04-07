@@ -90,12 +90,8 @@ pub async fn bgp_set_enabled(app: AppHandle, enabled: bool) -> Result<(), String
     storage::save_bgp_settings(&settings)?;
 
     if enabled {
-        if let Some(ip) = speaker::get_tailscale_ip() {
-            let bgp_speaker = speaker::BgpSpeaker::start(ip, None).await?;
-            app.manage(Arc::new(tokio::sync::Mutex::new(Some(bgp_speaker))));
-        } else {
-            return Err("Tailscale IP not found. Is Tailscale connected?".to_string());
-        }
+        let bgp_speaker = speaker::BgpSpeaker::start(None).await?;
+        app.manage(Arc::new(tokio::sync::Mutex::new(Some(bgp_speaker))));
     } else {
         if let Some(speaker_state) = app.try_state::<Arc<tokio::sync::Mutex<Option<speaker::BgpSpeaker>>>>() {
             let mut guard = speaker_state.lock().await;
@@ -139,8 +135,8 @@ pub async fn bgp_pull_rules(peer_id: String) -> Result<RuleDiff, String> {
         .find(|p| p.id == peer_id)
         .ok_or_else(|| format!("peer {peer_id} not found"))?;
 
-    let local_ip = speaker::get_tailscale_ip().ok_or("Tailscale IP not found")?;
-    let result = fsm::pull_rules(&peer.address, local_ip.octets()).await?;
+    let router_id = speaker::get_router_id();
+    let result = fsm::pull_rules(&peer.address, router_id).await?;
 
     let local_rules = rules_storage::load_rules();
     let diff = compute_diff(&local_rules, &result.remote_rules);
@@ -187,8 +183,7 @@ pub async fn bgp_start_sync(app: AppHandle, peer_id: String) -> Result<(), Strin
         .ok_or_else(|| format!("peer {peer_id} not found"))?
         .clone();
 
-    let local_ip = speaker::get_tailscale_ip().ok_or("Tailscale IP not found")?;
-    let router_id = local_ip.octets();
+    let router_id = speaker::get_router_id();
 
     let app_handle = app.clone();
     let on_applied: sync_session::OnSyncApplied = Arc::new(move || {
