@@ -38,7 +38,10 @@ fn default_accept_routes() -> bool {
 }
 
 fn default_hostname() -> String {
-    "calamity".to_string()
+    hostname::get()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .unwrap_or_else(|| "calamity".to_string())
 }
 
 impl Default for TailscaleSettings {
@@ -76,7 +79,7 @@ mod tests {
     fn default_settings_have_expected_values() {
         let settings = TailscaleSettings::default();
         assert!(!settings.enabled);
-        assert_eq!(settings.hostname, "calamity");
+        assert!(!settings.hostname.is_empty());
         assert!(settings.auth_key.is_empty());
         assert!(settings.oauth_client_id.is_empty());
         assert!(settings.exit_node.is_empty());
@@ -98,7 +101,7 @@ mod tests {
         assert!(settings.enabled);
         assert_eq!(settings.auth_key, "tskey-auth-abc123");
         assert_eq!(settings.exit_node, "my-server");
-        assert_eq!(settings.hostname, "calamity");
+        assert!(!settings.hostname.is_empty());
         assert!(settings.oauth_client_id.is_empty());
         assert!(settings.accept_routes);
     }

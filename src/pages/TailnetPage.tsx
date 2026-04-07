@@ -87,7 +87,7 @@ export function TailnetPage() {
   const [oauthId, setOauthId] = useState("");
   const [oauthSecret, setOauthSecret] = useState("");
   const [authKey, setAuthKey] = useState("");
-  const [hostname, setHostname] = useState("calamity");
+  const [hostname, setHostname] = useState("");
   const [tags, setTags] = useState("");
   const [testing, setTesting] = useState(false);
   const [manualExitNode, setManualExitNode] = useState("");

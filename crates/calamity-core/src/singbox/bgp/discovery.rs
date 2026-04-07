@@ -105,9 +105,12 @@ pub async fn discover_tailscale() -> Vec<DiscoveredPeer> {
         }
     };
 
+    // Use local IP to filter self instead of hostname (multiple devices can share hostname)
+    let local_ip = crate::platform::get_tailscale_ip().map(|ip| ip.to_string());
+
     let mut peers = Vec::new();
     for device in devices {
-        if device.is_self || device.ip.is_empty() {
+        if device.ip.is_empty() || local_ip.as_deref() == Some(&device.ip) {
             continue;
         }
         let addr = format!("{}:{}", device.ip, BGP_PORT);
