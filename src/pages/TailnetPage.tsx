@@ -143,6 +143,7 @@ export function TailnetPage() {
         hostname,
         tags: tags.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean),
       });
+      await fetchSettings();
       toast.success(t("tailnet.saved"));
     } catch (e: any) {
       toast.error(e?.message || String(e));
