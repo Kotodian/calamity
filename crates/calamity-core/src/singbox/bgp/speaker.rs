@@ -3,7 +3,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, watch};
 
-use super::{codec, fsm, sync_session};
+use super::{codec, fsm, storage, sync_session};
 
 pub struct BgpSpeaker {
     shutdown_tx: watch::Sender<bool>,
@@ -114,6 +114,26 @@ async fn handle_incoming(
 
     let peer_addr = stream.peer_addr().map(|a| a.to_string()).unwrap_or_default();
     eprintln!("[bgp] session established with {peer_addr} (serving)");
+
+    // Auto-add the connecting peer if not already in peer list
+    let peer_ip = stream
+        .peer_addr()
+        .map(|a| a.ip().to_string())
+        .unwrap_or_default();
+    if !peer_ip.is_empty() {
+        let mut settings = storage::load_bgp_settings();
+        let already_exists = settings.peers.iter().any(|p| p.address == peer_ip);
+        if !already_exists {
+            eprintln!("[bgp] auto-adding peer {peer_ip}");
+            settings.peers.push(storage::BgpPeer {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: peer_ip.clone(),
+                address: peer_ip,
+                auto_discovered: true,
+            });
+            let _ = storage::save_bgp_settings(&settings);
+        }
+    }
 
     // Send local data (full initial sync)
     let entries = sync_session::collect_local_data();
