@@ -3,6 +3,7 @@ pub mod nodes_storage;
 pub mod rules_storage;
 pub mod ai_auth_storage;
 pub mod ai_auth_ca;
+pub mod ai_auth_reverse_proxy;
 pub mod dns_storage;
 pub mod subscriptions_storage;
 pub mod tailscale_storage;
