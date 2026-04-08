@@ -103,6 +103,15 @@ A modern, feature-rich macOS & Linux proxy client powered by <a href="https://si
 - TCP MSS clamping to avoid fragmentation when Tailscale forces lower MTU
 - One-toggle activation with automatic cleanup on exit
 
+**AI Auth Gateway**
+
+- Centralized AI API authentication management in gateway mode — configure API keys once and share access across all LAN devices
+- Supported providers: OpenAI, Anthropic Claude, Google Gemini
+- DNS-based reverse proxy with automatic Authorization / API-key header injection per provider
+- Supports both API Key and OAuth authentication flows with token lifecycle management
+- LAN devices install the CA certificate via `http://gateway-ip:8900` for HTTPS interception
+- Per-service enable/disable toggle and connectivity testing
+
 **Rule Sync (BGP)**
 
 - Synchronize routing rules between Calamity instances over Tailscale network
@@ -283,6 +292,7 @@ calamity/                       # Cargo workspace root
 - [x] Gateway mode (transparent LAN proxy)
 - [x] BGP rule sync between Calamity instances (Phase 1: manual pull)
 - [ ] BGP rule sync Phase 2: auto-sync with persistent sessions
+- [x] AI Auth Gateway (centralized AI API auth for LAN devices)
 - [ ] Config hot-reload
 - [ ] Versioned releases
 - [x] Cross-platform CLI & headless daemon (Linux)
