@@ -281,21 +281,31 @@ fn build_dns_section(
         }));
     }
 
-    // Inject AI auth DNS rules: resolve AI domains to gateway LAN IP
+    // Inject AI auth DNS rules: LAN devices get AI domains resolved to
+    // the gateway IP (reverse proxy); the gateway itself uses normal DNS
+    // so its own AI traffic follows regular proxy rules.
     if ai_auth.enabled {
         let domains = ai_auth.enabled_domains();
         if !domains.is_empty() {
             if let Some(lan_ip) = crate::platform::get_lan_ip() {
+                // Rule 1 (highest priority): gateway's own AI DNS queries
+                // → use the final DNS server (normal resolution, not hijacked)
+                rules.insert(0, json!({
+                    "domain": &domains,
+                    "source_ip_cidr": [format!("{lan_ip}/32")],
+                    "server": &dns.final_server
+                }));
+                // Rule 2: everyone else (LAN devices) → return gateway IP
                 let answers: Vec<Value> = domains
                     .iter()
                     .map(|d| json!(format!("{d}. IN A {lan_ip}")))
                     .collect();
-                rules.insert(0, json!({
-                    "domain": domains,
+                rules.insert(1, json!({
+                    "domain": &domains,
                     "action": "predefined",
                     "answer": answers
                 }));
-                log::info!("AI auth DNS: {} domains → {lan_ip}", domains.len());
+                log::info!("AI auth DNS: {} domains → {lan_ip} (LAN only)", domains.len());
             }
         }
     }
