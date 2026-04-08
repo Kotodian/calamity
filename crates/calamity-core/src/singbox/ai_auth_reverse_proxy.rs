@@ -25,10 +25,7 @@ pub struct AiAuthProxy {
 
 impl AiAuthProxy {
     /// Start the reverse proxy.
-    pub async fn start(
-        settings: AiAuthSettings,
-        socks_port: u16,
-    ) -> Result<Self, String> {
+    pub async fn start(settings: AiAuthSettings) -> Result<Self, String> {
         ai_auth_ca::ensure_ca_exists()?;
 
         let bind_addr: SocketAddr = format!("0.0.0.0:{}", settings.proxy_port)
@@ -65,7 +62,7 @@ impl AiAuthProxy {
                                 let cache = cert_cache.clone();
                                 tokio::spawn(async move {
                                     if let Err(e) = handle_connection(
-                                        stream, peer, settings, cache, socks_port,
+                                        stream, peer, settings, cache,
                                     ).await {
                                         log::warn!("AI proxy {peer}: {e}");
                                     }
@@ -96,7 +93,6 @@ async fn handle_connection(
     peer: SocketAddr,
     settings: Arc<AiAuthSettings>,
     cert_cache: Arc<Mutex<HashMap<String, Arc<ServerConfig>>>>,
-    socks_port: u16,
 ) -> Result<(), String> {
     // Peek at TLS ClientHello to extract SNI
     let mut buf = [0u8; 4096];
@@ -117,7 +113,7 @@ async fn handle_connection(
     let service = settings.find_service_for_host(&sni);
     if service.is_none() {
         // Not an AI domain — TCP tunnel to the real server via SOCKS
-        return tunnel_passthrough(stream, &sni, socks_port).await;
+        return tunnel_passthrough(stream, &sni).await;
     }
 
     let service = service.unwrap();
@@ -176,14 +172,12 @@ async fn handle_connection(
         header_str
     };
 
-    // Connect to the real API via SOCKS proxy
-    let socks_addr: SocketAddr = format!("127.0.0.1:{socks_port}")
-        .parse()
-        .map_err(|e| format!("socks addr: {e}"))?;
-    let target = format!("{sni}:443");
-    let upstream = tokio_socks::tcp::Socks5Stream::connect(socks_addr, target.as_str())
+    // Connect to real API directly — the connection originates from the
+    // gateway machine so DNS won't hit the predefined rule (source_ip
+    // exclusion), and sing-box routes it according to the user's rules.
+    let upstream_tcp = TcpStream::connect(format!("{sni}:443"))
         .await
-        .map_err(|e| format!("SOCKS connect to {sni}: {e}"))?;
+        .map_err(|e| format!("connect to {sni}: {e}"))?;
 
     // TLS to real server
     let mut root_store = rustls::RootCertStore::empty();
@@ -197,7 +191,7 @@ async fn handle_connection(
     let server_name = rustls::pki_types::ServerName::try_from(sni.clone())
         .map_err(|e| format!("server name: {e}"))?;
     let mut upstream_tls = connector
-        .connect(server_name, upstream.into_inner())
+        .connect(server_name, upstream_tcp)
         .await
         .map_err(|e| format!("upstream TLS: {e}"))?;
 
@@ -236,19 +230,13 @@ async fn handle_connection(
 async fn tunnel_passthrough(
     mut client: TcpStream,
     sni: &str,
-    socks_port: u16,
 ) -> Result<(), String> {
     if sni.is_empty() {
         return Err("no SNI, dropping connection".into());
     }
-    let socks_addr: SocketAddr = format!("127.0.0.1:{socks_port}")
-        .parse()
-        .map_err(|e| format!("socks addr: {e}"))?;
-    let target = format!("{sni}:443");
-    let upstream = tokio_socks::tcp::Socks5Stream::connect(socks_addr, target.as_str())
+    let mut upstream = TcpStream::connect(format!("{sni}:443"))
         .await
-        .map_err(|e| format!("SOCKS tunnel {sni}: {e}"))?;
-    let mut upstream = upstream.into_inner();
+        .map_err(|e| format!("tunnel connect {sni}: {e}"))?;
     tokio::io::copy_bidirectional(&mut client, &mut upstream)
         .await
         .map_err(|e| format!("tunnel copy: {e}"))?;

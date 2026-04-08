@@ -170,8 +170,7 @@ impl SingboxProcess {
             return;
         }
 
-        let socks_port = settings.socks_port;
-        match super::ai_auth_reverse_proxy::AiAuthProxy::start(ai_settings, socks_port).await {
+        match super::ai_auth_reverse_proxy::AiAuthProxy::start(ai_settings).await {
             Ok(proxy) => {
                 *self.ai_auth_proxy.lock().await = Some(proxy);
                 log::info!("AI auth reverse proxy started");
