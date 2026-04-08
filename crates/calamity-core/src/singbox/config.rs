@@ -124,6 +124,7 @@ pub fn generate_config(settings: &AppSettings) -> Value {
     let rules_data = rules_storage::load_rules();
 
     // Build DNS section (needs rules_data for auto DNS detour generation)
+    let ai_auth = super::ai_auth_storage::load_ai_auth_settings();
     let dns_section = build_dns_section(
         &dns_settings,
         settings.enhanced_mode,
@@ -131,6 +132,7 @@ pub fn generate_config(settings: &AppSettings) -> Value {
         &rules_data,
         &all_node_tags,
         nodes_data.active_node.as_deref(),
+        &ai_auth,
     );
     let route_final =
         resolve_route_final(&rules_data, &all_node_tags, nodes_data.active_node.as_deref());
@@ -249,6 +251,7 @@ fn build_dns_section(
     rules_data: &rules_storage::RulesData,
     all_node_tags: &[String],
     active_node: Option<&str>,
+    ai_auth: &super::ai_auth_storage::AiAuthSettings,
 ) -> Value {
     let mut servers: Vec<Value> = dns
         .servers
@@ -276,6 +279,25 @@ fn build_dns_section(
             "domain_suffix": ["ts.net"],
             "server": "dns-tailscale"
         }));
+    }
+
+    // Inject AI auth DNS rules: resolve AI domains to gateway LAN IP
+    if ai_auth.enabled {
+        let domains = ai_auth.enabled_domains();
+        if !domains.is_empty() {
+            if let Some(lan_ip) = crate::platform::get_lan_ip() {
+                let answers: Vec<Value> = domains
+                    .iter()
+                    .map(|d| json!(format!("{d}. IN A {lan_ip}")))
+                    .collect();
+                rules.insert(0, json!({
+                    "domain": domains,
+                    "action": "predefined",
+                    "answer": answers
+                }));
+                log::info!("AI auth DNS: {} domains → {lan_ip}", domains.len());
+            }
+        }
     }
 
     // Auto-generate DNS servers/rules from domain-based route rules
@@ -940,7 +962,7 @@ mod tests {
         let mut dns = DnsSettings::default();
         dns.mode = dns_storage::DnsMode::Normal;
 
-        let section = build_dns_section(&dns, true, false, &rules_storage::RulesData::default(), &[], None);
+        let section = build_dns_section(&dns, true, false, &rules_storage::RulesData::default(), &[], None, &crate::singbox::ai_auth_storage::AiAuthSettings::default());
         let servers = section["servers"].as_array().expect("dns servers");
 
         assert!(servers.iter().any(|s| s["type"] == "fakeip" && s["tag"] == "dns-fakeip"));
@@ -951,7 +973,7 @@ mod tests {
         let mut dns = DnsSettings::default();
         dns.mode = dns_storage::DnsMode::Normal;
 
-        let section = build_dns_section(&dns, false, false, &rules_storage::RulesData::default(), &[], None);
+        let section = build_dns_section(&dns, false, false, &rules_storage::RulesData::default(), &[], None, &crate::singbox::ai_auth_storage::AiAuthSettings::default());
         let servers = section["servers"].as_array().expect("dns servers");
 
         assert!(!servers.iter().any(|s| s["type"] == "fakeip"));
@@ -1006,7 +1028,7 @@ mod tests {
 
         let all_node_tags = vec!["JP-Node".to_string()];
 
-        let section = build_dns_section(&dns, true, false, &rules_data, &all_node_tags, None);
+        let section = build_dns_section(&dns, true, false, &rules_data, &all_node_tags, None, &crate::singbox::ai_auth_storage::AiAuthSettings::default());
 
         let servers = section["servers"].as_array().unwrap();
         let rules = section["rules"].as_array().unwrap();

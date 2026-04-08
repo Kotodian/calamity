@@ -11,3 +11,8 @@ pub use gateway::{
     prevent_sleep, allow_sleep,
 };
 pub use network::{detect_lan_ip, detect_tun_interface, detect_tailscale_interface, get_interface_ip};
+
+/// Get the gateway's LAN IP address (alias for detect_lan_ip).
+pub fn get_lan_ip() -> Option<String> {
+    detect_lan_ip()
+}

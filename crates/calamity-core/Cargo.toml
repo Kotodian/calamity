@@ -30,3 +30,6 @@ notify = { version = "7", default-features = false, features = ["macos_kqueue"] 
 mdns-sd = "0.11"
 hostname = "0.4"
 fern = "0.7.1"
+rcgen = { version = "0.14", features = ["pem", "x509-parser"] }
+time = "0.3"
+pem = "3"
