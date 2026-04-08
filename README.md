@@ -291,7 +291,7 @@ calamity/                       # Cargo workspace root
 - [x] Concurrent subscription fetching
 - [x] Gateway mode (transparent LAN proxy)
 - [x] BGP rule sync between Calamity instances (Phase 1: manual pull)
-- [ ] BGP rule sync Phase 2: auto-sync with persistent sessions
+- [x] BGP rule sync Phase 2: auto-sync with persistent sessions
 - [x] AI Auth Gateway (centralized AI API auth for LAN devices)
 - [ ] Config hot-reload
 - [ ] Versioned releases
