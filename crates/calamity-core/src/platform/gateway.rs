@@ -25,7 +25,7 @@ pub fn get_ip_forwarding() -> bool {
 
 pub fn enable_ip_forwarding() -> Result<(), String> {
     if get_ip_forwarding() {
-        eprintln!("[gateway] IP forwarding already enabled");
+        log::info!("IP forwarding already enabled");
         return Ok(());
     }
     let set_arg = format!("{}=1", SYSCTL_KEY);
@@ -38,7 +38,7 @@ pub fn enable_ip_forwarding() -> Result<(), String> {
     if !output.status.success() {
         return Err(format!("sysctl failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
     }
-    eprintln!("[gateway] IP forwarding enabled");
+    log::info!("IP forwarding enabled");
     Ok(())
 }
 
@@ -53,9 +53,9 @@ pub fn disable_ip_forwarding() {
     let output = Command::new("sysctl").args(["-w", &set_arg]).output();
 
     match output {
-        Ok(o) if o.status.success() => eprintln!("[gateway] IP forwarding disabled"),
-        Ok(o) => eprintln!("[gateway] failed to disable IP forwarding: {}", String::from_utf8_lossy(&o.stderr).trim()),
-        Err(e) => eprintln!("[gateway] failed to disable IP forwarding: {}", e),
+        Ok(o) if o.status.success() => log::info!("IP forwarding disabled"),
+        Ok(o) => log::error!("failed to disable IP forwarding: {}", String::from_utf8_lossy(&o.stderr).trim()),
+        Err(e) => log::error!("failed to disable IP forwarding: {}", e),
     }
 }
 
@@ -88,10 +88,10 @@ pub fn prevent_sleep() {
         let _ = Command::new("sudo").args(["-n", "pmset", "-a", "disablesleep", "1"]).output();
         match Command::new("caffeinate").args(["-dims"]).spawn() {
             Ok(child) => {
-                eprintln!("[gateway] sleep prevention enabled (pid={})", child.id());
+                log::info!("sleep prevention enabled (pid={})", child.id());
                 *guard = Some(child);
             }
-            Err(e) => eprintln!("[gateway] failed to start caffeinate: {}", e),
+            Err(e) => log::error!("failed to start caffeinate: {}", e),
         }
     }
     #[cfg(target_os = "linux")]
@@ -101,10 +101,10 @@ pub fn prevent_sleep() {
             .spawn()
         {
             Ok(child) => {
-                eprintln!("[gateway] sleep prevention enabled (pid={})", child.id());
+                log::info!("sleep prevention enabled (pid={})", child.id());
                 *guard = Some(child);
             }
-            Err(e) => eprintln!("[gateway] failed to start systemd-inhibit: {}", e),
+            Err(e) => log::error!("failed to start systemd-inhibit: {}", e),
         }
     }
 }
@@ -114,7 +114,7 @@ pub fn allow_sleep() {
     if let Some(ref mut child) = *guard {
         let _ = child.kill();
         let _ = child.wait();
-        eprintln!("[gateway] sleep prevention disabled");
+        log::info!("sleep prevention disabled");
     }
     *guard = None;
 
@@ -168,7 +168,7 @@ fn enable_pf_rules(mtu: u16, tailscale_ip: Option<&str>) -> Result<(), String> {
         return Err(format!("pfctl failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
     }
     let _ = Command::new("sudo").args(["-n", "pfctl", "-e"]).output();
-    eprintln!("[gateway] pf rules enabled (tun={}, mac={}, ts={}, max-mss={})", tun_iface, mac_ip,
+    log::info!("pf rules enabled (tun={}, mac={}, ts={}, max-mss={})", tun_iface, mac_ip,
         ts.as_ref().map(|(i, ip)| format!("{}:{}", i, ip)).unwrap_or_else(|| "none".to_string()), mtu.saturating_sub(40));
     Ok(())
 }
@@ -221,7 +221,7 @@ fn register_pf_anchor() -> Result<(), String> {
     if !output.status.success() {
         return Err(format!("pfctl anchor registration failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
     }
-    eprintln!("[gateway] pf anchor registered");
+    log::info!("pf anchor registered");
     Ok(())
 }
 
@@ -229,9 +229,9 @@ fn register_pf_anchor() -> Result<(), String> {
 fn disable_pf_rules() {
     let output = Command::new("sudo").args(["-n", "pfctl", "-a", PF_ANCHOR, "-F", "all"]).output();
     match output {
-        Ok(o) if o.status.success() => eprintln!("[gateway] pf rules disabled"),
-        Ok(o) => eprintln!("[gateway] failed to flush pf anchor: {}", String::from_utf8_lossy(&o.stderr).trim()),
-        Err(e) => eprintln!("[gateway] failed to flush pf anchor: {}", e),
+        Ok(o) if o.status.success() => log::info!("pf rules disabled"),
+        Ok(o) => log::error!("failed to flush pf anchor: {}", String::from_utf8_lossy(&o.stderr).trim()),
+        Err(e) => log::error!("failed to flush pf anchor: {}", e),
     }
 }
 
@@ -289,7 +289,7 @@ fn enable_nft_rules(mtu: u16, tailscale_ip: Option<&str>) -> Result<(), String> 
     }
     let _ = Command::new("ip").args(["rule", "add", "fwmark", "1", "table", "100"]).output();
     let _ = Command::new("ip").args(["route", "add", "default", "dev", &tun_iface, "table", "100"]).output();
-    eprintln!("[gateway] nft rules enabled (tun={}, lan={}:{}, ts={}, max-mss={})", tun_iface, lan_iface, lan_ip,
+    log::info!("nft rules enabled (tun={}, lan={}:{}, ts={}, max-mss={})", tun_iface, lan_iface, lan_ip,
         ts.as_ref().map(|(i, ip)| format!("{}:{}", i, ip)).unwrap_or_else(|| "none".to_string()), mtu.saturating_sub(40));
     Ok(())
 }
@@ -298,9 +298,9 @@ fn enable_nft_rules(mtu: u16, tailscale_ip: Option<&str>) -> Result<(), String> 
 fn disable_nft_rules() {
     let output = Command::new("nft").args(["delete", "table", "ip", NFT_TABLE]).output();
     match output {
-        Ok(o) if o.status.success() => eprintln!("[gateway] nft rules disabled"),
-        Ok(o) => eprintln!("[gateway] failed to delete nft table: {}", String::from_utf8_lossy(&o.stderr).trim()),
-        Err(e) => eprintln!("[gateway] failed to delete nft table: {}", e),
+        Ok(o) if o.status.success() => log::info!("nft rules disabled"),
+        Ok(o) => log::error!("failed to delete nft table: {}", String::from_utf8_lossy(&o.stderr).trim()),
+        Err(e) => log::error!("failed to delete nft table: {}", e),
     }
     let _ = Command::new("ip").args(["rule", "del", "fwmark", "1", "table", "100"]).output();
     let _ = Command::new("ip").args(["route", "del", "default", "table", "100"]).output();

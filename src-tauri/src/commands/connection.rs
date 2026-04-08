@@ -99,9 +99,9 @@ pub async fn singbox_start(app: AppHandle) -> Result<(), String> {
         match crate::singbox::bgp::speaker::BgpSpeaker::start(None).await {
             Ok(speaker) => {
                 app.manage(std::sync::Arc::new(tokio::sync::Mutex::new(Some(speaker))));
-                eprintln!("[bgp] speaker started on 0.0.0.0:17900");
+                log::info!("BGP speaker started on 0.0.0.0:17900");
             }
-            Err(e) => eprintln!("[bgp] failed to start speaker: {e}"),
+            Err(e) => log::error!("failed to start BGP speaker: {e}"),
         }
     }
 
@@ -152,7 +152,7 @@ pub async fn app_quit(app: AppHandle) {
     // Clean up before exiting — the RunEvent::Exit handler is only a fallback.
     let process = app.state::<Arc<SingboxProcess>>().inner().clone();
     if let Err(error) = cleanup_before_app_exit(|| async move { process.stop().await }).await {
-        eprintln!("[singbox] failed to stop during app quit: {}", error);
+        log::error!("failed to stop during app quit: {}", error);
     }
     emit_connection_state_changed(&app).await;
     app.exit(0);

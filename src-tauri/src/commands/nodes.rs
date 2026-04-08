@@ -179,11 +179,11 @@ async fn restart_singbox(app: &AppHandle) {
     let settings = storage::load_settings();
     match process.reload(&settings).await {
         Ok(()) => {
-            eprintln!("[nodes] sing-box reloaded successfully");
+            log::info!("sing-box reloaded successfully");
             let _ = app.emit("singbox-restarted", ());
         }
         Err(e) => {
-            eprintln!("[nodes] sing-box reload failed: {}", e);
+            log::error!("sing-box reload failed: {}", e);
             let _ = app.emit("singbox-error", &e);
         }
     }

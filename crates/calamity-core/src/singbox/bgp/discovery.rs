@@ -48,7 +48,7 @@ pub fn register_mdns(hostname: &str, port: u16) -> Result<mdns_sd::ServiceDaemon
     .map_err(|e| format!("mDNS service info: {e}"))?;
     mdns.register(service_info)
         .map_err(|e| format!("mDNS register: {e}"))?;
-    eprintln!("[bgp-discovery] registered mDNS service: {hostname}");
+    log::info!("registered mDNS service: {hostname}");
     Ok(mdns)
 }
 
@@ -57,7 +57,7 @@ pub async fn discover_mdns(timeout: Duration) -> Vec<DiscoveredPeer> {
     let mdns = match mdns_sd::ServiceDaemon::new() {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("[bgp-discovery] mDNS browse init failed: {e}");
+            log::error!("mDNS browse init failed: {e}");
             return vec![];
         }
     };
@@ -65,7 +65,7 @@ pub async fn discover_mdns(timeout: Duration) -> Vec<DiscoveredPeer> {
     let receiver = match mdns.browse(MDNS_SERVICE_TYPE) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("[bgp-discovery] mDNS browse failed: {e}");
+            log::error!("mDNS browse failed: {e}");
             return vec![];
         }
     };
@@ -113,7 +113,7 @@ pub async fn discover_tailscale() -> Vec<DiscoveredPeer> {
     let devices = match tailscale_api::fetch_all_devices(&mut ts_settings).await {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("[bgp-discovery] Tailscale API failed: {e}");
+            log::error!("Tailscale API failed: {e}");
             return vec![];
         }
     };

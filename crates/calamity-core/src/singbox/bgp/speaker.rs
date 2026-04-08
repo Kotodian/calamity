@@ -22,7 +22,7 @@ impl BgpSpeaker {
             .await
             .map_err(|e| format!("failed to bind {bind_addr}: {e}"))?;
 
-        eprintln!("[bgp] speaker listening on {bind_addr}");
+        log::info!("speaker listening on {bind_addr}");
 
         // Register mDNS service for LAN discovery
         let sys_hostname = hostname::get()
@@ -38,23 +38,23 @@ impl BgpSpeaker {
                     accept_result = listener.accept() => {
                         match accept_result {
                             Ok((mut stream, peer_addr)) => {
-                                eprintln!("[bgp] incoming connection from {peer_addr}");
+                                log::info!("incoming connection from {peer_addr}");
                                 let rid = router_id;
                                 let callback = on_remote_update.clone();
                                 tokio::spawn(async move {
                                     if let Err(e) = handle_incoming(&mut stream, rid, callback).await {
-                                        eprintln!("[bgp] error serving {peer_addr}: {e}");
+                                        log::error!("error serving {peer_addr}: {e}");
                                     }
                                 });
                             }
                             Err(e) => {
-                                eprintln!("[bgp] accept error: {e}");
+                                log::error!("accept error: {e}");
                             }
                         }
                     }
                     _ = rx.changed() => {
                         if *rx.borrow() {
-                            eprintln!("[bgp] speaker shutting down");
+                            log::info!("speaker shutting down");
                             break;
                         }
                     }
@@ -113,7 +113,7 @@ async fn handle_incoming(
     fsm::handshake_server(stream, router_id).await?;
 
     let peer_addr = stream.peer_addr().map(|a| a.to_string()).unwrap_or_default();
-    eprintln!("[bgp] session established with {peer_addr} (serving)");
+    log::info!("session established with {peer_addr} (serving)");
 
     // Auto-add the connecting peer if not already in peer list
     let peer_ip = stream
@@ -124,7 +124,7 @@ async fn handle_incoming(
         let mut settings = storage::load_bgp_settings();
         let already_exists = settings.peers.iter().any(|p| p.address == peer_ip);
         if !already_exists {
-            eprintln!("[bgp] auto-adding peer {peer_ip}");
+            log::info!("auto-adding peer {peer_ip}");
             settings.peers.push(storage::BgpPeer {
                 id: uuid::Uuid::new_v4().to_string(),
                 name: peer_ip.clone(),
@@ -167,8 +167,8 @@ async fn handle_incoming(
                             let parsed = fsm::parse_update_entries(&body)?;
                             if !parsed.is_empty() {
                                 let sync_data = codec::decode_sync_data(&parsed)?;
-                                eprintln!(
-                                    "[bgp] received {} rules, {} withdrawals from {peer_addr}",
+                                log::info!(
+                                    "received {} rules, {} withdrawals from {peer_addr}",
                                     sync_data.rules.rules.len(),
                                     sync_data.withdrawn_keys.len()
                                 );
@@ -197,7 +197,7 @@ async fn handle_incoming(
                     if !incremental.is_empty() {
                         stream.write_all(&fsm::build_update(&incremental)).await
                             .map_err(|e| format!("send UPDATE: {e}"))?;
-                        eprintln!("[bgp] pushed incremental update ({} entries) to {peer_addr}", incremental.len());
+                        log::info!("pushed incremental update ({} entries) to {peer_addr}", incremental.len());
                     }
                     last_sent = current;
                 }

@@ -12,6 +12,8 @@ use singbox::process::SingboxProcess;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _ = calamity_core::logging::init(log::LevelFilter::Info);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_autostart::init(
@@ -95,8 +97,8 @@ pub fn run() {
                         .collect();
 
                     if !due_ids.is_empty() {
-                        eprintln!(
-                            "[subscriptions] auto-updating {} subscription(s)",
+                        log::info!(
+                            "auto-updating {} subscription(s)",
                             due_ids.len()
                         );
                         // update_all_subscriptions handles concurrent fetch + single reload

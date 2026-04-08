@@ -7,13 +7,13 @@ pub fn set_system_proxy(http_port: u16, socks_port: u16) {
     {
         let services = get_active_network_services();
         if services.is_empty() {
-            eprintln!("[system-proxy] no active network services found");
+            log::warn!("no active network services found");
             return;
         }
         let http_str = http_port.to_string();
         let socks_str = socks_port.to_string();
         for service in &services {
-            eprintln!("[system-proxy] setting proxy on: {}", service);
+            log::info!("setting proxy on: {}", service);
             let cmds: Vec<Vec<&str>> = vec![
                 vec!["-setwebproxy", service, "127.0.0.1", &http_str],
                 vec!["-setwebproxystate", service, "on"],
@@ -48,7 +48,7 @@ pub fn set_system_proxy(http_port: u16, socks_port: u16) {
             for args in &cmds {
                 let _ = Command::new("gsettings").args(args).output();
             }
-            eprintln!("[system-proxy] GNOME proxy set");
+            log::info!("GNOME proxy set");
             return;
         }
         // Try KDE
@@ -67,7 +67,7 @@ pub fn set_system_proxy(http_port: u16, socks_port: u16) {
             .args(["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "socksProxy",
                    &format!("socks://127.0.0.1:{}", socks_port)])
             .output();
-        eprintln!("[system-proxy] attempted KDE proxy set");
+        log::info!("attempted KDE proxy set");
     }
 }
 
@@ -76,11 +76,11 @@ pub fn clear_system_proxy() {
     {
         let services = get_active_network_services();
         if services.is_empty() {
-            eprintln!("[system-proxy] no active network services found");
+            log::warn!("no active network services found");
             return;
         }
         for service in &services {
-            eprintln!("[system-proxy] clearing proxy on: {}", service);
+            log::info!("clearing proxy on: {}", service);
             let cmds: Vec<Vec<&str>> = vec![
                 vec!["-setwebproxystate", service, "off"],
                 vec!["-setsecurewebproxystate", service, "off"],
@@ -98,13 +98,13 @@ pub fn clear_system_proxy() {
             .output()
             .is_ok()
         {
-            eprintln!("[system-proxy] GNOME proxy cleared");
+            log::info!("GNOME proxy cleared");
             return;
         }
         let _ = Command::new("kwriteconfig5")
             .args(["--file", "kioslaverc", "--group", "Proxy Settings", "--key", "ProxyType", "0"])
             .output();
-        eprintln!("[system-proxy] attempted KDE proxy clear");
+        log::info!("attempted KDE proxy clear");
     }
 }
 

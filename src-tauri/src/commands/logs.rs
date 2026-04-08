@@ -75,7 +75,7 @@ pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), Strin
     let token = CancellationToken::new();
     app.manage(LogStreamCancel(token.clone()));
 
-    eprintln!("[logs] start_log_stream called, level={}, gen={}", level, gen);
+    log::info!("start_log_stream called, level={}, gen={}", level, gen);
 
     // Emit version info as first log entry
     match process.api().version().await {
@@ -90,13 +90,13 @@ pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), Strin
                 },
             );
         }
-        Err(e) => eprintln!("[logs] failed to get version: {}", e),
+        Err(e) => log::error!("failed to get version: {}", e),
     }
 
     let response = match process.api().logs_stream(&level).await {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("[logs] failed to connect log stream: {}", e);
+            log::error!("failed to connect log stream: {}", e);
             return Err(e);
         }
     };
@@ -108,13 +108,13 @@ pub async fn start_log_stream(app: AppHandle, level: String) -> Result<(), Strin
         loop {
             // Check if this task has been superseded
             if token.is_cancelled() || STREAM_GENERATION.load(Ordering::SeqCst) != gen {
-                eprintln!("[logs] stream gen={} cancelled", gen);
+                log::info!("stream gen={} cancelled", gen);
                 break;
             }
 
             tokio::select! {
                 _ = token.cancelled() => {
-                    eprintln!("[logs] stream gen={} cancelled via token", gen);
+                    log::info!("stream gen={} cancelled via token", gen);
                     break;
                 }
                 chunk = response.chunk() => {

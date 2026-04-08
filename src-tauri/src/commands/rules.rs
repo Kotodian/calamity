@@ -13,6 +13,7 @@ pub async fn get_rules() -> Result<RulesData, String> {
 #[tauri::command]
 pub async fn add_rule(app: AppHandle, rule: RouteRuleConfig) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
+    log::info!("rule added: {} ({})", rule.name, rule.match_type);
     data.rules.push(rule);
     reindex(&mut data);
     rules_storage::save_rules(&data)?;
@@ -23,6 +24,7 @@ pub async fn add_rule(app: AppHandle, rule: RouteRuleConfig) -> Result<RulesData
 #[tauri::command]
 pub async fn update_rule(app: AppHandle, rule: RouteRuleConfig) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
+    log::info!("rule updated: {}", rule.id);
     if let Some(existing) = data.rules.iter_mut().find(|r| r.id == rule.id) {
         *existing = rule;
     }
@@ -34,6 +36,7 @@ pub async fn update_rule(app: AppHandle, rule: RouteRuleConfig) -> Result<RulesD
 #[tauri::command]
 pub async fn delete_rule(app: AppHandle, id: String) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
+    log::info!("rule deleted: {}", id);
     data.rules.retain(|r| r.id != id);
     reindex(&mut data);
     rules_storage::save_rules(&data)?;
@@ -44,6 +47,7 @@ pub async fn delete_rule(app: AppHandle, id: String) -> Result<RulesData, String
 #[tauri::command]
 pub async fn reorder_rules(app: AppHandle, ordered_ids: Vec<String>) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
+    log::info!("rules reordered");
     data.rules.sort_by_key(|r| {
         ordered_ids
             .iter()
@@ -63,6 +67,7 @@ pub async fn update_final_outbound(
     outbound_node: Option<String>,
 ) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
+    log::info!("final outbound updated: {}", outbound);
     data.final_outbound = outbound;
     data.final_outbound_node = outbound_node;
     rules_storage::save_rules(&data)?;
@@ -73,6 +78,7 @@ pub async fn update_final_outbound(
 #[tauri::command]
 pub async fn update_ruleset_interval(app: AppHandle, interval: u64) -> Result<RulesData, String> {
     let mut data = rules_storage::load_rules();
+    log::info!("ruleset interval updated: {}s", interval);
     data.update_interval = interval;
     rules_storage::save_rules(&data)?;
     reload_singbox(&app).await;
@@ -90,11 +96,11 @@ async fn reload_singbox(app: &AppHandle) {
     let settings = storage::load_settings();
     match process.reload_with_timeout(&settings, std::time::Duration::from_secs(30)).await {
         Ok(()) => {
-            eprintln!("[rules] sing-box reloaded successfully");
+            log::info!("sing-box reloaded successfully");
             let _ = app.emit("singbox-restarted", ());
         }
         Err(e) => {
-            eprintln!("[rules] sing-box reload failed: {}", e);
+            log::error!("sing-box reload failed: {}", e);
             let _ = app.emit("singbox-error", &e);
         }
     }

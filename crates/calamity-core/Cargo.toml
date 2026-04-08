@@ -29,3 +29,4 @@ rustybgp-packet = { git = "https://github.com/osrg/rustybgp" }
 notify = { version = "7", default-features = false, features = ["macos_kqueue"] }
 mdns-sd = "0.11"
 hostname = "0.4"
+fern = "0.7.1"

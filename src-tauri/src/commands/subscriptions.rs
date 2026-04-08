@@ -202,9 +202,9 @@ pub async fn update_all_subscriptions(app: AppHandle) -> Result<Vec<Subscription
         match fetch_result {
             Ok(result) => match apply_fetch_result(id, result) {
                 Ok(sub) => results.push(sub),
-                Err(e) => eprintln!("[subscriptions] apply {} failed: {}", id, e),
+                Err(e) => log::error!("apply {} failed: {}", id, e),
             },
-            Err(e) => eprintln!("[subscriptions] fetch {} failed: {}", id, e),
+            Err(e) => log::error!("fetch {} failed: {}", id, e),
         }
     }
 
@@ -330,11 +330,11 @@ async fn restart_singbox(app: &AppHandle) {
     let settings = storage::load_settings();
     match process.reload_with_timeout(&settings, std::time::Duration::from_secs(30)).await {
         Ok(()) => {
-            eprintln!("[subscriptions] sing-box reloaded successfully");
+            log::info!("sing-box reloaded successfully");
             let _ = app.emit("singbox-restarted", ());
         }
         Err(e) => {
-            eprintln!("[subscriptions] sing-box reload failed: {}", e);
+            log::error!("sing-box reload failed: {}", e);
             let _ = app.emit("singbox-error", &e);
         }
     }

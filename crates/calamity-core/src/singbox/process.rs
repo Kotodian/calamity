@@ -77,7 +77,7 @@ impl SingboxProcess {
         // If Clash API is already responding in the expected mode, reuse it
         // but still regenerate config and hot-reload so any setting changes take effect.
         if self.api.health_check().await.unwrap_or(false) && current_mode == Some(desired_mode) {
-            eprintln!("[singbox] existing instance detected, reloading config");
+            log::info!("existing instance detected, reloading config");
             return self.reload(settings).await;
         }
 
@@ -93,8 +93,8 @@ impl SingboxProcess {
     ) -> Result<(), String> {
         let run_mode = run_mode_for_settings(settings);
 
-        eprintln!(
-            "[singbox] spawning: {} run -c {}",
+        log::info!(
+            "spawning: {} run -c {}",
             &self.singbox_path, config_path
         );
 
@@ -131,8 +131,8 @@ impl SingboxProcess {
             if self.api.health_check().await.unwrap_or(false) {
                 self.set_runtime(Some(run_mode), Some(config_path.to_string()), None)
                     .await;
-                eprintln!(
-                    "[singbox] started successfully in {} mode",
+                log::info!(
+                    "started successfully in {} mode",
                     run_mode.as_str()
                 );
                 return Ok(());
@@ -145,7 +145,7 @@ impl SingboxProcess {
             "sing-box started in {} mode, Clash API not yet responding after 15s (may still be initializing)",
             run_mode.as_str()
         );
-        eprintln!("[singbox] warning: {}", warning);
+        log::warn!("{}", warning);
         self.set_runtime(
             Some(run_mode),
             Some(config_path.to_string()),
@@ -201,7 +201,7 @@ impl SingboxProcess {
             )
             .await;
             if !stopped {
-                eprintln!("[singbox] stop timed out: Clash API still responding after 5s");
+                log::warn!("stop timed out: Clash API still responding after 5s");
             }
         }
 
@@ -211,13 +211,13 @@ impl SingboxProcess {
 
     /// Synchronous cleanup for use in exit handlers where async may deadlock.
     pub fn stop_sync(&self) {
-        eprintln!("[singbox] stop_sync: starting cleanup");
+        log::info!("stop_sync: starting cleanup");
 
         // Try to kill TUN process via PID file
         let pid_path = super::storage::app_data_dir().join("singbox-tun.pid");
         if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                eprintln!("[singbox] stop_sync: killing TUN pid {}", pid);
+                log::info!("stop_sync: killing TUN pid {}", pid);
                 let _ = terminate_pid_with_sudo_sync(pid);
             }
             let _ = std::fs::remove_file(&pid_path);
@@ -228,7 +228,7 @@ impl SingboxProcess {
             .args(["-9", "-f", "sing-box run"])
             .output();
 
-        eprintln!("[singbox] stop_sync: cleanup done");
+        log::info!("stop_sync: cleanup done");
     }
 
     /// Stop any running sing-box (managed or orphan), then start fresh
@@ -297,24 +297,24 @@ impl SingboxProcess {
         };
 
         if !sent {
-            eprintln!("[singbox] no process found to reload");
+            log::info!("no process found to reload");
             return Ok(());
         }
 
         // Wait for Clash API to recover after SIGHUP
         let iterations = (timeout.as_millis() / 100) as usize;
-        eprintln!("[singbox] config reloaded, waiting for Clash API (timeout {}s)...", timeout.as_secs());
+        log::info!("config reloaded, waiting for Clash API (timeout {}s)...", timeout.as_secs());
         for _ in 0..iterations {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             if self.api.health_check().await.unwrap_or(false) {
-                eprintln!("[singbox] Clash API recovered after reload");
+                log::info!("Clash API recovered after reload");
                 self.restarting.store(false, std::sync::atomic::Ordering::Relaxed);
                 return Ok(());
             }
         }
 
         self.restarting.store(false, std::sync::atomic::Ordering::Relaxed);
-        eprintln!("[singbox] warning: Clash API not responding {}s after reload", timeout.as_secs());
+        log::warn!("Clash API not responding {}s after reload", timeout.as_secs());
         Ok(())
     }
 
@@ -334,7 +334,7 @@ impl SingboxProcess {
             return Err(format!("SIGHUP failed for pid {}", pid));
         }
 
-        eprintln!("[singbox] sent SIGHUP to pid {}{}", pid, if use_sudo { " (sudo)" } else { "" });
+        log::info!("sent SIGHUP to pid {}{}", pid, if use_sudo { " (sudo)" } else { "" });
         Ok(())
     }
 
@@ -462,7 +462,7 @@ impl SingboxProcess {
                 let reader = BufReader::new(stderr);
                 let mut lines = reader.lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    eprintln!("{}", line);
+                    log::info!("{}", line);
                     let mut rt = runtime_for_stderr.lock().await;
                     rt.recent_stderr.push(line);
                     if rt.recent_stderr.len() > MAX_RECENT_LINES {

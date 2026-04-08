@@ -283,12 +283,12 @@ pub fn apply_system_proxy_on_start(settings: &AppSettings) {
 /// Called on connect and settings change.
 pub fn apply_gateway_rules(settings: &AppSettings) {
     if let Err(e) = gateway::enable_ip_forwarding() {
-        eprintln!("[gateway] failed to enable IP forwarding: {}", e);
+        log::error!("failed to enable IP forwarding: {}", e);
     } else {
         GATEWAY_IP_FWD_ENABLED.store(true, Ordering::Relaxed);
     }
     if let Err(e) = gateway::enable_pf_rules(settings.tun_config.mtu, None) {
-        eprintln!("[gateway] failed to enable pf rules: {}", e);
+        log::error!("failed to enable pf rules: {}", e);
     }
     gateway::prevent_sleep();
 }

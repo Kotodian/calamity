@@ -37,7 +37,7 @@ impl IpcServer {
         let listener = UnixListener::bind(&socket_path)
             .map_err(|e| format!("bind {}: {e}", socket_path.display()))?;
 
-        eprintln!("[ipc] listening on {}", socket_path.display());
+        log::info!("listening on {}", socket_path.display());
 
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
@@ -53,18 +53,18 @@ impl IpcServer {
                                 let handler = handler.clone();
                                 tokio::spawn(async move {
                                     if let Err(e) = handle_connection(stream, &handler).await {
-                                        eprintln!("[ipc] connection error: {e}");
+                                        log::error!("connection error: {e}");
                                     }
                                 });
                             }
                             Err(e) => {
-                                eprintln!("[ipc] accept error: {e}");
+                                log::error!("accept error: {e}");
                             }
                         }
                     }
                     _ = rx.changed() => {
                         if *rx.borrow() {
-                            eprintln!("[ipc] server shutting down");
+                            log::info!("server shutting down");
                             break;
                         }
                     }

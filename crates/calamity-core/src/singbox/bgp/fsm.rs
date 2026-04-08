@@ -259,7 +259,7 @@ pub async fn pull_rules(peer_addr: &str, local_router_id: [u8; 4]) -> Result<Pul
         return Err(format!("expected KEEPALIVE, got type {msg_type}"));
     }
 
-    eprintln!("[bgp] session established with {peer_addr}");
+    log::info!("session established with {peer_addr}");
 
     let mut all_entries: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
 
@@ -296,8 +296,8 @@ pub async fn pull_rules(peer_addr: &str, local_router_id: [u8; 4]) -> Result<Pul
     }
 
     let sync_data = codec::decode_sync_data(&all_entries)?;
-    eprintln!(
-        "[bgp] received {} rules, {} DNS servers, {} nodes from {peer_addr}",
+    log::info!(
+        "received {} rules, {} DNS servers, {} nodes from {peer_addr}",
         sync_data.rules.rules.len(),
         sync_data.dns.as_ref().map_or(0, |d| d.servers.len()),
         sync_data.node_uris.len()
@@ -327,7 +327,7 @@ pub async fn serve_rules(mut stream: TcpStream, local_router_id: [u8; 4]) -> Res
     }
 
     let peer_addr = stream.peer_addr().map(|a| a.to_string()).unwrap_or_default();
-    eprintln!("[bgp] session established with {peer_addr} (serving)");
+    log::info!("session established with {peer_addr} (serving)");
 
     let rules_data = crate::singbox::rules_storage::load_rules();
     let syncable = codec::filter_syncable_rules(&rules_data);
@@ -343,8 +343,8 @@ pub async fn serve_rules(mut stream: TcpStream, local_router_id: [u8; 4]) -> Res
     stream.write_all(&build_update(&entries)).await.map_err(|e| format!("send UPDATE: {e}"))?;
     stream.write_all(&build_update(&[])).await.map_err(|e| format!("send end-of-rib: {e}"))?;
 
-    eprintln!(
-        "[bgp] sent {} rules + {} DNS servers + {} nodes to {peer_addr} ({} process rules filtered)",
+    log::info!(
+        "sent {} rules + {} DNS servers + {} nodes to {peer_addr} ({} process rules filtered)",
         syncable.rules.len(),
         dns_data.servers.len(),
         node_uris.len(),

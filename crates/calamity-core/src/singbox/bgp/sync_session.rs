@@ -248,15 +248,15 @@ fn merge_remote_data(data: &SyncData) {
 
         if rules_changed {
             let _ = rules_storage::save_rules(&local_rules);
-            eprintln!("[bgp-sync] withdrew rules via explicit withdrawal");
+            log::info!("withdrew rules via explicit withdrawal");
         }
         if dns_changed {
             let _ = dns_storage::save_dns_settings(&local_dns);
-            eprintln!("[bgp-sync] withdrew DNS entries via explicit withdrawal");
+            log::info!("withdrew DNS entries via explicit withdrawal");
         }
         if nodes_changed {
             let _ = nodes_storage::save_nodes(&local_nodes);
-            eprintln!("[bgp-sync] withdrew nodes via explicit withdrawal");
+            log::info!("withdrew nodes via explicit withdrawal");
         }
     }
 
@@ -387,8 +387,8 @@ async fn run_session_loop(
         if attempt > 0 {
             *status.lock().await = SyncStatus::Reconnecting { attempt };
             let delay = backoff_duration(attempt);
-            eprintln!(
-                "[bgp-sync] reconnecting in {}ms (attempt {})",
+            log::info!(
+                "reconnecting in {}ms (attempt {})",
                 delay.as_millis(),
                 attempt
             );
@@ -417,7 +417,7 @@ async fn run_session_loop(
                 return;
             }
             Err(e) => {
-                eprintln!("[bgp-sync] session error: {e}");
+                log::error!("session error: {e}");
                 attempt = attempt.saturating_add(1);
             }
         }
@@ -442,7 +442,7 @@ async fn connect_and_sync(
         .map_err(|e| format!("connect failed: {e}"))?;
 
     fsm::handshake_client(&mut stream, local_router_id).await?;
-    eprintln!("[bgp-sync] session established with {peer_addr}");
+    log::info!("session established with {peer_addr}");
 
     // Send our data first (full initial sync)
     let local_entries = collect_local_data();
@@ -481,8 +481,8 @@ async fn connect_and_sync(
                         let entries = fsm::parse_update_entries(&body)?;
                         if !entries.is_empty() {
                             let sync_data = codec::decode_sync_data(&entries)?;
-                            eprintln!(
-                                "[bgp-sync] received {} rules, {} DNS servers, {} nodes, {} withdrawals",
+                            log::info!(
+                                "received {} rules, {} DNS servers, {} nodes, {} withdrawals",
                                 sync_data.rules.rules.len(),
                                 sync_data.dns.as_ref().map_or(0, |d| d.servers.len()),
                                 sync_data.node_uris.len(),
@@ -512,7 +512,7 @@ async fn connect_and_sync(
                 if !incremental.is_empty() {
                     stream.write_all(&fsm::build_update(&incremental)).await
                         .map_err(|e| format!("send UPDATE: {e}"))?;
-                    eprintln!("[bgp-sync] pushed incremental update ({} entries) to {peer_addr}", incremental.len());
+                    log::info!("pushed incremental update ({} entries) to {peer_addr}", incremental.len());
                 }
                 last_sent = current;
             }

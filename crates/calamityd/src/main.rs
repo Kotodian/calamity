@@ -20,11 +20,13 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    eprintln!("[calamityd] starting v{}", env!("CARGO_PKG_VERSION"));
+    let _ = calamity_core::logging::init(log::LevelFilter::Info);
+
+    log::info!("starting v{}", env!("CARGO_PKG_VERSION"));
 
     // app_data_dir() auto-detects: root → /etc/calamity, user → ~/.config/calamity
     let config_dir = storage::app_data_dir();
-    eprintln!("[calamityd] config dir: {}", config_dir.display());
+    log::info!("config dir: {}", config_dir.display());
 
     // Load settings and create process
     let settings = storage::load_settings();
@@ -39,9 +41,9 @@ async fn main() {
     // Restore previous running state
     let daemon_state = storage::load_daemon_state();
     if daemon_state.running {
-        eprintln!("[calamityd] restoring previous running state");
+        log::info!("restoring previous running state");
         if let Err(e) = process.start(&settings).await {
-            eprintln!("[calamityd] failed to restore sing-box: {e}");
+            log::error!("failed to restore sing-box: {e}");
         }
     }
 
@@ -49,11 +51,11 @@ async fn main() {
     let bgp_speaker = if bgp_storage::load_bgp_settings().enabled {
         match speaker::BgpSpeaker::start(None).await {
             Ok(s) => {
-                eprintln!("[calamityd] BGP speaker started on 0.0.0.0:17900");
+                log::info!("BGP speaker started on 0.0.0.0:17900");
                 Some(s)
             }
             Err(e) => {
-                eprintln!("[calamityd] BGP speaker failed: {e}");
+                log::error!("BGP speaker failed: {e}");
                 None
             }
         }
@@ -85,11 +87,11 @@ async fn main() {
                     });
                     match SyncSession::start(peer_addr, router_id, on_applied).await {
                         Ok(session) => {
-                            eprintln!("[calamityd] auto-started sync with peer {active_peer_id}");
+                            log::info!("auto-started sync with peer {active_peer_id}");
                             state.lock().await.sync_session = Some(session);
                         }
                         Err(e) => {
-                            eprintln!("[calamityd] failed to auto-start sync: {e}");
+                            log::error!("failed to auto-start sync: {e}");
                         }
                     }
             }
@@ -106,11 +108,11 @@ async fn main() {
     }))
     .await
     .unwrap_or_else(|e| {
-        eprintln!("[calamityd] failed to start IPC server: {e}");
+        log::error!("failed to start IPC server: {e}");
         std::process::exit(1);
     });
 
-    eprintln!("[calamityd] ready");
+    log::info!("ready");
 
     // Notify systemd we're ready (sd_notify)
     if let Ok(addr) = std::env::var("NOTIFY_SOCKET") {
@@ -121,15 +123,15 @@ async fn main() {
     let shutdown_state = state.clone();
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
-            eprintln!("[calamityd] received SIGINT");
+            log::info!("received SIGINT");
         }
         _ = wait_for_sigterm() => {
-            eprintln!("[calamityd] received SIGTERM");
+            log::info!("received SIGTERM");
         }
     }
 
     // Cleanup
-    eprintln!("[calamityd] shutting down...");
+    log::info!("shutting down...");
     {
         let mut s = shutdown_state.lock().await;
         if let Some(session) = s.sync_session.take() {
@@ -144,7 +146,7 @@ async fn main() {
     calamity_core::platform::disable_redirect();
     server.stop();
 
-    eprintln!("[calamityd] stopped");
+    log::info!("stopped");
 }
 
 async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
@@ -423,7 +425,7 @@ async fn handle_command(state: Arc<Mutex<AppState>>, cmd: Command) -> Response {
                         updated += 1;
                     }
                     Err(e) => {
-                        eprintln!("[daemon] failed to update subscription '{}': {e}", sub.name);
+                        log::error!("failed to update subscription '{}': {e}", sub.name);
                     }
                 }
             }
