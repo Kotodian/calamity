@@ -12,7 +12,6 @@ import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage";
 import { RuleSetMarketPage } from "./pages/RuleSetMarketPage";
 import { BgpSyncPage } from "./pages/BgpSyncPage";
-import { AiAuthPage } from "./pages/AiAuthPage";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useSettingsStore } from "./stores/settings";
@@ -65,7 +64,6 @@ export default function App() {
           <Route path="tailnet/bgp-sync" element={<BgpSyncPage />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="dns" element={<DnsPage />} />
-          <Route path="ai-auth" element={<AiAuthPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

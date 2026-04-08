@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useSettingsStore } from "@/stores/settings";
 import type { Language, LogLevel, Theme } from "@/services/types";
+import { AiAuthSection } from "@/pages/AiAuthPage";
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -308,6 +309,7 @@ export function SettingsPage() {
               <p className="text-xs text-emerald-400">{t("settings.gatewayModeActive")}</p>
             </div>
           )}
+          <AiAuthSection gatewayMode={settings.gatewayMode} />
         </CardContent>
       </Card>
 

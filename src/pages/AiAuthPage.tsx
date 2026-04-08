@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { aiAuthService } from "@/services/ai-auth";
-import { settingsService } from "@/services/settings";
 import type { AiAuthSettings, AiServiceConfig, AiProvider, AiAuthType } from "@/services/types";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -251,10 +250,10 @@ function ServiceCard({
   );
 }
 
-export function AiAuthPage() {
+export function AiAuthSection({ gatewayMode: gatewayModeProp }: { gatewayMode: boolean }) {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<AiAuthSettings | null>(null);
-  const [gatewayMode, setGatewayMode] = useState(false);
+  const gatewayMode = gatewayModeProp;
   const [saving, setSaving] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -262,12 +261,8 @@ export function AiAuthPage() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const [aiSettings, appSettings] = await Promise.all([
-        aiAuthService.getSettings(),
-        settingsService.getSettings(),
-      ]);
+      const aiSettings = await aiAuthService.getSettings();
       setSettings(aiSettings);
-      setGatewayMode(appSettings.gatewayMode);
     } catch (e: any) {
       toast.error(e?.message || String(e));
     }
@@ -363,20 +358,9 @@ export function AiAuthPage() {
   if (!settings) return null;
 
   return (
-    <div className="p-6 space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between animate-slide-up">
-        <div>
-          <h1 className="text-xl font-semibold">{t("aiAuth.title")}</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("aiAuth.subtitle")}</p>
-        </div>
-      </div>
-
+    <div className="space-y-4 mt-4">
       {/* Master toggle */}
-      <div
-        className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5 animate-slide-up space-y-4"
-        style={{ animationDelay: "80ms" }}
-      >
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
@@ -458,10 +442,7 @@ export function AiAuthPage() {
       </div>
 
       {/* CA Certificate */}
-      <div
-        className="rounded-xl border border-white/[0.06] bg-card/40 backdrop-blur-xl p-5 animate-slide-up space-y-4"
-        style={{ animationDelay: "160ms" }}
-      >
+      <div className="rounded-lg border border-white/[0.06] bg-muted/20 p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-medium">{t("aiAuth.caCertificate")}</h3>
@@ -505,7 +486,7 @@ export function AiAuthPage() {
       </div>
 
       {/* Save */}
-      <div className="flex items-center gap-2 animate-slide-up" style={{ animationDelay: "240ms" }}>
+      <div className="flex items-center gap-2">
         <Button
           size="sm"
           className="text-xs shadow-[0_0_15px_rgba(254,151,185,0.15)]"
