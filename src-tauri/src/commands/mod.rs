@@ -13,3 +13,4 @@ pub mod subscriptions;
 pub mod tailscale;
 pub mod traffic;
 pub mod bgp_sync;
+pub mod ai_auth;

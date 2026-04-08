@@ -267,6 +267,12 @@ pub fn run() {
             commands::bgp_sync::bgp_start_sync,
             commands::bgp_sync::bgp_stop_sync,
             commands::bgp_sync::bgp_sync_status,
+            commands::ai_auth::ai_auth_get_settings,
+            commands::ai_auth::ai_auth_update_settings,
+            commands::ai_auth::ai_auth_install_ca_cert,
+            commands::ai_auth::ai_auth_export_ca_cert,
+            commands::ai_auth::ai_auth_refresh_tokens,
+            commands::ai_auth::ai_auth_test,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
