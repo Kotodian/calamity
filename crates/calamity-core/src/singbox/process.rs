@@ -49,6 +49,8 @@ pub struct SingboxProcess {
     singbox_path: String,
     /// Set to true during restart/reload to suppress false crash detection.
     restarting: std::sync::atomic::AtomicBool,
+    /// AI auth reverse proxy (started alongside sing-box when enabled).
+    ai_auth_proxy: Arc<Mutex<Option<super::ai_auth_reverse_proxy::AiAuthProxy>>>,
 }
 
 impl SingboxProcess {
@@ -59,6 +61,7 @@ impl SingboxProcess {
             api: ClashApi::new(),
             singbox_path,
             restarting: std::sync::atomic::AtomicBool::new(false),
+            ai_auth_proxy: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -135,6 +138,7 @@ impl SingboxProcess {
                     "started successfully in {} mode",
                     run_mode.as_str()
                 );
+                self.start_ai_auth_proxy_if_enabled(settings).await;
                 return Ok(());
             }
         }
@@ -152,10 +156,42 @@ impl SingboxProcess {
             None,
         )
         .await;
+        self.start_ai_auth_proxy_if_enabled(settings).await;
         Ok(())
     }
 
+    /// Start the AI auth reverse proxy if enabled in settings.
+    async fn start_ai_auth_proxy_if_enabled(&self, settings: &AppSettings) {
+        // Stop any existing proxy first
+        self.stop_ai_auth_proxy().await;
+
+        let ai_settings = super::ai_auth_storage::load_ai_auth_settings();
+        if !ai_settings.enabled || ai_settings.services.iter().all(|s| !s.enabled) {
+            return;
+        }
+
+        let socks_port = settings.socks_port;
+        match super::ai_auth_reverse_proxy::AiAuthProxy::start(ai_settings, socks_port).await {
+            Ok(proxy) => {
+                *self.ai_auth_proxy.lock().await = Some(proxy);
+                log::info!("AI auth reverse proxy started");
+            }
+            Err(e) => {
+                log::error!("AI auth reverse proxy failed to start: {e}");
+            }
+        }
+    }
+
+    async fn stop_ai_auth_proxy(&self) {
+        let mut guard = self.ai_auth_proxy.lock().await;
+        if let Some(proxy) = guard.take() {
+            proxy.stop();
+            log::info!("AI auth reverse proxy stopped");
+        }
+    }
+
     pub async fn stop(&self) -> Result<(), String> {
+        self.stop_ai_auth_proxy().await;
         let pre_stop_api_healthy = self.api.health_check().await.unwrap_or(false);
         let runtime = self.runtime.lock().await.clone();
         let mut guard = self.child.lock().await;
