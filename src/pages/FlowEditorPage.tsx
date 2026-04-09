@@ -24,7 +24,7 @@ function FlowEditorInner() {
   );
 
   return (
-    <div className="h-full w-full relative">
+    <div className="w-full relative h-screen">
       {/* Toolbar */}
       <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
         <NodeAddPanel />
@@ -57,6 +57,7 @@ function FlowEditorInner() {
 
       {/* Canvas */}
       <FlowCanvas
+        key={nodes.length + "-" + edges.length}
         initialNodes={nodes}
         initialEdges={edges}
         onConnect={onConnect}

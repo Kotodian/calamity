@@ -12,6 +12,7 @@ export function buildMatchNodes(rules: RouteRule[]): MatchNode[] {
     data: {
       kind: "match" as const,
       ruleId: r.id,
+      ruleName: r.name,
       matchType: r.matchType,
       matchValue: r.matchValue,
       invert: r.invert,
@@ -103,10 +104,25 @@ export function buildEdges(
       type: "flow",
     });
 
-    const matchingDnsRule = dnsRules.find(
-      (dr) => dr.matchValue === rule.matchValue && dr.enabled,
-    );
-    if (matchingDnsRule) {
+    // Match DNS rules to route rules by semantic association:
+    // DNS rule_set "geosite-cn" matches route geosite:"cn"
+    // DNS rule_set "ruleset-Tailscale" matches route rule-set:"Tailscale"
+    // DNS domain/domain-suffix matches route domain-suffix by value
+    const matchingDnsRule = dnsRules.find((dr) => {
+      if (!dr.enabled) return false;
+      if (dr.matchType === "rule_set") {
+        const dnsVal = dr.matchValue.toLowerCase();
+        const ruleVal = rule.matchValue.toLowerCase();
+        if (rule.matchType === "geosite") return dnsVal === `geosite-${ruleVal}`;
+        if (rule.matchType === "rule-set") return dnsVal === `ruleset-${ruleVal}` || dnsVal === rule.matchValue.toLowerCase();
+        return false;
+      }
+      // Direct match for domain-based DNS rules
+      return ["domain-suffix", "domain-keyword", "domain-full", "domain-regex"].includes(rule.matchType)
+        && dr.matchValue === rule.matchValue;
+    });
+    const needsDnsEdge = matchingDnsRule && !["ip-cidr", "geoip", "process-name", "process-path", "port", "port-range", "network"].includes(rule.matchType);
+    if (needsDnsEdge) {
       edges.push({
         id: `e-dns-${rule.id}-${matchingDnsRule.server}`,
         source: `match-${rule.id}`,

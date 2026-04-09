@@ -35,7 +35,7 @@ function OutboundNodeComponent({ data: rawData, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card/60 backdrop-blur-xl px-4 py-3 min-w-[160px] transition-all",
+        "rounded-xl border bg-card/60 backdrop-blur-xl px-4 py-3 min-w-[220px] transition-all",
         outboundColor(data.outboundType, !!selected),
       )}
     >

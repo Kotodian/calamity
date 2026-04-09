@@ -4,6 +4,7 @@ import type { RouteRule, OutboundType } from "@/services/types";
 export interface MatchNodeData {
   kind: "match";
   ruleId: string;
+  ruleName: string;
   matchType: RouteRule["matchType"];
   matchValue: string;
   invert?: boolean;
@@ -48,9 +49,9 @@ export type FlowEdge = Edge<FlowEdgeData>;
 
 export const COLUMN_X = {
   match: 0,
-  dns: 450,
-  outbound: 900,
+  dns: 600,
+  outbound: 1200,
 } as const;
 
 export const NODE_HEIGHT = 80;
-export const NODE_GAP = 16;
+export const NODE_GAP = 24;

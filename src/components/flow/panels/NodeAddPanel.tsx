@@ -139,7 +139,7 @@ export function NodeAddPanel() {
             />
           </div>
           <DialogFooter>
-            <Button size="sm" onClick={handleAddMatch}>{t("common.add")}</Button>
+            <Button size="sm" onClick={handleAddMatch}>{t("common.actions.add")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -163,7 +163,7 @@ export function NodeAddPanel() {
             />
           </div>
           <DialogFooter>
-            <Button size="sm" onClick={handleAddDns}>{t("common.add")}</Button>
+            <Button size="sm" onClick={handleAddDns}>{t("common.actions.add")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -216,7 +216,7 @@ export function NodeAddPanel() {
             />
           </div>
           <DialogFooter>
-            <Button size="sm" onClick={handleAddProxy}>{t("common.add")}</Button>
+            <Button size="sm" onClick={handleAddProxy}>{t("common.actions.add")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

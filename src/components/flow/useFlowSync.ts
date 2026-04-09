@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Connection } from "@xyflow/react";
 import { useRulesStore } from "@/stores/rules";
 import { useDnsStore } from "@/stores/dns";
@@ -32,7 +32,7 @@ export function useFlowSync() {
 
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
 
   // Load all data on mount
   useEffect(() => {
@@ -50,9 +50,9 @@ export function useFlowSync() {
 
     const allEdges = buildEdges(rules, dnsRules, dnsConfig?.servers ?? []);
 
-    if (!initialized) {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
       setNodes(layout(allNodes));
-      setInitialized(true);
     } else {
       // Preserve positions for existing nodes, layout new ones
       setNodes((prev) => {
@@ -64,7 +64,7 @@ export function useFlowSync() {
       });
     }
     setEdges(allEdges);
-  }, [rules, dnsConfig, dnsRules, groups, layout, initialized]);
+  }, [rules, dnsConfig, dnsRules, groups, layout]);
 
   // Handle new connection: match → outbound, match → dns, dns → outbound
   const onConnect = useCallback(

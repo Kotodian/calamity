@@ -26,7 +26,7 @@ function FlowEdgeComponent(props: EdgeProps) {
 
   return (
     <BaseEdge
-      {...props}
+      id={props.id}
       path={edgePath}
       style={{
         stroke: color,

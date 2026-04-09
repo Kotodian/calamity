@@ -78,12 +78,12 @@ function MatchEditor({ data, onClose }: { data: MatchNodeData; onClose: () => vo
         onChange={(e) => setMatchValue(e.target.value)}
       />
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{t("common.enabled")}</span>
+        <span className="text-xs text-muted-foreground">{t("common.actions.enabled")}</span>
         <Switch checked={enabled} onCheckedChange={setEnabled} />
       </div>
       <div className="flex gap-2">
         <Button size="sm" className="text-xs flex-1" onClick={handleSave}>
-          {t("common.save")}
+          {t("common.actions.save")}
         </Button>
         <Button
           size="sm"
@@ -138,7 +138,7 @@ function DnsEditor({ data, onClose }: { data: DnsNodeData; onClose: () => void }
       />
       <div className="flex gap-2">
         <Button size="sm" className="text-xs flex-1" onClick={handleSave}>
-          {t("common.save")}
+          {t("common.actions.save")}
         </Button>
         <Button
           size="sm"
