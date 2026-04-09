@@ -12,6 +12,7 @@ import { ConnectionsPage } from "./pages/ConnectionsPage";
 import { SubscriptionsPage } from "./pages/SubscriptionsPage";
 import { RuleSetMarketPage } from "./pages/RuleSetMarketPage";
 import { BgpSyncPage } from "./pages/BgpSyncPage";
+import FlowEditorPage from "./pages/FlowEditorPage";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useSettingsStore } from "./stores/settings";
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="subscriptions" element={<SubscriptionsPage />} />
           <Route path="dns" element={<DnsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="/flow" element={<FlowEditorPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
