@@ -21,6 +21,9 @@ export function useFlowSync() {
   const dnsConfig = useDnsStore((s) => s.config);
   const dnsRules = useDnsStore((s) => s.rules);
   const fetchDns = useDnsStore((s) => s.fetchAll);
+  const addDnsRule = useDnsStore((s) => s.addRule);
+  const updateDnsServer = useDnsStore((s) => s.updateServer);
+  const deleteDnsRule = useDnsStore((s) => s.deleteRule);
 
   const groups = useNodesStore((s) => s.groups);
   const fetchGroups = useNodesStore((s) => s.fetchGroups);
@@ -63,19 +66,80 @@ export function useFlowSync() {
     setEdges(allEdges);
   }, [rules, dnsConfig, dnsRules, groups, layout, initialized]);
 
-  // Handle new connection: match → outbound
+  // Handle new connection: match → outbound, match → dns, dns → outbound
   const onConnect = useCallback(
     (connection: Connection) => {
       const { source, target, sourceHandle } = connection;
       if (!source || !target) return;
 
+      // Route connection: match → outbound
       if (sourceHandle === "route-out" && target.startsWith("out-")) {
         const ruleId = source.replace("match-", "");
         const { outbound, outboundNode } = parseOutboundNodeId(target);
         updateRule(ruleId, { outbound: outbound as any, outboundNode });
       }
+
+      // DNS resolve connection: match → dns server
+      if (sourceHandle === "dns-out" && target.startsWith("dns-")) {
+        const ruleId = source.replace("match-", "");
+        const rule = rules.find((r) => r.id === ruleId);
+        const serverName = target.replace("dns-", "");
+        if (rule) {
+          addDnsRule({
+            matchType: rule.matchType === "domain-full" ? "domain" : rule.matchType as any,
+            matchValue: rule.matchValue,
+            server: serverName,
+            enabled: true,
+          });
+        }
+      }
+
+      // DNS detour connection: dns → outbound (proxy node)
+      if (sourceHandle === "detour-out" && target.startsWith("out-proxy-")) {
+        const serverName = source.replace("dns-", "");
+        const detourNodeName = target.replace("out-proxy-", "");
+        const server = (dnsConfig?.servers ?? []).find((s) => s.name === serverName);
+        if (server) {
+          updateDnsServer({ ...server, detour: detourNodeName });
+        }
+      }
     },
-    [updateRule],
+    [updateRule, addDnsRule, updateDnsServer, rules, dnsConfig],
+  );
+
+  // Handle edge deletion: sync removals back to stores
+  const onEdgesDelete = useCallback(
+    (deletedEdges: FlowEdge[]) => {
+      for (const edge of deletedEdges) {
+        const kind = edge.data?.kind;
+
+        if (kind === "route" && edge.source.startsWith("match-")) {
+          const ruleId = edge.source.replace("match-", "");
+          updateRule(ruleId, { outbound: "direct", outboundNode: undefined });
+        }
+
+        if (kind === "dns-resolve") {
+          const serverName = edge.target.replace("dns-", "");
+          const ruleId = edge.source.replace("match-", "");
+          const rule = rules.find((r) => r.id === ruleId);
+          const dnsRule = dnsRules.find(
+            (dr) => dr.server === serverName && dr.matchValue === rule?.matchValue,
+          );
+          if (dnsRule) {
+            deleteDnsRule((dnsRule as any).id ?? serverName);
+          }
+        }
+
+        if (kind === "dns-detour") {
+          const serverName = edge.source.replace("dns-", "");
+          const server = (dnsConfig?.servers ?? []).find((s) => s.name === serverName);
+          if (server) {
+            updateDnsServer({ ...server, detour: undefined });
+          }
+        }
+      }
+    },
+    [updateRule, deleteDnsRule, updateDnsServer, rules, dnsRules, dnsConfig],
   );
 
   const doAutoLayout = useCallback(() => {
@@ -88,6 +152,7 @@ export function useFlowSync() {
     setNodes,
     setEdges,
     onConnect,
+    onEdgesDelete,
     doAutoLayout,
   };
 }
