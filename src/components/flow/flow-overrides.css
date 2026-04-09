@@ -1,0 +1,39 @@
+/* Override ReactFlow defaults for dark glassmorphic theme */
+.react-flow__node {
+  cursor: grab;
+}
+
+.react-flow__node:active {
+  cursor: grabbing;
+}
+
+.react-flow__handle {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.4);
+  box-shadow: 0 0 8px rgba(254, 151, 185, 0.4);
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3;
+}
+
+.react-flow__selection {
+  background: rgba(254, 151, 185, 0.05);
+  border: 1px solid rgba(254, 151, 185, 0.2);
+  border-radius: 8px;
+}
+
+.react-flow__minimap {
+  border-radius: 12px;
+}
+
+.react-flow__controls {
+  border-radius: 12px;
+}
+
+.react-flow__controls button {
+  border-radius: 6px;
+}
