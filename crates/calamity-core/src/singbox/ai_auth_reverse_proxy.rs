@@ -408,6 +408,9 @@ async fn handle_ca_http(mut stream: TcpStream) -> io::Result<()> {
                 e.into_bytes(),
             ),
         }
+    } else if req.starts_with("GET /install.sh") {
+        let script = ca_install_script();
+        ("200 OK", "text/plain; charset=utf-8", script.into_bytes())
     } else if req.starts_with("GET /ca.pem") {
         match std::fs::read(ai_auth_ca::ca_cert_path()) {
             Ok(data) => ("200 OK", "application/x-pem-file", data),
@@ -437,21 +440,67 @@ fn ca_install_page() -> String {
         r#"<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Calamity AI Auth - Install CA Certificate</title>
-<style>body{{font-family:system-ui;max-width:600px;margin:40px auto;padding:0 20px;line-height:1.6}}
-h1{{color:#333}}a{{color:#0066cc}}code{{background:#f4f4f4;padding:2px 6px;border-radius:3px}}</style>
+<style>
+body{{font-family:system-ui;max-width:600px;margin:40px auto;padding:0 20px;line-height:1.6;color:#e0e0e0;background:#1a1a2e}}
+h1{{color:#e94560}}h2{{color:#c0c0c0;margin-top:1.5em}}
+a{{color:#6cb4ee}}code{{background:#16213e;padding:2px 8px;border-radius:4px;font-size:0.9em}}
+pre{{background:#16213e;padding:12px;border-radius:8px;overflow-x:auto}}
+.btn{{display:inline-block;background:#e94560;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:4px 0}}
+.btn:hover{{opacity:0.9}}
+.one-liner{{background:#0f3460;border:1px solid #e94560;padding:12px;border-radius:8px;margin:12px 0;font-family:monospace;font-size:0.95em;word-break:break-all}}
+</style>
 </head><body>
 <h1>Calamity AI Auth</h1>
-<p>Install the CA certificate to enable AI API authentication through this gateway.</p>
+<p>Install the CA certificate to use AI services through this gateway.</p>
+
+<h2>One-Line Install</h2>
+<div class="one-liner">curl -fsSL http://{lan_ip}:8900/install.sh | bash</div>
+<p style="font-size:0.85em;color:#888">Works on macOS and Linux. Automatically detects platform and installs + trusts the certificate.</p>
+
 <h2>Apple (macOS / iOS)</h2>
-<p><a href="/ca.mobileconfig">Download Configuration Profile</a> — open it, then go to Settings → General → Profiles to install and trust.</p>
-<h2>Other Platforms</h2>
-<p><a href="/ca.pem">Download CA Certificate (PEM)</a></p>
-<h3>Linux</h3>
-<pre><code>curl http://{lan_ip}:8900/ca.pem | sudo tee /usr/local/share/ca-certificates/calamity.crt
-sudo update-ca-certificates</code></pre>
-<h3>Windows</h3>
-<p>Download the PEM file, rename to <code>.crt</code>, double-click → Install → Place in "Trusted Root Certification Authorities".</p>
+<a class="btn" href="/ca.mobileconfig">Download Profile</a>
+<p style="font-size:0.85em">After downloading: Settings → General → Profiles → Install → Trust.</p>
+
+<h2>Manual Download</h2>
+<a class="btn" href="/ca.pem" style="background:#0f3460">Download CA Certificate (PEM)</a>
+
 </body></html>"#
+    )
+}
+
+fn ca_install_script() -> String {
+    let lan_ip = crate::platform::get_lan_ip().unwrap_or_else(|| "gateway-ip".into());
+    format!(
+        r#"#!/bin/bash
+set -e
+GATEWAY="http://{lan_ip}:8900"
+CERT="/tmp/calamity-ca.pem"
+
+echo "Downloading Calamity AI Auth CA certificate..."
+curl -fsSL "$GATEWAY/ca.pem" -o "$CERT"
+
+if [ "$(uname)" = "Darwin" ]; then
+    echo "Installing to macOS System Keychain (requires admin password)..."
+    sudo security add-trusted-cert -d -r trustRoot \
+        -k /Library/Keychains/System.keychain "$CERT"
+    echo "Done! CA certificate installed and trusted on macOS."
+elif [ -d /usr/local/share/ca-certificates ]; then
+    echo "Installing to system CA store (Debian/Ubuntu)..."
+    sudo cp "$CERT" /usr/local/share/ca-certificates/calamity-ai-auth.crt
+    sudo update-ca-certificates
+    echo "Done! CA certificate installed."
+elif [ -d /etc/pki/ca-trust/source/anchors ]; then
+    echo "Installing to system CA store (RHEL/Fedora)..."
+    sudo cp "$CERT" /etc/pki/ca-trust/source/anchors/calamity-ai-auth.pem
+    sudo update-ca-trust
+    echo "Done! CA certificate installed."
+else
+    echo "Certificate downloaded to $CERT"
+    echo "Please install it manually to your system CA store."
+fi
+
+rm -f "$CERT"
+"#
     )
 }
 
