@@ -8,8 +8,11 @@ import {
   useEdgesState,
   addEdge,
   type OnConnect,
+  type OnEdgesDelete,
   type NodeTypes,
   type EdgeTypes,
+  type Node,
+  type Edge,
   BackgroundVariant,
 } from "@xyflow/react";
 import { MatchNodeComponent_Memo } from "./nodes/MatchNode";
@@ -18,15 +21,15 @@ import { OutboundNodeComponent_Memo } from "./nodes/OutboundNode";
 import { FlowEdgeComponent_Memo } from "./edges/FlowEdge";
 import type { FlowNode, FlowEdge } from "./flow-types";
 
-const nodeTypes: NodeTypes = {
+const nodeTypes = {
   match: MatchNodeComponent_Memo,
   dns: DnsNodeComponent_Memo,
   outbound: OutboundNodeComponent_Memo,
-};
+} as NodeTypes;
 
-const edgeTypes: EdgeTypes = {
+const edgeTypes = {
   flow: FlowEdgeComponent_Memo,
-};
+} as EdgeTypes;
 
 interface FlowCanvasProps {
   initialNodes: FlowNode[];
@@ -43,13 +46,20 @@ export function FlowCanvas({
   onNodeDoubleClick,
   onEdgesDelete,
 }: FlowCanvasProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes as Node[]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as Edge[]);
 
   useMemo(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
+    setNodes(initialNodes as Node[]);
+    setEdges(initialEdges as Edge[]);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  const handleEdgesDelete: OnEdgesDelete = useCallback(
+    (deletedEdges) => {
+      onEdgesDelete?.(deletedEdges as FlowEdge[]);
+    },
+    [onEdgesDelete],
+  );
 
   const handleConnect: OnConnect = useCallback(
     (params) => {
@@ -67,7 +77,7 @@ export function FlowCanvas({
       onEdgesChange={onEdgesChange}
       onConnect={handleConnect}
       onNodeDoubleClick={onNodeDoubleClick}
-      onEdgesDelete={onEdgesDelete}
+      onEdgesDelete={handleEdgesDelete}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       fitView

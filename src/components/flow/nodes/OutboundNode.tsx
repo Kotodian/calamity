@@ -23,13 +23,14 @@ const outboundColor = (type: string, selected: boolean) => {
   }
 };
 
-function OutboundNodeComponent({ data, selected }: NodeProps<OutboundNodeData>) {
+function OutboundNodeComponent({ data: rawData, selected }: NodeProps) {
+  const data = rawData as OutboundNodeData;
   const label =
     data.outboundType === "proxy"
-      ? data.nodeName ?? "Proxy"
+      ? (data.nodeName as string | undefined) ?? "Proxy"
       : data.outboundType === "dns-detour"
-        ? data.nodeName ?? "Detour"
-        : data.outboundType;
+        ? (data.nodeName as string | undefined) ?? "Detour"
+        : data.outboundType as string;
 
   return (
     <div

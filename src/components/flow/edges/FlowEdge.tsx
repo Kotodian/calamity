@@ -8,8 +8,9 @@ const edgeColor: Record<string, string> = {
   "dns-detour": "rgba(168,85,247,0.5)",
 };
 
-function FlowEdgeComponent(props: EdgeProps<FlowEdgeData>) {
+function FlowEdgeComponent(props: EdgeProps) {
   const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data } = props;
+  const edgeData = data as FlowEdgeData | undefined;
 
   const [edgePath] = getSmoothStepPath({
     sourceX,
@@ -21,7 +22,7 @@ function FlowEdgeComponent(props: EdgeProps<FlowEdgeData>) {
     borderRadius: 12,
   });
 
-  const color = edgeColor[data?.kind ?? "route"];
+  const color = edgeColor[(edgeData?.kind ?? "route") as string];
 
   return (
     <BaseEdge
@@ -30,7 +31,7 @@ function FlowEdgeComponent(props: EdgeProps<FlowEdgeData>) {
       style={{
         stroke: color,
         strokeWidth: 2,
-        strokeDasharray: data?.kind === "dns-detour" ? "6 4" : undefined,
+        strokeDasharray: edgeData?.kind === "dns-detour" ? "6 4" : undefined,
       }}
     />
   );

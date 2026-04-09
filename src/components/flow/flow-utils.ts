@@ -1,6 +1,6 @@
-import type { RouteRule, DnsServer, DnsRule, ProxyNode, NodeGroup } from "@/services/types";
+import type { RouteRule, DnsServer, DnsRule, NodeGroup } from "@/services/types";
 import type {
-  MatchNode, DnsFlowNode, OutboundFlowNode, FlowNode, FlowEdge,
+  MatchNode, DnsFlowNode, OutboundFlowNode, FlowEdge,
 } from "./flow-types";
 import { COLUMN_X, NODE_HEIGHT, NODE_GAP } from "./flow-types";
 

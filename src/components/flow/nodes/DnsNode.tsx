@@ -4,8 +4,9 @@ import { Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DnsNodeData } from "../flow-types";
 
-function DnsNodeComponent({ data, selected }: NodeProps<DnsNodeData>) {
-  const shortAddr = data.address
+function DnsNodeComponent({ data: rawData, selected }: NodeProps) {
+  const data = rawData as DnsNodeData;
+  const shortAddr = (data.address as string)
     .replace("https://", "")
     .replace("tls://", "")
     .replace("/dns-query", "");

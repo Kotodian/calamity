@@ -1,5 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { RouteRule, DnsServer, DnsRule, ProxyNode, OutboundType } from "@/services/types";
+import type { RouteRule, OutboundType } from "@/services/types";
 
 export interface MatchNodeData {
   kind: "match";
@@ -11,6 +11,7 @@ export interface MatchNodeData {
   ruleSetUrl?: string;
   ruleSetLocalPath?: string;
   order: number;
+  [key: string]: unknown;
 }
 
 export interface DnsNodeData {
@@ -19,6 +20,7 @@ export interface DnsNodeData {
   address: string;
   enabled: boolean;
   domainResolver?: string;
+  [key: string]: unknown;
 }
 
 export interface OutboundNodeData {
@@ -27,6 +29,7 @@ export interface OutboundNodeData {
   nodeName?: string;
   nodeProtocol?: string;
   nodeCountryCode?: string;
+  [key: string]: unknown;
 }
 
 export type MatchNode = Node<MatchNodeData, "match">;
@@ -38,6 +41,7 @@ export type EdgeKind = "route" | "dns-resolve" | "dns-detour";
 
 export interface FlowEdgeData {
   kind: EdgeKind;
+  [key: string]: unknown;
 }
 
 export type FlowEdge = Edge<FlowEdgeData>;
