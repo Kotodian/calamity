@@ -88,7 +88,7 @@ impl Default for AiAuthSettings {
 }
 
 fn default_proxy_port() -> u16 {
-    8443
+    443
 }
 
 /// Status of a provider's credential (for UI display).
@@ -335,7 +335,7 @@ mod tests {
     fn default_settings() {
         let settings = AiAuthSettings::default();
         assert!(!settings.enabled);
-        assert_eq!(settings.proxy_port, 8443);
+        assert_eq!(settings.proxy_port, 443);
         assert!(settings.providers.is_empty());
     }
 
@@ -353,7 +353,7 @@ mod tests {
     fn enabled_domains_from_providers() {
         let settings = AiAuthSettings {
             enabled: true,
-            proxy_port: 8443,
+            proxy_port: 443,
             providers: vec![AiProvider::OpenAi, AiProvider::Anthropic],
         };
         let domains = settings.enabled_domains();
@@ -364,7 +364,7 @@ mod tests {
     fn find_provider_for_host() {
         let settings = AiAuthSettings {
             enabled: true,
-            proxy_port: 8443,
+            proxy_port: 443,
             providers: vec![AiProvider::OpenAi],
         };
         assert_eq!(
