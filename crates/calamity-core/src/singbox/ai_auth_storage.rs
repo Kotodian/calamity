@@ -6,19 +6,6 @@ const AI_AUTH_FILE: &str = "ai_auth.json";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum AiAuthType {
-    ApiKey,
-    OAuth,
-}
-
-impl Default for AiAuthType {
-    fn default() -> Self {
-        Self::ApiKey
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
 pub enum AiProvider {
     OpenAi,
     Anthropic,
@@ -26,7 +13,21 @@ pub enum AiProvider {
 }
 
 impl AiProvider {
-    /// Domains that this provider uses for API traffic.
+    pub const ALL: &[AiProvider] = &[
+        AiProvider::OpenAi,
+        AiProvider::Anthropic,
+        AiProvider::GoogleGemini,
+    ];
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::OpenAi => "OpenAI",
+            Self::Anthropic => "Anthropic",
+            Self::GoogleGemini => "Google Gemini",
+        }
+    }
+
+    /// API domains to intercept.
     pub fn domains(&self) -> &[&str] {
         match self {
             Self::OpenAi => &["api.openai.com"],
@@ -35,73 +36,35 @@ impl AiProvider {
         }
     }
 
-    /// Returns (header_name, header_value_template) for API key auth.
-    /// The template contains `{key}` as placeholder.
-    pub fn api_key_header(&self) -> (&str, &str) {
+    /// (header_name, value_template) — `{key}` is replaced with the credential.
+    pub fn auth_header_template(&self) -> (&str, &str) {
         match self {
             Self::OpenAi => ("Authorization", "Bearer {key}"),
             Self::Anthropic => ("x-api-key", "{key}"),
             Self::GoogleGemini => ("x-goog-api-key", "{key}"),
         }
     }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AiServiceConfig {
-    pub id: String,
-    pub provider: AiProvider,
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub auth_type: AiAuthType,
-    // API key auth
-    #[serde(default)]
-    pub api_key: String,
-    // OAuth auth
-    #[serde(default)]
-    pub oauth_client_id: String,
-    #[serde(default)]
-    pub oauth_client_secret: String,
-    #[serde(default)]
-    pub oauth_token_url: String,
-    #[serde(default)]
-    pub oauth_access_token: String,
-    #[serde(default)]
-    pub oauth_token_expires: String,
-    #[serde(default)]
-    pub oauth_scopes: String,
-}
-
-impl AiServiceConfig {
-    /// Resolve the current auth token (API key or OAuth access token).
-    pub fn resolve_token(&self) -> Option<String> {
-        match self.auth_type {
-            AiAuthType::ApiKey => {
-                if self.api_key.is_empty() {
-                    None
-                } else {
-                    Some(self.api_key.clone())
-                }
-            }
-            AiAuthType::OAuth => {
-                if self.oauth_access_token.is_empty() {
-                    None
-                } else {
-                    Some(self.oauth_access_token.clone())
-                }
-            }
+    /// Try to discover a credential from the local system.
+    /// Checks env vars first, then well-known config files.
+    pub fn discover_credential(&self) -> Option<String> {
+        match self {
+            Self::OpenAi => discover_openai_key(),
+            Self::Anthropic => discover_anthropic_key(),
+            Self::GoogleGemini => discover_gemini_key(),
         }
     }
 
-    /// Build the (header_name, header_value) pair for injection.
+    /// Build the auth header using a discovered or cached credential.
     pub fn auth_header(&self) -> Option<(String, String)> {
-        let token = self.resolve_token()?;
-        let (name, template) = self.provider.api_key_header();
-        Some((name.to_string(), template.replace("{key}", &token)))
+        let key = self.discover_credential()?;
+        let (name, template) = self.auth_header_template();
+        Some((name.to_string(), template.replace("{key}", &key)))
     }
 }
 
+/// Settings stored in `ai_auth.json` — only toggle and provider list.
+/// Credentials are NOT stored here; they're discovered at runtime.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiAuthSettings {
@@ -109,8 +72,9 @@ pub struct AiAuthSettings {
     pub enabled: bool,
     #[serde(default = "default_proxy_port")]
     pub proxy_port: u16,
+    /// Which providers are enabled for LAN auth sharing.
     #[serde(default)]
-    pub services: Vec<AiServiceConfig>,
+    pub providers: Vec<AiProvider>,
 }
 
 impl Default for AiAuthSettings {
@@ -118,7 +82,7 @@ impl Default for AiAuthSettings {
         Self {
             enabled: false,
             proxy_port: default_proxy_port(),
-            services: Vec::new(),
+            providers: Vec::new(),
         }
     }
 }
@@ -127,21 +91,50 @@ fn default_proxy_port() -> u16 {
     8443
 }
 
+/// Status of a provider's credential (for UI display).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderStatus {
+    pub provider: AiProvider,
+    pub name: String,
+    pub enabled: bool,
+    pub credential_found: bool,
+    pub source: String,
+}
+
 impl AiAuthSettings {
-    /// Collect all domains from enabled services.
+    /// Collect all domains from enabled providers.
     pub fn enabled_domains(&self) -> Vec<String> {
-        self.services
+        self.providers
             .iter()
-            .filter(|s| s.enabled)
-            .flat_map(|s| s.provider.domains().iter().map(|d| d.to_string()))
+            .flat_map(|p| p.domains().iter().map(|d| d.to_string()))
             .collect()
     }
 
-    /// Find the service config for a given host.
-    pub fn find_service_for_host(&self, host: &str) -> Option<&AiServiceConfig> {
-        self.services.iter().find(|s| {
-            s.enabled && s.provider.domains().iter().any(|d| *d == host)
-        })
+    /// Find the provider for a given host.
+    pub fn find_provider_for_host(&self, host: &str) -> Option<AiProvider> {
+        self.providers
+            .iter()
+            .find(|p| p.domains().iter().any(|d| *d == host))
+            .copied()
+    }
+
+    /// Scan all providers and report their credential status.
+    pub fn scan_providers(&self) -> Vec<ProviderStatus> {
+        AiProvider::ALL
+            .iter()
+            .map(|p| {
+                let enabled = self.providers.contains(p);
+                let (found, source) = detect_credential_source(p);
+                ProviderStatus {
+                    provider: *p,
+                    name: p.name().to_string(),
+                    enabled,
+                    credential_found: found,
+                    source,
+                }
+            })
+            .collect()
     }
 }
 
@@ -153,6 +146,187 @@ pub fn save_ai_auth_settings(settings: &AiAuthSettings) -> Result<(), String> {
     write_json(AI_AUTH_FILE, settings)
 }
 
+// ── Credential discovery ────────────────────────────────────────────
+
+fn discover_openai_key() -> Option<String> {
+    // 1. Env var
+    if let Ok(key) = std::env::var("OPENAI_API_KEY") {
+        if !key.is_empty() {
+            return Some(key);
+        }
+    }
+    // 2. ~/.codex/auth.json → {"token": "..."}
+    if let Some(home) = dirs::home_dir() {
+        let path = home.join(".codex/auth.json");
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
+                if let Some(token) = json.get("token").and_then(|v| v.as_str()) {
+                    if !token.is_empty() {
+                        return Some(token.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn discover_anthropic_key() -> Option<String> {
+    // 1. Env var
+    if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+        if !key.is_empty() {
+            return Some(key);
+        }
+    }
+    // 2. macOS keychain
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(key) = read_macos_keychain("ANTHROPIC_API_KEY") {
+            return Some(key);
+        }
+    }
+    // 3. ~/.claude/.credentials.json
+    if let Some(home) = dirs::home_dir() {
+        let path = home.join(".claude/.credentials.json");
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
+                // Try common key names
+                for key_name in &["apiKey", "api_key", "token"] {
+                    if let Some(val) = json.get(*key_name).and_then(|v| v.as_str()) {
+                        if !val.is_empty() {
+                            return Some(val.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn discover_gemini_key() -> Option<String> {
+    // 1. Env vars
+    for var in &["GEMINI_API_KEY", "GOOGLE_API_KEY"] {
+        if let Ok(key) = std::env::var(var) {
+            if !key.is_empty() {
+                return Some(key);
+            }
+        }
+    }
+    // 2. ~/.gemini/.env → GEMINI_API_KEY=xxx
+    if let Some(home) = dirs::home_dir() {
+        let path = home.join(".gemini/.env");
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            for line in data.lines() {
+                let line = line.trim();
+                if let Some(val) = line.strip_prefix("GEMINI_API_KEY=") {
+                    let val = val.trim().trim_matches('"').trim_matches('\'');
+                    if !val.is_empty() {
+                        return Some(val.to_string());
+                    }
+                }
+                if let Some(val) = line.strip_prefix("GOOGLE_API_KEY=") {
+                    let val = val.trim().trim_matches('"').trim_matches('\'');
+                    if !val.is_empty() {
+                        return Some(val.to_string());
+                    }
+                }
+            }
+        }
+    }
+    // 3. gcloud ADC
+    if let Some(home) = dirs::home_dir() {
+        let path = home.join(".config/gcloud/application_default_credentials.json");
+        if let Ok(data) = std::fs::read_to_string(&path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
+                // ADC has client_id/client_secret/refresh_token, not a direct API key.
+                // We'd need OAuth flow for this; skip for now.
+                if let Some(token) = json.get("access_token").and_then(|v| v.as_str()) {
+                    if !token.is_empty() {
+                        return Some(token.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn read_macos_keychain(service: &str) -> Option<String> {
+    let output = std::process::Command::new("security")
+        .args(["find-generic-password", "-s", service, "-w"])
+        .output()
+        .ok()?;
+    if output.status.success() {
+        let val = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !val.is_empty() {
+            return Some(val);
+        }
+    }
+    None
+}
+
+/// Detect where a credential would come from (for UI status display).
+fn detect_credential_source(provider: &AiProvider) -> (bool, String) {
+    match provider {
+        AiProvider::OpenAi => {
+            if std::env::var("OPENAI_API_KEY").is_ok_and(|k| !k.is_empty()) {
+                return (true, "env:OPENAI_API_KEY".into());
+            }
+            if let Some(home) = dirs::home_dir() {
+                let path = home.join(".codex/auth.json");
+                if path.exists() {
+                    if discover_openai_key().is_some() {
+                        return (true, "~/.codex/auth.json".into());
+                    }
+                }
+            }
+            (false, String::new())
+        }
+        AiProvider::Anthropic => {
+            if std::env::var("ANTHROPIC_API_KEY").is_ok_and(|k| !k.is_empty()) {
+                return (true, "env:ANTHROPIC_API_KEY".into());
+            }
+            #[cfg(target_os = "macos")]
+            {
+                if read_macos_keychain("ANTHROPIC_API_KEY").is_some() {
+                    return (true, "macOS Keychain".into());
+                }
+            }
+            if let Some(home) = dirs::home_dir() {
+                let path = home.join(".claude/.credentials.json");
+                if path.exists() {
+                    if discover_anthropic_key().is_some() {
+                        return (true, "~/.claude/.credentials.json".into());
+                    }
+                }
+            }
+            (false, String::new())
+        }
+        AiProvider::GoogleGemini => {
+            for var in &["GEMINI_API_KEY", "GOOGLE_API_KEY"] {
+                if std::env::var(var).is_ok_and(|k| !k.is_empty()) {
+                    return (true, format!("env:{var}"));
+                }
+            }
+            if let Some(home) = dirs::home_dir() {
+                let path = home.join(".gemini/.env");
+                if path.exists() {
+                    if discover_gemini_key().is_some() {
+                        return (true, "~/.gemini/.env".into());
+                    }
+                }
+                let path = home.join(".config/gcloud/application_default_credentials.json");
+                if path.exists() {
+                    return (true, "gcloud ADC".into());
+                }
+            }
+            (false, String::new())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,7 +336,7 @@ mod tests {
         let settings = AiAuthSettings::default();
         assert!(!settings.enabled);
         assert_eq!(settings.proxy_port, 8443);
-        assert!(settings.services.is_empty());
+        assert!(settings.providers.is_empty());
     }
 
     #[test]
@@ -176,86 +350,37 @@ mod tests {
     }
 
     #[test]
-    fn auth_header_api_key() {
-        let svc = AiServiceConfig {
-            id: "1".into(),
-            provider: AiProvider::OpenAi,
-            enabled: true,
-            auth_type: AiAuthType::ApiKey,
-            api_key: "sk-test123".into(),
-            oauth_client_id: String::new(),
-            oauth_client_secret: String::new(),
-            oauth_token_url: String::new(),
-            oauth_access_token: String::new(),
-            oauth_token_expires: String::new(),
-            oauth_scopes: String::new(),
-        };
-        let (name, value) = svc.auth_header().unwrap();
-        assert_eq!(name, "Authorization");
-        assert_eq!(value, "Bearer sk-test123");
-    }
-
-    #[test]
-    fn auth_header_anthropic() {
-        let svc = AiServiceConfig {
-            id: "2".into(),
-            provider: AiProvider::Anthropic,
-            enabled: true,
-            auth_type: AiAuthType::ApiKey,
-            api_key: "sk-ant-xxx".into(),
-            oauth_client_id: String::new(),
-            oauth_client_secret: String::new(),
-            oauth_token_url: String::new(),
-            oauth_access_token: String::new(),
-            oauth_token_expires: String::new(),
-            oauth_scopes: String::new(),
-        };
-        let (name, value) = svc.auth_header().unwrap();
-        assert_eq!(name, "x-api-key");
-        assert_eq!(value, "sk-ant-xxx");
-    }
-
-    #[test]
-    fn enabled_domains_filters_disabled() {
+    fn enabled_domains_from_providers() {
         let settings = AiAuthSettings {
             enabled: true,
             proxy_port: 8443,
-            services: vec![
-                AiServiceConfig {
-                    id: "1".into(),
-                    provider: AiProvider::OpenAi,
-                    enabled: true,
-                    auth_type: AiAuthType::ApiKey,
-                    api_key: "k".into(),
-                    ..Default::default()
-                },
-                AiServiceConfig {
-                    id: "2".into(),
-                    provider: AiProvider::Anthropic,
-                    enabled: false,
-                    ..Default::default()
-                },
-            ],
+            providers: vec![AiProvider::OpenAi, AiProvider::Anthropic],
         };
         let domains = settings.enabled_domains();
-        assert_eq!(domains, vec!["api.openai.com"]);
+        assert_eq!(domains, vec!["api.openai.com", "api.anthropic.com"]);
     }
-}
 
-impl Default for AiServiceConfig {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            provider: AiProvider::OpenAi,
-            enabled: false,
-            auth_type: AiAuthType::ApiKey,
-            api_key: String::new(),
-            oauth_client_id: String::new(),
-            oauth_client_secret: String::new(),
-            oauth_token_url: String::new(),
-            oauth_access_token: String::new(),
-            oauth_token_expires: String::new(),
-            oauth_scopes: String::new(),
-        }
+    #[test]
+    fn find_provider_for_host() {
+        let settings = AiAuthSettings {
+            enabled: true,
+            proxy_port: 8443,
+            providers: vec![AiProvider::OpenAi],
+        };
+        assert_eq!(
+            settings.find_provider_for_host("api.openai.com"),
+            Some(AiProvider::OpenAi)
+        );
+        assert_eq!(settings.find_provider_for_host("api.anthropic.com"), None);
+    }
+
+    #[test]
+    fn scan_providers_lists_all() {
+        let settings = AiAuthSettings::default();
+        let statuses = settings.scan_providers();
+        assert_eq!(statuses.len(), 3);
+        assert_eq!(statuses[0].name, "OpenAI");
+        assert_eq!(statuses[1].name, "Anthropic");
+        assert_eq!(statuses[2].name, "Google Gemini");
     }
 }

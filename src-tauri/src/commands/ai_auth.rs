@@ -1,6 +1,5 @@
-use crate::singbox::ai_auth_storage::{self, AiAuthSettings};
+use crate::singbox::ai_auth_storage::{self, AiAuthSettings, ProviderStatus};
 use crate::singbox::ai_auth_ca;
-use crate::singbox::ai_auth_api;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use crate::singbox::process::SingboxProcess;
@@ -9,6 +8,13 @@ use crate::singbox::storage;
 #[tauri::command]
 pub async fn ai_auth_get_settings() -> Result<AiAuthSettings, String> {
     Ok(ai_auth_storage::load_ai_auth_settings())
+}
+
+/// Scan all providers and return their credential status.
+#[tauri::command]
+pub async fn ai_auth_scan_providers() -> Result<Vec<ProviderStatus>, String> {
+    let settings = ai_auth_storage::load_ai_auth_settings();
+    Ok(settings.scan_providers())
 }
 
 #[tauri::command]
@@ -36,33 +42,31 @@ pub async fn ai_auth_export_ca_cert() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn ai_auth_refresh_tokens() -> Result<(), String> {
-    ai_auth_api::refresh_all_if_needed().await
-}
-
-#[tauri::command]
 pub async fn ai_auth_test(provider: String) -> Result<String, String> {
-    // Make a simple test request through the reverse proxy to verify auth injection
-    let settings = ai_auth_storage::load_ai_auth_settings();
-    let svc = settings.services.iter()
-        .find(|s| format!("{:?}", s.provider).to_lowercase().contains(&provider.to_lowercase()))
-        .ok_or_else(|| format!("provider '{provider}' not found"))?;
+    let p = match provider.as_str() {
+        "open_ai" => ai_auth_storage::AiProvider::OpenAi,
+        "anthropic" => ai_auth_storage::AiProvider::Anthropic,
+        "google_gemini" => ai_auth_storage::AiProvider::GoogleGemini,
+        _ => return Err(format!("unknown provider: {provider}")),
+    };
 
-    let (header_name, header_value) = svc.auth_header()
-        .ok_or("no auth credentials configured")?;
+    let (header_name, header_value) = p
+        .auth_header()
+        .ok_or("no credential found on this machine")?;
 
-    let test_url = match svc.provider {
+    let test_url = match p {
         ai_auth_storage::AiProvider::OpenAi => "https://api.openai.com/v1/models",
         ai_auth_storage::AiProvider::Anthropic => "https://api.anthropic.com/v1/models",
         ai_auth_storage::AiProvider::GoogleGemini => "https://generativelanguage.googleapis.com/v1/models",
     };
 
     let client = reqwest::Client::new();
-    let resp = client.get(test_url)
+    let resp = client
+        .get(test_url)
         .header(&header_name, &header_value)
         .send()
         .await
-        .map_err(|e| format!("test request failed: {e}"))?;
+        .map_err(|e| format!("request failed: {e}"))?;
 
     let status = resp.status();
     if status.is_success() {

@@ -284,26 +284,19 @@ export interface TunRuntimeStatus {
 
 // AI Auth
 export type AiProvider = "open_ai" | "anthropic" | "google_gemini";
-export type AiAuthType = "api_key" | "oauth";
-
-export interface AiServiceConfig {
-  id: string;
-  provider: AiProvider;
-  enabled: boolean;
-  authType: AiAuthType;
-  apiKey: string;
-  oauthClientId: string;
-  oauthClientSecret: string;
-  oauthTokenUrl: string;
-  oauthAccessToken: string;
-  oauthTokenExpires: string;
-  oauthScopes: string;
-}
 
 export interface AiAuthSettings {
   enabled: boolean;
   proxyPort: number;
-  services: AiServiceConfig[];
+  providers: AiProvider[];
+}
+
+export interface ProviderStatus {
+  provider: AiProvider;
+  name: string;
+  enabled: boolean;
+  credentialFound: boolean;
+  source: string;
 }
 
 // Tray

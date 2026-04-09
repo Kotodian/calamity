@@ -110,14 +110,13 @@ async fn handle_connection(
     let sni = extract_sni(&buf[..n]).unwrap_or_default();
 
     // Only reverse-proxy configured AI domains; tunnel everything else
-    let service = settings.find_service_for_host(&sni);
-    if service.is_none() {
-        // Not an AI domain — TCP tunnel to the real server via SOCKS
+    let provider = settings.find_provider_for_host(&sni);
+    if provider.is_none() {
         return tunnel_passthrough(stream, &sni).await;
     }
 
-    let service = service.unwrap();
-    let auth_header = service.auth_header();
+    let provider = provider.unwrap();
+    let auth_header = provider.auth_header();
 
     // Get or create TLS server config for this domain
     let tls_config = get_or_create_tls_config(&sni, &cert_cache).await?;

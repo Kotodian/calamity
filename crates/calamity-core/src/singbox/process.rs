@@ -166,7 +166,7 @@ impl SingboxProcess {
         self.stop_ai_auth_proxy().await;
 
         let ai_settings = super::ai_auth_storage::load_ai_auth_settings();
-        if !ai_settings.enabled || ai_settings.services.iter().all(|s| !s.enabled) {
+        if !ai_settings.enabled || ai_settings.providers.is_empty() {
             return;
         }
 
