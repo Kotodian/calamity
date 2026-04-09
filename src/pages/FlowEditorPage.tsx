@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 
 function FlowEditorInner() {
   const { t } = useTranslation();
-  const { nodes, edges, onConnect, doAutoLayout } = useFlowSync();
+  const { nodes, edges, onConnect, onEdgesDelete, doAutoLayout } = useFlowSync();
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
 
   const handleNodeDoubleClick = useCallback(
@@ -60,6 +60,7 @@ function FlowEditorInner() {
         initialNodes={nodes}
         initialEdges={edges}
         onConnect={onConnect}
+        onEdgesDelete={onEdgesDelete}
         onNodeDoubleClick={handleNodeDoubleClick}
       />
 
