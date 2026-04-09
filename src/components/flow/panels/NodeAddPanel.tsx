@@ -17,6 +17,7 @@ import { useNodesStore } from "@/stores/nodes";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { parseMultipleUris } from "@/lib/proxy-uri";
+import { countryFlag } from "@/lib/flags";
 import type { RouteRule } from "@/services/types";
 
 const matchTypes: RouteRule["matchType"][] = [
@@ -42,6 +43,12 @@ export function NodeAddPanel() {
   const [dnsAddress, setDnsAddress] = useState("");
 
   const [proxyUri, setProxyUri] = useState("");
+
+  const allProxyNodes = groups.flatMap((g) => g.nodes);
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredNodes = allProxyNodes.filter((n) =>
+    n.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   async function handleAddMatch() {
     if (!matchValue.trim()) return;
@@ -167,6 +174,36 @@ export function NodeAddPanel() {
             <DialogTitle className="text-sm">{t("flow.addOutbound")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <Input
+              className="text-xs"
+              placeholder={t("flow.searchNode")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {filteredNodes.slice(0, 20).map((n) => (
+                <button
+                  key={n.id}
+                  className="w-full text-left text-xs px-2 py-1.5 rounded-lg hover:bg-muted/30 flex items-center gap-2"
+                  onClick={() => {
+                    addRule({
+                      name: `→ ${n.name}`,
+                      enabled: true,
+                      matchType: "domain-suffix",
+                      matchValue: "",
+                      outbound: "proxy",
+                      outboundNode: n.name,
+                    });
+                    setProxyOpen(false);
+                  }}
+                >
+                  <span>{countryFlag(n.countryCode)}</span>
+                  <span className="truncate">{n.name}</span>
+                  <span className="text-muted-foreground ml-auto">{n.protocol}</span>
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-white/[0.06] pt-2" />
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <ClipboardPaste className="h-3.5 w-3.5" />
               {t("flow.pasteUri")}
