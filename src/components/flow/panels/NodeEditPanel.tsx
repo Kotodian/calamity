@@ -103,16 +103,20 @@ function DnsEditor({ data, onClose }: { data: DnsNodeData; onClose: () => void }
   const updateServer = useDnsStore((s) => s.updateServer);
   const deleteServer = useDnsStore((s) => s.deleteServer);
 
-  const [name, setName] = useState(data.serverName);
   const [address, setAddress] = useState(data.address);
 
   useEffect(() => {
-    setName(data.serverName);
     setAddress(data.address);
   }, [data]);
 
   function handleSave() {
-    updateServer({ name, address, enabled: data.enabled });
+    updateServer({
+      name: data.serverName,
+      address,
+      enabled: data.enabled,
+      detour: typeof data.detour === "string" ? data.detour : undefined,
+      domainResolver: typeof data.domainResolver === "string" ? data.domainResolver : undefined,
+    });
     onClose();
   }
 
@@ -127,8 +131,8 @@ function DnsEditor({ data, onClose }: { data: DnsNodeData; onClose: () => void }
       <Input
         className="text-xs"
         placeholder="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        value={data.serverName}
+        readOnly
       />
       <Input
         className="text-xs"

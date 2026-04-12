@@ -57,7 +57,6 @@ function FlowEditorInner() {
 
       {/* Canvas */}
       <FlowCanvas
-        key={nodes.length + "-" + edges.length}
         initialNodes={nodes}
         initialEdges={edges}
         onConnect={onConnect}

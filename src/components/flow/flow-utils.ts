@@ -36,6 +36,7 @@ export function buildDnsNodes(servers: DnsServer[]): DnsFlowNode[] {
         serverName: s.name,
         address: s.address,
         enabled: s.enabled,
+        detour: s.detour,
         domainResolver: s.domainResolver,
       },
     }));
@@ -59,10 +60,26 @@ export function buildOutboundNodes(
     seen.add(fixed);
   }
 
+  for (const proxyNode of allNodes) {
+    if (seen.has(proxyNode.name)) continue;
+    seen.add(proxyNode.name);
+    nodes.push({
+      id: `out-proxy-${proxyNode.name}`,
+      type: "outbound" as const,
+      position: { x: COLUMN_X.outbound, y: nodes.length * (NODE_HEIGHT + NODE_GAP) },
+      data: {
+        kind: "outbound" as const,
+        outboundType: "proxy",
+        nodeName: proxyNode.name,
+        nodeProtocol: proxyNode.protocol,
+        nodeCountryCode: proxyNode.countryCode,
+      },
+    });
+  }
+
   for (const rule of rules) {
     if (rule.outbound === "proxy" && rule.outboundNode && !seen.has(rule.outboundNode)) {
       seen.add(rule.outboundNode);
-      const proxyNode = allNodes.find((n) => n.name === rule.outboundNode);
       nodes.push({
         id: `out-proxy-${rule.outboundNode}`,
         type: "outbound" as const,
@@ -71,8 +88,6 @@ export function buildOutboundNodes(
           kind: "outbound" as const,
           outboundType: "proxy",
           nodeName: rule.outboundNode,
-          nodeProtocol: proxyNode?.protocol,
-          nodeCountryCode: proxyNode?.countryCode,
         },
       });
     }
@@ -104,23 +119,7 @@ export function buildEdges(
       type: "flow",
     });
 
-    // Match DNS rules to route rules by semantic association:
-    // DNS rule_set "geosite-cn" matches route geosite:"cn"
-    // DNS rule_set "ruleset-Tailscale" matches route rule-set:"Tailscale"
-    // DNS domain/domain-suffix matches route domain-suffix by value
-    const matchingDnsRule = dnsRules.find((dr) => {
-      if (!dr.enabled) return false;
-      if (dr.matchType === "rule_set") {
-        const dnsVal = dr.matchValue.toLowerCase();
-        const ruleVal = rule.matchValue.toLowerCase();
-        if (rule.matchType === "geosite") return dnsVal === `geosite-${ruleVal}`;
-        if (rule.matchType === "rule-set") return dnsVal === `ruleset-${ruleVal}` || dnsVal === rule.matchValue.toLowerCase();
-        return false;
-      }
-      // Direct match for domain-based DNS rules
-      return ["domain-suffix", "domain-keyword", "domain-full", "domain-regex"].includes(rule.matchType)
-        && dr.matchValue === rule.matchValue;
-    });
+    const matchingDnsRule = dnsRules.find((dr) => matchesDnsRule(rule, dr));
     const needsDnsEdge = matchingDnsRule && !["ip-cidr", "geoip", "process-name", "process-path", "port", "port-range", "network"].includes(rule.matchType);
     if (needsDnsEdge) {
       edges.push({
@@ -160,4 +159,44 @@ export function parseOutboundNodeId(nodeId: string): {
     return { outbound: "proxy", outboundNode: nodeId.replace("out-proxy-", "") };
   }
   return { outbound: nodeId.replace("out-", "") };
+}
+
+export function toDnsRuleMatch(
+  rule: Pick<RouteRule, "matchType" | "matchValue">,
+): Pick<DnsRule, "matchType" | "matchValue"> | null {
+  switch (rule.matchType) {
+    case "domain-full":
+      return { matchType: "domain", matchValue: rule.matchValue };
+    case "domain-suffix":
+    case "domain-keyword":
+    case "domain-regex":
+      return { matchType: rule.matchType, matchValue: rule.matchValue };
+    case "geosite":
+      return { matchType: "rule_set", matchValue: `geosite-${rule.matchValue}` };
+    case "rule-set":
+      return { matchType: "rule_set", matchValue: `ruleset-${rule.matchValue}` };
+    default:
+      return null;
+  }
+}
+
+export function matchesDnsRule(
+  rule: Pick<RouteRule, "matchType" | "matchValue">,
+  dnsRule: Pick<DnsRule, "enabled" | "matchType" | "matchValue">,
+): boolean {
+  if (!dnsRule.enabled) return false;
+
+  const expected = toDnsRuleMatch(rule);
+  if (!expected) return false;
+
+  if (
+    dnsRule.matchType === expected.matchType
+    && dnsRule.matchValue.toLowerCase() === expected.matchValue.toLowerCase()
+  ) {
+    return true;
+  }
+
+  return rule.matchType === "rule-set"
+    && dnsRule.matchType === "rule_set"
+    && dnsRule.matchValue.toLowerCase() === rule.matchValue.toLowerCase();
 }

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -46,8 +46,16 @@ export function FlowCanvas({
   onNodeDoubleClick,
   onEdgesDelete,
 }: FlowCanvasProps) {
-  const [nodes, , onNodesChange] = useNodesState(initialNodes as Node[]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as Edge[]);
+
+  useEffect(() => {
+    setNodes(initialNodes as Node[]);
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges(initialEdges as Edge[]);
+  }, [initialEdges, setEdges]);
 
   const handleEdgesDelete: OnEdgesDelete = useCallback(
     (deletedEdges) => {

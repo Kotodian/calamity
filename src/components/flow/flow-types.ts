@@ -20,6 +20,7 @@ export interface DnsNodeData {
   serverName: string;
   address: string;
   enabled: boolean;
+  detour?: string;
   domainResolver?: string;
   [key: string]: unknown;
 }

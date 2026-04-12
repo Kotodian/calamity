@@ -9,7 +9,9 @@ import {
   buildDnsNodes,
   buildOutboundNodes,
   buildEdges,
+  matchesDnsRule,
   parseOutboundNodeId,
+  toDnsRuleMatch,
 } from "./flow-utils";
 import { useAutoLayout } from "./useAutoLayout";
 
@@ -85,9 +87,14 @@ export function useFlowSync() {
         const rule = rules.find((r) => r.id === ruleId);
         const serverName = target.replace("dns-", "");
         if (rule) {
+          const dnsRuleMatch = toDnsRuleMatch(rule);
+          if (!dnsRuleMatch) return;
+          const existingRule = dnsRules.find(
+            (dr) => dr.server === serverName && matchesDnsRule(rule, dr),
+          );
+          if (existingRule) return;
           addDnsRule({
-            matchType: rule.matchType === "domain-full" ? "domain" : rule.matchType as any,
-            matchValue: rule.matchValue,
+            ...dnsRuleMatch,
             server: serverName,
             enabled: true,
           });
@@ -104,7 +111,7 @@ export function useFlowSync() {
         }
       }
     },
-    [updateRule, addDnsRule, updateDnsServer, rules, dnsConfig],
+    [updateRule, addDnsRule, updateDnsServer, rules, dnsRules, dnsConfig],
   );
 
   // Handle edge deletion: sync removals back to stores
@@ -123,10 +130,10 @@ export function useFlowSync() {
           const ruleId = edge.source.replace("match-", "");
           const rule = rules.find((r) => r.id === ruleId);
           const dnsRule = dnsRules.find(
-            (dr) => dr.server === serverName && dr.matchValue === rule?.matchValue,
+            (dr) => dr.server === serverName && !!rule && matchesDnsRule(rule, dr),
           );
           if (dnsRule) {
-            deleteDnsRule((dnsRule as any).id ?? serverName);
+            deleteDnsRule(dnsRule.matchValue);
           }
         }
 
